@@ -1,0 +1,6 @@
+{
+  "framework": "remix",
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm --filter @surewaka/landing build",
+  "outputDirectory": "build"
+}

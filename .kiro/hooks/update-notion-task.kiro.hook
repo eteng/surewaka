@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Update Notion Task on Completion",
+  "description": "When a spec task is completed, prompts the agent to update the corresponding task in the Notion Master Task Hub database (mark as Done, check Complete).",
+  "version": "1",
+  "when": {
+    "type": "postTaskExecution"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A spec task was just completed. Check if there is a corresponding task in the Notion Master Task Hub database (data source: collection://34fbbd69-ff4a-815e-957e-000b081ef0b7). If a matching task exists (search by task name), update its Status to \"Done\" and set Complete to \"__YES__\". If no matching task exists, create one in the Tech workstream with Status \"Done\" and Complete checked. Always include a brief summary of what was implemented in the task page content."
+  }
+}

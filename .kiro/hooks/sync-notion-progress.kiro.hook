@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Sync Progress to Notion",
+  "description": "When the agent stops after completing work, prompts it to check if any Notion tasks should be updated to reflect progress made during the session.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Before finishing, check if any significant development work was completed in this session that should be reflected in the Notion Master Task Hub (data source: collection://34fbbd69-ff4a-815e-957e-000b081ef0b7). If work was done on a feature or task that has a matching entry, update its Status (To-Do → In Progress, or In Progress → Done). Only update if meaningful progress was made — don't update for minor edits or questions. Use Workstream \"Tech\" for all code-related tasks."
+  }
+}

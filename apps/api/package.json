@@ -1,0 +1,27 @@
+{
+  "name": "@surewaka/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --dts",
+    "start": "node dist/index.js",
+    "lint": "eslint src/",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "hono": "^4.6.0",
+    "@hono/node-server": "^1.13.0",
+    "@surewaka/shared": "workspace:*",
+    "@surewaka/db": "workspace:*",
+    "@surewaka/supabase": "workspace:*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "tsup": "^8.3.0",
+    "vitest": "^2.1.0",
+    "typescript": "^5.7.0"
+  }
+}

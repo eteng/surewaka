@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "mcp-gsheets": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-gsheets@latest"
+      ],
+      "env": {
+        "GOOGLE_PROJECT_ID": "gowakawell",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/home/allfather/.config/gowakawell/service-account.json"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "sheets_batch_get_values"
+      ]
+    },
+    "notion": {
+      "type": "http",
+      "url": "https://mcp.notion.com/mcp",
+      "autoApprove": [
+        "*"
+      ]
+    }
+  }
+}

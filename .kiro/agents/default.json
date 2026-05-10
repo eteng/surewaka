@@ -1,0 +1,14 @@
+{
+  "name": "default",
+  "description": "Default agent with Google Sheets access for gowakawell project",
+  "mcpServers": {
+    "mcp-gsheets": {
+      "command": "npx",
+      "args": ["-y", "mcp-gsheets@latest"],
+      "env": {
+        "GOOGLE_PROJECT_ID": "gowakawell",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/home/allfather/.config/gowakawell/service-account.json"
+      }
+    }
+  }
+}
