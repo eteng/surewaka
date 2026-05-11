@@ -55,6 +55,22 @@ export const carriers = pgTable('carriers', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+export const waitlistUserTypeEnum = pgEnum('waitlist_user_type', [
+  'sender',
+  'business',
+  'driver',
+]);
+
+export const waitlistSignups = pgTable('waitlist_signups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  fullName: text('full_name').notNull(),
+  email: text('email').notNull().unique(),
+  userType: waitlistUserTypeEnum('user_type').notNull(),
+  source: text('source').default('home'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 export const deliveries = pgTable('deliveries', {
   id: uuid('id').primaryKey().defaultRandom(),
   customerId: uuid('customer_id')

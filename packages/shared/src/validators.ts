@@ -33,3 +33,12 @@ export const registerDriverSchema = z.object({
   licensePlate: z.string().min(5),
   vehicleModel: z.string().min(2),
 });
+
+export const waitlistSignupSchema = z.object({
+  fullName: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  email: z.string().email('Please enter a valid email address'),
+  userType: z.enum(['sender', 'business', 'driver']),
+  source: z.string().optional().default('home'),
+});
+
+export type WaitlistSignup = z.infer<typeof waitlistSignupSchema>;

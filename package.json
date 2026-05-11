@@ -1,7 +1,7 @@
 {
   "name": "surewaka",
   "private": true,
-  "packageManager": "pnpm@9.15.0",
+  "packageManager": "pnpm@9.15.9",
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
@@ -17,6 +17,6 @@
     "typescript": "^5.7.0"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   }
 }

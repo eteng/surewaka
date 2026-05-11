@@ -152,3 +152,15 @@ This document defines the requirements for the SureWaka landing page — a publi
 3. THE Landing_Page SHALL support custom domain configuration (surewaka.com)
 4. THE Landing_Page SHALL be server-side rendered for optimal performance on slow Nigerian networks
 5. THE deployment SHALL complete in under 2 minutes from push to live
+
+### Requirement 13: Pre-Launch Access Protection
+
+**User Story:** As the product owner, I want the landing page protected with basic authentication before launch, so that unwanted visitors cannot see the site while it's under development.
+
+#### Acceptance Criteria
+
+1. THE Landing_Page SHALL require HTTP Basic Authentication for all routes when the environment variable `BASIC_AUTH_ENABLED` is set to `true`
+2. WHEN a Visitor accesses any page without valid credentials, THE Landing_Page SHALL return a 401 response with a browser-native authentication prompt
+3. THE basic auth credentials SHALL be configured via environment variables (`BASIC_AUTH_USER` and `BASIC_AUTH_PASSWORD`)
+4. WHEN `BASIC_AUTH_ENABLED` is not set or is set to `false`, THE Landing_Page SHALL be publicly accessible without authentication
+5. THE basic auth protection SHALL apply to all routes including campaign pages but SHALL NOT block static assets required for the authentication prompt to render
