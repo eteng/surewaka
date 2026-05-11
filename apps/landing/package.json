@@ -18,6 +18,8 @@
     "@react-router/serve": "^7.1.0",
     "@surewaka/shared": "workspace:*",
     "@surewaka/supabase": "workspace:*",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "isbot": "^5",

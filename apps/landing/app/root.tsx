@@ -1,4 +1,6 @@
 import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration, useRouteError } from 'react-router';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import './app.css';
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -18,6 +20,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         {children}
+        <Analytics />
+        <SpeedInsights />
         <ScrollRestoration />
         <Scripts />
       </body>
