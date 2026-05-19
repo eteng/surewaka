@@ -1,0 +1,62 @@
+{
+  "name": "@surewaka/mobile-customer",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start",
+    "dev:ios": "expo start --ios",
+    "dev:android": "expo start --android",
+    "build": "echo 'Use EAS Build for mobile'",
+    "lint": "eslint .",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@expo-google-fonts/inter": "^0.4.2",
+    "@hookform/resolvers": "^5.2.2",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@supabase/supabase-js": "^2.47.0",
+    "@surewaka/mobile-shared": "workspace:*",
+    "@surewaka/shared": "workspace:*",
+    "expo": "~55.0.0",
+    "expo-build-properties": "~55.0.14",
+    "expo-camera": "~55.0.18",
+    "expo-clipboard": "~55.0.13",
+    "expo-constants": "~55.0.0",
+    "expo-dev-client": "~55.0.34",
+    "expo-font": "~55.0.7",
+    "expo-haptics": "~55.0.14",
+    "expo-image": "~55.0.10",
+    "expo-image-picker": "~55.0.20",
+    "expo-linking": "~55.0.0",
+    "expo-location": "~55.1.10",
+    "expo-notifications": "~55.0.23",
+    "expo-router": "~55.0.0",
+    "expo-secure-store": "~55.0.14",
+    "expo-status-bar": "~55.0.0",
+    "nativewind": "^4.2.4",
+    "react": "19.2.0",
+    "react-hook-form": "^7.76.0",
+    "react-native": "0.83.6",
+    "react-native-css-interop": "^0.2.4",
+    "react-native-reanimated": "^4.3.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.23.0",
+    "react-native-url-polyfill": "^3.0.0",
+    "tailwindcss": "^3.4.19",
+    "zod": "^3.23.0",
+    "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "postcss": "^8.5.14",
+    "typescript": "^5.7.0"
+  },
+  "expo": {
+    "install": {
+      "exclude": [
+        "@react-native-async-storage/async-storage"
+      ]
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "SureWaka Driver",
+    "slug": "surewaka-driver",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "surewaka-driver",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.surewaka.driver",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We need your location to show nearby delivery jobs and provide navigation.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Background location is used to update delivery tracking in real-time.",
+        "NSCameraUsageDescription": "Camera is used to capture proof of delivery photos."
+      }
+    },
+    "android": {
+      "package": "com.surewaka.driver",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-location",
+      "expo-camera"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2c5b1295-a53c-4e84-ba68-1fe48c2b9953"
+      }
+    },
+    "owner": "surewaka"
+  }
+}

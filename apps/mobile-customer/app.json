@@ -1,0 +1,81 @@
+{
+  "expo": {
+    "name": "SureWaka",
+    "slug": "surewaka-customer",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "surewaka",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#16a34a"
+    },
+    "ios": {
+      "bundleIdentifier": "com.surewaka.customer",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.surewaka.customer"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "92aac293-ebd9-41a4-ba22-9694655e91bb"
+      }
+    },
+    "owner": "surewaka",
+    "plugins": [
+      [
+        "expo-router"
+      ],
+      [
+        "expo-build-properties"
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "SureWaka needs camera access to photograph packages for delivery confirmation."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SureWaka needs access to your photos to attach package images to deliveries.",
+          "cameraPermission": "SureWaka needs camera access to take photos of packages."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "SureWaka uses your location to show nearby carriers and track your deliveries.",
+          "locationWhenInUsePermission": "SureWaka uses your location to find carriers near you.",
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#16a34a"
+        }
+      ],
+      [
+        "expo-secure-store"
+      ],
+      [
+        "expo-image"
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Inter_400Regular.ttf",
+            "./assets/fonts/Inter_500Medium.ttf",
+            "./assets/fonts/Inter_600SemiBold.ttf",
+            "./assets/fonts/Inter_700Bold.ttf"
+          ]
+        }
+      ]
+    ]
+  }
+}
