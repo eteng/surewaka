@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Block .env File Access",
+  "description": "Prevents AI agent from reading .env files, .env.local, or any file likely to contain secrets. The agent should reference .env.example for structure instead.",
+  "version": "1",
+  "when": {
+    "type": "preToolUse",
+    "toolTypes": [
+      "read"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Check if the file being read matches any of these patterns: .env, .env.local, .env.*.local, or any file path containing \"secret\", \"credentials\", or \"key\" files. If it does, DO NOT proceed with reading the file. Instead, inform the user that you cannot access secret files and suggest they reference .env.example for the expected structure. Access is DENIED for secret files."
+  }
+}
