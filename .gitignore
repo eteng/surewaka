@@ -28,7 +28,23 @@ Thumbs.db
 # Testing
 coverage/
 
+# Supabase local state
+supabase/.temp/
+
+# Expo / React Native
+.expo/
+
 # Misc
 *.log
 *.tsbuildinfo
 *.zip
+
+# Secrets / credentials (safety net)
+*.pem
+*.key
+*.p12
+*.keystore
+service-account*.json
+credentials*.json
+google-services.json
+GoogleService-Info.plist
