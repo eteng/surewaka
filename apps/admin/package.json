@@ -20,7 +20,8 @@
     "clsx": "^2.1.0",
     "class-variance-authority": "^0.7.0",
     "lucide-react": "^0.468.0",
-    "@surewaka/shared": "workspace:*"
+    "@surewaka/shared": "workspace:*",
+    "isbot": "^5"
   },
   "devDependencies": {
     "@react-router/dev": "^7.1.0",
