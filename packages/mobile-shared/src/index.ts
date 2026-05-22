@@ -9,5 +9,7 @@ export { useAuth } from './hooks/use-auth';
 export { useLocation } from './hooks/use-location';
 export { apiClient, createAuthClient } from './api/client';
 export type { ApiResponse } from './api/client';
+export { searchAddress, reverseGeocode } from './maps/locationiq';
+export type { LocationSuggestion } from './maps/locationiq';
 export { useAuthStore } from './store/auth-store';
 export { useBookingStore } from './store/booking-store';
