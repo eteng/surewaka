@@ -17,9 +17,14 @@ out/
 # IDE
 .idea/
 .claude/
+.cursor/
 CLAUDE.md
 *.swp
 *.swo
+
+# Debug screenshots
+*-screenshot*.png
+*-screenshot*.jpg
 
 # OS
 .DS_Store
