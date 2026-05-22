@@ -42,3 +42,16 @@ export const waitlistSignupSchema = z.object({
 });
 
 export type WaitlistSignup = z.infer<typeof waitlistSignupSchema>;
+
+// ─── Mobile Auth Validators ──────────────────────────────────────────────────
+
+export const phoneOtpSchema = z.object({
+  phone: z.string().regex(/^\+234\d{10}$/, 'Enter a valid Nigerian phone number (e.g. +2348012345678)'),
+});
+
+export const otpVerifySchema = z.object({
+  otp: z.string().length(6, 'OTP must be 6 digits').regex(/^\d{6}$/, 'OTP must contain only numbers'),
+});
+
+export type PhoneOtpInput = z.infer<typeof phoneOtpSchema>;
+export type OtpVerifyInput = z.infer<typeof otpVerifySchema>;
