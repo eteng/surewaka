@@ -2,7 +2,19 @@ import '../global.css';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as Sentry from '@sentry/react-native';
+import Constants from 'expo-constants';
 import { ThemeProvider, useAuthStore } from '@surewaka/mobile-shared';
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  enabled: !__DEV__,
+  debug: false,
+  tracesSampleRate: 0.2,
+  environment: __DEV__ ? 'development' : 'production',
+  release: Constants.expoConfig?.version,
+  integrations: [Sentry.reactNativeTracingIntegration()],
+});
 
 function InnerLayout() {
   const initialize = useAuthStore((s) => s.initialize);
@@ -31,7 +43,7 @@ function InnerLayout() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   return (
     <ThemeProvider>
       <StatusBar style="auto" />
@@ -39,3 +51,5 @@ export default function RootLayout() {
     </ThemeProvider>
   );
 }
+
+export default Sentry.wrap(RootLayout);

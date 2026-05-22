@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import * as Sentry from '@sentry/react-native';
 import { supabase } from '../supabase';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -35,12 +36,18 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     if (session) {
       set({ user: session.user, session, loading: false, initialized: true });
+      Sentry.setUser({ id: session.user.id, email: session.user.email });
     } else {
       set({ loading: false, initialized: true });
     }
 
     supabase.auth.onAuthStateChange((_event, newSession) => {
       set({ user: newSession?.user ?? null, session: newSession });
+      if (newSession?.user) {
+        Sentry.setUser({ id: newSession.user.id, email: newSession.user.email });
+      } else {
+        Sentry.setUser(null);
+      }
     });
   },
 
@@ -72,5 +79,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   signOut: async () => {
     await supabase.auth.signOut();
     set({ user: null, session: null });
+    Sentry.setUser(null);
   },
 }));
