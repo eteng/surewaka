@@ -25,18 +25,27 @@ type CarrierRoutesEnv = {
 const carrierRoutes = new Hono<CarrierRoutesEnv>();
 
 /**
- * GET /carriers — List all active carriers (for dropdowns)
+ * GET /carriers — List all active carriers (for customer booking)
  *
- * Returns a list of carriers with id and name for use in role assignment
- * and invitation forms. Requires authentication.
+ * Returns carriers with id, name, rating, and delivery count.
+ * Used by the mobile app booking flow for carrier comparison.
  *
  * Requirements: 5.4, 8.4
  */
-carrierRoutes.get('/carriers', requireAuth, async (c) => {
+carrierRoutes.get('/carriers', async (c) => {
   const carrierList = await db
-    .select({ id: carriers.id, name: carriers.name })
+    .select({
+      id: carriers.id,
+      name: carriers.name,
+      slug: carriers.slug,
+      rating: carriers.rating,
+      deliveryCount: carriers.deliveryCount,
+      isVerified: carriers.isVerified,
+      logoUrl: carriers.logoUrl,
+    })
     .from(carriers)
-    .where(eq(carriers.isActive, true));
+    .where(eq(carriers.isActive, true))
+    .orderBy(carriers.rating);
 
   return c.json({ data: carrierList, error: null, meta: null }, 200);
 });
