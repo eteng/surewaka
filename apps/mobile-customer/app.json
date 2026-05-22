@@ -27,10 +27,23 @@
     "owner": "surewaka",
     "plugins": [
       [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "organization": "surewaka",
+          "project": "mobile-customer"
+        }
+      ],
+      [
         "expo-router"
       ],
       [
-        "expo-build-properties"
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24
+          }
+        }
       ],
       [
         "expo-camera",
@@ -51,6 +64,12 @@
           "locationAlwaysAndWhenInUsePermission": "SureWaka uses your location to show nearby carriers and track your deliveries.",
           "locationWhenInUsePermission": "SureWaka uses your location to find carriers near you.",
           "isAndroidBackgroundLocationEnabled": false
+        }
+      ],
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsImpl": "mapbox"
         }
       ],
       [
