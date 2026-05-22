@@ -1,5 +1,6 @@
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, Button } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as Sentry from '@sentry/react-native';
 import { useBookingStore } from '@surewaka/mobile-shared';
 
 const mockCarriers = [
@@ -72,6 +73,18 @@ export default function CarriersScreen() {
       ))}
 
       <View className="h-8" />
+
+      <View className="mt-2 mb-8 px-4 py-3 bg-yellow-50 rounded-xl border border-yellow-200">
+        <Text className="text-xs text-gray-500 mb-2 uppercase font-semibold">
+          Dev: Sentry Test
+        </Text>
+        <Button
+          title="Try!"
+          onPress={() => {
+            Sentry.captureException(new Error('First error'));
+          }}
+        />
+      </View>
     </ScrollView>
   );
 }
