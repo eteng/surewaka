@@ -1,6 +1,10 @@
-import { useState } from 'react';
-import { View, Text, Pressable, Dimensions } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuthStore } from '@surewaka/mobile-shared';
+
+const ONBOARDING_COMPLETE_KEY = 'surewaka_onboarding_complete';
 
 const slides = [
   {
@@ -22,22 +26,55 @@ const slides = [
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const user = useAuthStore((s) => s.user);
   const [currentSlide, setCurrentSlide] = useState(0);
+  // null = still checking, false = show slides, true = redirecting
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    async function resolveInitialRoute() {
+      // Already authenticated — skip everything and go to the app
+      if (user) {
+        router.replace('/(tabs)');
+        return;
+      }
+
+      // Has seen onboarding before but isn't signed in — go to auth
+      const completed = await AsyncStorage.getItem(ONBOARDING_COMPLETE_KEY);
+      if (completed === 'true') {
+        router.replace('/(auth)/sign-in');
+        return;
+      }
+
+      // First time — show slides
+      setChecking(false);
+    }
+
+    resolveInitialRoute();
+  }, [user, router]);
+
+  const markOnboardingComplete = () => AsyncStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true');
 
   const slide = slides[currentSlide];
   const isLast = currentSlide === slides.length - 1;
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (isLast) {
+      await markOnboardingComplete();
       router.replace('/(auth)/sign-in');
     } else {
       setCurrentSlide((prev) => prev + 1);
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    await markOnboardingComplete();
     router.replace('/(auth)/sign-in');
   };
+
+  // Blank while deciding where to send the user — root _layout already
+  // shows null during initialize(), so this is only a momentary AsyncStorage read.
+  if (checking) return null;
 
   return (
     <View className="flex-1 bg-white">
