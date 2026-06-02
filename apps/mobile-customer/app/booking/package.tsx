@@ -1,4 +1,5 @@
 import { View, Text, TextInput, Pressable, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +16,7 @@ const packageSchema = z.object({
 type FormData = z.infer<typeof packageSchema>;
 
 export default function PackageScreen() {
+  const { bottom } = useSafeAreaInsets();
   const router = useRouter();
   const packageDetails = useBookingStore((s) => s.packageDetails);
   const setPackageDetails = useBookingStore((s) => s.setPackageDetails);
@@ -36,11 +38,11 @@ export default function PackageScreen() {
       category: data.category,
     });
     setStep(3);
-    router.push('/booking/carriers');
+    router.push('/booking/recipient');
   };
 
   return (
-    <ScrollView className="flex-1 bg-white px-6 pt-6">
+    <ScrollView className="flex-1 bg-white px-6 pt-6" contentContainerStyle={{ paddingBottom: bottom + 24 }}>
       <Text className="text-2xl font-bold text-gray-900 mb-2">
         Package Details
       </Text>
@@ -123,7 +125,7 @@ export default function PackageScreen() {
 
       <Pressable
         onPress={handleSubmit(onSubmit)}
-        className="bg-primary py-4 rounded-xl items-center mb-8"
+        className="bg-primary py-4 rounded-xl items-center"
       >
         <Text className="text-white text-lg font-semibold">Continue</Text>
       </Pressable>

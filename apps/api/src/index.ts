@@ -2,6 +2,8 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import addressRoutes from './routes/addresses';
+import deliveryRoutes from './routes/deliveries';
 
 const app = new Hono();
 
@@ -14,6 +16,8 @@ app.get('/health', (c) => c.json({ status: 'ok', service: 'surewaka-api' }));
 
 // API routes
 app.get('/api/v1', (c) => c.json({ message: 'SureWaka API v1' }));
+app.route('/api/v1/addresses', addressRoutes);
+app.route('/api/v1/deliveries', deliveryRoutes);
 
 // Start server
 const port = Number(process.env.PORT) || 4000;

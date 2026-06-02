@@ -15,10 +15,21 @@ export const packageDetailsSchema = z.object({
   category: z.enum(PACKAGE_CATEGORIES),
 });
 
+const NIGERIAN_PHONE_RE = /^(\+234|0)[789][01]\d{8}$/;
+
+export const recipientDetailsSchema = z.object({
+  recipientName: z.string().min(2).max(100),
+  recipientPhone: z.string().regex(NIGERIAN_PHONE_RE, 'Enter a valid Nigerian mobile number'),
+  deliveryNotes: z.string().max(200).optional(),
+});
+
+export type RecipientDetails = z.infer<typeof recipientDetailsSchema>;
+
 export const createDeliverySchema = z.object({
   pickup: locationSchema,
   dropoff: locationSchema,
   packageDetails: packageDetailsSchema,
+  recipientDetails: recipientDetailsSchema,
 });
 
 export const registerUserSchema = z.object({
@@ -55,3 +66,38 @@ export const otpVerifySchema = z.object({
 
 export type PhoneOtpInput = z.infer<typeof phoneOtpSchema>;
 export type OtpVerifyInput = z.infer<typeof otpVerifySchema>;
+
+// ─── Address Validators ──────────────────────────────────────────────────────
+
+export const savedAddressSchema = z.object({
+  id:           z.string().uuid(),
+  label:        z.string().min(1).max(50),
+  address_text: z.string().min(1),
+  city:         z.string(),
+  state:        z.string(),
+  lat:          z.number(),
+  lng:          z.number(),
+  created_at:   z.string(),
+});
+
+export const createSavedAddressSchema = savedAddressSchema.omit({ id: true, created_at: true });
+export const updateSavedAddressSchema = createSavedAddressSchema.partial();
+
+export type SavedAddress = z.infer<typeof savedAddressSchema>;
+export type CreateSavedAddress = z.infer<typeof createSavedAddressSchema>;
+export type UpdateSavedAddress = z.infer<typeof updateSavedAddressSchema>;
+
+export const recentLocationSchema = z.object({
+  id:           z.string().uuid(),
+  address_text: z.string().min(1),
+  city:         z.string(),
+  state:        z.string(),
+  lat:          z.number(),
+  lng:          z.number(),
+  used_at:      z.string(),
+});
+
+export const upsertRecentLocationSchema = recentLocationSchema.omit({ id: true, used_at: true });
+
+export type RecentLocation = z.infer<typeof recentLocationSchema>;
+export type UpsertRecentLocation = z.infer<typeof upsertRecentLocationSchema>;

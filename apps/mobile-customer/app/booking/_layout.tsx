@@ -1,6 +1,6 @@
 import { Stack, useRouter, usePathname } from 'expo-router';
 
-const steps = ['Pickup', 'Drop-off', 'Package', 'Carriers', 'Review', 'Confirmed'];
+const steps = ['Pickup', 'Drop-off', 'Package', 'Recipient', 'Carriers', 'Review', 'Confirmed'];
 
 export default function BookingLayout() {
   const router = useRouter();
@@ -33,12 +33,16 @@ export default function BookingLayout() {
         options={{ title: `Step 3 of ${steps.length}: Package` }}
       />
       <Stack.Screen
+        name="recipient"
+        options={{ title: `Step 4 of ${steps.length}: Recipient` }}
+      />
+      <Stack.Screen
         name="carriers"
-        options={{ title: `Step 4 of ${steps.length}: Choose Service` }}
+        options={{ title: `Step 5 of ${steps.length}: Choose Service` }}
       />
       <Stack.Screen
         name="review"
-        options={{ title: `Step 5 of ${steps.length}: Review` }}
+        options={{ title: `Step 6 of ${steps.length}: Review` }}
       />
       <Stack.Screen
         name="confirmed"

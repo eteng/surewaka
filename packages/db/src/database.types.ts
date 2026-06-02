@@ -1,3 +1,5 @@
+npm warn Unknown project config "public-hoist-pattern". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+Initialising login role...
 export type Json =
   | string
   | number
@@ -72,21 +74,21 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "carrier_members_carrier_id_fkey"
+            foreignKeyName: "carrier_members_carrier_id_carriers_id_fk"
             columns: ["carrier_id"]
             isOneToOne: false
             referencedRelation: "carriers"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "carrier_members_invited_by_fkey"
+            foreignKeyName: "carrier_members_invited_by_users_id_fk"
             columns: ["invited_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "carrier_members_user_id_fkey"
+            foreignKeyName: "carrier_members_user_id_users_id_fk"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -105,9 +107,8 @@ export type Database = {
           logo_url: string | null
           name: string
           rating: number | null
-          slug: string | null
+          slug: string
           updated_at: string
-          verified: boolean
           verified_at: string | null
           verified_by: string | null
         }
@@ -121,9 +122,8 @@ export type Database = {
           logo_url?: string | null
           name: string
           rating?: number | null
-          slug?: string | null
+          slug: string
           updated_at?: string
-          verified?: boolean
           verified_at?: string | null
           verified_by?: string | null
         }
@@ -137,15 +137,14 @@ export type Database = {
           logo_url?: string | null
           name?: string
           rating?: number | null
-          slug?: string | null
+          slug?: string
           updated_at?: string
-          verified?: boolean
           verified_at?: string | null
           verified_by?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "carriers_verified_by_fkey"
+            foreignKeyName: "carriers_verified_by_users_id_fk"
             columns: ["verified_by"]
             isOneToOne: false
             referencedRelation: "users"
@@ -291,6 +290,134 @@ export type Database = {
           },
         ]
       }
+      name_change_requests: {
+        Row: {
+          created_at: string
+          current_name: string
+          id: string
+          reason: string
+          requested_name: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["name_change_status"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_name: string
+          id?: string
+          reason: string
+          requested_name: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["name_change_status"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_name?: string
+          id?: string
+          reason?: string
+          requested_name?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["name_change_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "name_change_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "name_change_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          resource_link: string | null
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          resource_link?: string | null
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          resource_link?: string | null
+          title?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recent_locations: {
+        Row: {
+          address_text: string
+          city: string
+          id: string
+          lat: number
+          lng: number
+          state: string
+          used_at: string
+          user_id: string
+        }
+        Insert: {
+          address_text: string
+          city: string
+          id?: string
+          lat: number
+          lng: number
+          state: string
+          used_at?: string
+          user_id: string
+        }
+        Update: {
+          address_text?: string
+          city?: string
+          id?: string
+          lat?: number
+          lng?: number
+          state?: string
+          used_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       role_audit_log: {
         Row: {
           action: string
@@ -327,14 +454,14 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "role_audit_log_performed_by_fkey"
+            foreignKeyName: "role_audit_log_performed_by_users_id_fk"
             columns: ["performed_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "role_audit_log_user_id_fkey"
+            foreignKeyName: "role_audit_log_user_id_users_id_fk"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -378,14 +505,14 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "user_roles_assigned_by_fkey"
+            foreignKeyName: "user_roles_assigned_by_users_id_fk"
             columns: ["assigned_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "user_roles_user_id_fkey"
+            foreignKeyName: "user_roles_user_id_users_id_fk"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -393,32 +520,77 @@ export type Database = {
           },
         ]
       }
+      user_saved_addresses: {
+        Row: {
+          address_text: string
+          city: string
+          created_at: string
+          id: string
+          label: string
+          lat: number
+          lng: number
+          state: string
+          user_id: string
+        }
+        Insert: {
+          address_text: string
+          city: string
+          created_at?: string
+          id?: string
+          label: string
+          lat: number
+          lng: number
+          state: string
+          user_id: string
+        }
+        Update: {
+          address_text?: string
+          city?: string
+          created_at?: string
+          id?: string
+          label?: string
+          lat?: number
+          lng?: number
+          state?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
+          avatar_url: string | null
           created_at: string
           email: string
           id: string
           name: string
+          notification_email: boolean
+          notification_sms: boolean
           phone: string
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
           verified: boolean
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           email: string
           id?: string
           name: string
+          notification_email?: boolean
+          notification_sms?: boolean
           phone: string
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           verified?: boolean
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           email?: string
           id?: string
           name?: string
+          notification_email?: boolean
+          notification_sms?: boolean
           phone?: string
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
@@ -463,6 +635,8 @@ export type Database = {
     Functions: {
       get_user_roles: { Args: never; Returns: string[] }
       has_role: { Args: { required_role: string }; Returns: boolean }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       carrier_member_role: "carrier_admin" | "carrier_driver"
@@ -473,12 +647,19 @@ export type Database = {
         | "in_transit"
         | "delivered"
         | "cancelled"
+      name_change_status: "pending" | "approved" | "rejected"
+      notification_type:
+        | "new_user_signup"
+        | "delivery_issue"
+        | "carrier_verification_request"
+        | "carrier_verified"
+        | "dispute_opened"
+        | "driver_verification_request"
+        | "system_alert"
       package_category: "document" | "parcel" | "fragile" | "heavy" | "food"
       user_role:
         | "customer"
         | "driver"
-        | "carrier"
-        | "admin"
         | "carrier_driver"
         | "carrier_admin"
         | "support_agent"
@@ -624,12 +805,20 @@ export const Constants = {
         "delivered",
         "cancelled",
       ],
+      name_change_status: ["pending", "approved", "rejected"],
+      notification_type: [
+        "new_user_signup",
+        "delivery_issue",
+        "carrier_verification_request",
+        "carrier_verified",
+        "dispute_opened",
+        "driver_verification_request",
+        "system_alert",
+      ],
       package_category: ["document", "parcel", "fragile", "heavy", "food"],
       user_role: [
         "customer",
         "driver",
-        "carrier",
-        "admin",
         "carrier_driver",
         "carrier_admin",
         "support_agent",

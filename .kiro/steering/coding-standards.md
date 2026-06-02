@@ -22,7 +22,8 @@ description: TypeScript, API, database, AI agent, and file naming conventions fo
 - Use Drizzle ORM — no raw SQL unless absolutely necessary
 - All tables have `id` (uuid), `createdAt`, `updatedAt`
 - Use enums for fixed value sets
-- Migrations via `drizzle-kit generate` and `drizzle-kit migrate`
+- **NEVER use `drizzle-kit push`** — Supabase is the migration source of truth
+- Migration workflow: `supabase migration new <name>` → `supabase migration fetch --yes` → regenerate types → sync Drizzle schema manually
 
 ## AI Agents
 - System prompts in markdown files (version controlled)

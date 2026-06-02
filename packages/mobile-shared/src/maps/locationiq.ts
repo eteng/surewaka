@@ -17,6 +17,8 @@ export type LocationIQResult = {
     road?: string;
     neighbourhood?: string;
     suburb?: string;
+    town?: string;
+    county?: string;
     city?: string;
     state?: string;
     country?: string;
@@ -41,6 +43,7 @@ export async function searchAddress(query: string): Promise<LocationSuggestion[]
     limit: '5',
     format: 'json',
     countrycodes: 'ng',
+    addressdetails: '1',
   });
 
   const response = await fetch(`${LOCATIONIQ_BASE}/autocomplete?${params}`);
@@ -60,7 +63,7 @@ export async function searchAddress(query: string): Promise<LocationSuggestion[]
   }));
 }
 
-export async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
+export async function reverseGeocode(lat: number, lon: number): Promise<LocationSuggestion | null> {
   const params = new URLSearchParams({
     key: API_KEY,
     lat: lat.toString(),
@@ -75,5 +78,13 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string |
   }
 
   const result = (await response.json()) as LocationIQResult;
-  return result.display_name ?? null;
+  if (!result.display_name) return null;
+
+  return {
+    place_id: result.place_id,
+    display_name: result.display_name,
+    lat: result.lat,
+    lon: result.lon,
+    address: result.address,
+  };
 }

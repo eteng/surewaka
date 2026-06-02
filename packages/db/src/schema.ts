@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, real, pgEnum, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, real, pgEnum, uuid, numeric } from 'drizzle-orm/pg-core';
 
 export const userRoleEnum = pgEnum('user_role', ['customer', 'driver', 'carrier', 'admin']);
 export const deliveryStatusEnum = pgEnum('delivery_status', [
@@ -91,6 +91,33 @@ export const deliveries = pgTable('deliveries', {
   packageWeight: real('package_weight').notNull(),
   packageCategory: packageCategoryEnum('package_category').notNull(),
   price: real('price'),
+  recipientName: text('recipient_name').notNull(),
+  recipientPhone: text('recipient_phone').notNull(),
+  deliveryNotes: text('delivery_notes'),
+  senderPhone: text('sender_phone'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const userSavedAddresses = pgTable('user_saved_addresses', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  userId:      uuid('user_id').notNull(),
+  label:       text('label').notNull(),
+  addressText: text('address_text').notNull(),
+  city:        text('city').notNull(),
+  state:       text('state').notNull(),
+  lat:         numeric('lat', { precision: 10, scale: 7 }).notNull(),
+  lng:         numeric('lng', { precision: 10, scale: 7 }).notNull(),
+  createdAt:   timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+export const recentLocations = pgTable('recent_locations', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  userId:      uuid('user_id').notNull(),
+  addressText: text('address_text').notNull(),
+  city:        text('city').notNull(),
+  state:       text('state').notNull(),
+  lat:         numeric('lat', { precision: 10, scale: 7 }).notNull(),
+  lng:         numeric('lng', { precision: 10, scale: 7 }).notNull(),
+  usedAt:      timestamp('used_at', { withTimezone: true }).defaultNow().notNull(),
 });

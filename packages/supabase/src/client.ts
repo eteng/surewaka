@@ -6,10 +6,10 @@ import { createClient } from '@supabase/supabase-js';
  */
 export function createServerClient(accessToken?: string) {
   const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  const supabaseAnonKey = process.env.SUPABASE_PUBLISHABLE_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY must be set');
+    throw new Error('SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY must be set');
   }
 
   return createClient(supabaseUrl, supabaseAnonKey, {

@@ -13,7 +13,7 @@ SureWaka is a logistics platform for Nigeria connecting senders with verified ca
 
 - **Build system**: Turborepo + pnpm 9.x workspaces
 - **Language**: TypeScript everywhere (target ES2022, strict mode, bundler module resolution)
-- **Node**: >=20
+- **Node**: >=22 (use `nvm use` — `.nvmrc` is in repo root)
 - **Package prefix**: `@surewaka/` for all internal packages
 
 | Directory | Purpose |
@@ -21,13 +21,15 @@ SureWaka is a logistics platform for Nigeria connecting senders with verified ca
 | `apps/web` | Customer-facing app (React Router v7, SSR, port 3000) |
 | `apps/admin` | Internal admin dashboard (React Router v7, SPA mode) |
 | `apps/landing` | Marketing site (React Router v7, SSR) |
-| `apps/mobile` | Mobile app (Expo / React Native) |
+| `apps/mobile-customer` | Customer mobile app (Expo / React Native) |
+| `apps/mobile-driver` | Driver mobile app (Expo / React Native) |
 | `apps/api` | REST API (Hono, port 4000) |
 | `packages/shared` | Domain types, Zod validators, constants |
 | `packages/ui` | Shared UI components (shadcn/ui pattern) |
 | `packages/db` | Database schema and client (Drizzle ORM + Supabase Postgres) |
 | `packages/supabase` | Supabase client (auth, storage, realtime) |
 | `packages/ai` | LLM client abstraction (Vercel AI SDK) |
+| `packages/mobile-shared` | Shared RN components, hooks, stores |
 | `agents/*` | AI agents (customer-support, onboarding, internal-ops) |
 | `workers/*` | Background workers (email, payment, agent, cron) |
 | `infra/` | Docker, Terraform, dev scripts |
@@ -72,7 +74,13 @@ SureWaka is a logistics platform for Nigeria connecting senders with verified ca
 - Timestamps: `created_at` and `updated_at` columns on all tables
 - Enums defined with `pgEnum` (e.g., `user_role`, `delivery_status`, `vehicle_type`)
 - Use `DATABASE_POOL_URL` for server queries, `DATABASE_URL` for migrations
-- Push schema: `pnpm --filter @surewaka/db db:push`
+- **NEVER use `drizzle-kit push`** — Supabase is the migration source of truth
+
+Schema change workflow:
+1. `supabase migration new <name>` — creates the migration file
+2. `supabase migration fetch --yes` — syncs locally
+3. `supabase gen types --linked > packages/db/src/types.ts` — regenerate types
+4. Keep `packages/db/src/schema.ts` (Drizzle) in sync manually
 
 ## AI Agents
 
@@ -97,7 +105,7 @@ pnpm dev                                    # Start all services
 pnpm build                                  # Build all packages
 pnpm --filter @surewaka/web dev             # Start customer web app
 pnpm --filter @surewaka/api dev             # Start API server
-pnpm --filter @surewaka/db db:push          # Push DB schema
+pnpm --filter @surewaka/db db:studio        # Open Drizzle Studio (read-only inspection)
 docker compose -f infra/docker/docker-compose.yml up -d  # Local DB/Redis
 ```
 
