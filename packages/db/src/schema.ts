@@ -121,3 +121,76 @@ export const recentLocations = pgTable('recent_locations', {
   lng:         numeric('lng', { precision: 10, scale: 7 }).notNull(),
   usedAt:      timestamp('used_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const notificationTypeEnum = pgEnum('notification_type', [
+  'new_user_signup',
+  'delivery_issue',
+  'carrier_verification_request',
+  'carrier_verified',
+  'dispute_opened',
+  'driver_verification_request',
+  'system_alert',
+]);
+
+export const nameChangeStatusEnum = pgEnum('name_change_status', ['pending', 'approved', 'rejected']);
+
+export const notifications = pgTable('notifications', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  userId:       uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  type:         notificationTypeEnum('type').notNull(),
+  title:        text('title').notNull(),
+  message:      text('message').notNull(),
+  resourceLink: text('resource_link'),
+  isRead:       boolean('is_read').notNull().default(false),
+  createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const nameChangeRequests = pgTable('name_change_requests', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  userId:        uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  currentName:   text('current_name').notNull(),
+  requestedName: text('requested_name').notNull(),
+  reason:        text('reason').notNull(),
+  status:        nameChangeStatusEnum('status').notNull().default('pending'),
+  reviewedBy:    uuid('reviewed_by').references(() => users.id),
+  reviewedAt:    timestamp('reviewed_at', { withTimezone: true }),
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const carrierMemberRoleEnum = pgEnum('carrier_member_role', ['carrier_admin', 'carrier_driver']);
+
+export const userRoles = pgTable('user_roles', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  role:       userRoleEnum('role').notNull(),
+  scopeType:  text('scope_type'),
+  scopeId:    uuid('scope_id'),
+  assignedBy: uuid('assigned_by').references(() => users.id),
+  assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),
+  revokedAt:  timestamp('revoked_at', { withTimezone: true }),
+  isActive:   boolean('is_active').notNull().default(true),
+});
+
+export const carrierMembers = pgTable('carrier_members', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  carrierId:  uuid('carrier_id').notNull().references(() => carriers.id, { onDelete: 'cascade' }),
+  userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  role:       carrierMemberRoleEnum('role').notNull(),
+  invitedBy:  uuid('invited_by').references(() => users.id),
+  joinedAt:   timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+  leftAt:     timestamp('left_at', { withTimezone: true }),
+  isActive:   boolean('is_active').notNull().default(true),
+});
+
+export const roleAuditLog = pgTable('role_audit_log', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  userId:      uuid('user_id').notNull().references(() => users.id),
+  role:        userRoleEnum('role').notNull(),
+  action:      text('action').notNull(),
+  scopeType:   text('scope_type'),
+  scopeId:     uuid('scope_id'),
+  performedBy: uuid('performed_by').references(() => users.id),
+  reason:      text('reason'),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

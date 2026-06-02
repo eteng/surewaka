@@ -38,6 +38,22 @@ export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
 });
 
 /**
+ * Requires MFA (aal2) — rejects if session is only aal1.
+ */
+export const requireMfa = createMiddleware<AuthEnv>(async (c, next) => {
+  const token = c.get('accessToken');
+  if (!token) {
+    return c.json({ data: null, error: { code: 'UNAUTHORIZED', message: 'Missing token' }, meta: null }, 401);
+  }
+  const supabase = createServerClient(token);
+  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (!data || data.currentLevel !== 'aal2') {
+    return c.json({ data: null, error: { code: 'MFA_REQUIRED', message: 'MFA verification required' }, meta: null }, 403);
+  }
+  await next();
+});
+
+/**
  * Optional auth — attaches user if token present, continues without if not.
  */
 export const optionalAuth = createMiddleware<AuthEnv>(async (c, next) => {

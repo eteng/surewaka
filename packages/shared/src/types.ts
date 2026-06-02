@@ -8,7 +8,7 @@ export type DeliveryStatus =
   | 'delivered'
   | 'cancelled';
 
-export type UserRole = 'customer' | 'driver' | 'carrier' | 'admin';
+export type UserRole = 'customer' | 'driver' | 'carrier' | 'admin' | 'surewaka_admin' | 'carrier_driver' | 'carrier_admin';
 
 export interface User {
   id: string;
@@ -64,3 +64,48 @@ export interface Driver {
   available: boolean;
   currentLocation?: Location;
 }
+
+export type UserRoleRecord = {
+  id: string;
+  userId: string;
+  role: UserRole;
+  scopeType: 'carrier' | null;
+  scopeId: string | null;
+  assignedBy: string | null;
+  assignedAt: Date | null;
+  revokedAt: Date | null;
+  isActive: boolean;
+};
+
+export type AppMetadata = {
+  roles: string[];
+  primary_role: string;
+  carrier_id?: string;
+};
+
+export type ProfilePreferencesUpdate = {
+  notificationEmail?: boolean;
+  notificationSms?: boolean;
+};
+
+export type NameChangeRequest = {
+  requestedName: string;
+  reason: string;
+};
+
+export type NotificationData = {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  resourceLink: string | null;
+  isRead: boolean;
+  createdAt: string;
+};
+
+export type PaginationMeta = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};

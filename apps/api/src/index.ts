@@ -3,7 +3,14 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import addressRoutes from './routes/addresses';
+import carrierRoutes from './routes/carriers';
 import deliveryRoutes from './routes/deliveries';
+import notificationRoutes from './routes/notifications';
+import profileRoutes from './routes/profile';
+import adminNameChangeRoutes from './routes/admin/name-change-requests';
+import adminRoleRoutes from './routes/admin/roles';
+import adminUserRoutes from './routes/admin/users';
+import adminWaitlistRoutes from './routes/admin/waitlist';
 
 const app = new Hono();
 
@@ -17,7 +24,14 @@ app.get('/health', (c) => c.json({ status: 'ok', service: 'surewaka-api' }));
 // API routes
 app.get('/api/v1', (c) => c.json({ message: 'SureWaka API v1' }));
 app.route('/api/v1/addresses', addressRoutes);
+app.route('/api/v1/carriers', carrierRoutes);
 app.route('/api/v1/deliveries', deliveryRoutes);
+app.route('/api/v1/notifications', notificationRoutes);
+app.route('/api/v1/profile', profileRoutes);
+app.route('/api/v1/admin/name-change-requests', adminNameChangeRoutes);
+app.route('/api/v1/admin/roles', adminRoleRoutes);
+app.route('/api/v1/admin/users', adminUserRoutes);
+app.route('/api/v1/admin/waitlist', adminWaitlistRoutes);
 
 // Start server
 const port = Number(process.env.PORT) || 4000;

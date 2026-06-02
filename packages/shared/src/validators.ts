@@ -101,3 +101,133 @@ export const upsertRecentLocationSchema = recentLocationSchema.omit({ id: true, 
 
 export type RecentLocation = z.infer<typeof recentLocationSchema>;
 export type UpsertRecentLocation = z.infer<typeof upsertRecentLocationSchema>;
+
+// ─── Carrier Driver Onboarding ───────────────────────────────────────────────
+
+export const onboardCarrierDriverSchema = z.object({
+  phone: z.string().regex(/^\+234\d{10}$/, 'Enter a valid Nigerian phone number'),
+  fullName: z.string().min(2).max(100),
+});
+
+export type OnboardCarrierDriver = z.infer<typeof onboardCarrierDriverSchema>;
+
+// ─── RBAC ────────────────────────────────────────────────────────────────────
+
+export const assignRoleSchema = z.object({
+  userId: z.string().uuid(),
+  role: z.enum(['customer', 'driver', 'carrier', 'admin', 'surewaka_admin', 'carrier_driver', 'carrier_admin']),
+  scopeType: z.string().optional(),
+  scopeId: z.string().uuid().optional(),
+  reason: z.string().max(500).optional(),
+});
+
+export const revokeRoleSchema = z.object({
+  userId: z.string().uuid(),
+  role: z.enum(['customer', 'driver', 'carrier', 'admin', 'surewaka_admin', 'carrier_driver', 'carrier_admin']),
+  scopeId: z.string().uuid().optional(),
+  reason: z.string().max(500).optional(),
+});
+
+export type AssignRole = z.infer<typeof assignRoleSchema>;
+export type RevokeRole = z.infer<typeof revokeRoleSchema>;
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+export const notificationQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  type: z.string().optional(),
+  isRead: z.enum(['true', 'false']).transform(v => v === 'true').optional(),
+});
+
+export const createNotificationSchema = z.object({
+  userId: z.string().uuid(),
+  type: z.string().min(1),
+  title: z.string().min(1).max(200),
+  message: z.string().min(1).max(1000),
+  resourceLink: z.string().url().optional(),
+});
+
+export type NotificationQuery = z.infer<typeof notificationQuerySchema>;
+export type CreateNotificationInput = z.infer<typeof createNotificationSchema>;
+
+// ─── Waitlist Admin ──────────────────────────────────────────────────────────
+
+export const waitlistQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().optional(),
+  userType: z.enum(['sender', 'business', 'driver']).optional(),
+  source: z.string().optional(),
+  sortBy: z.enum(['createdAt', 'fullName', 'email', 'userType']).default('createdAt'),
+  sortDir: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export type WaitlistQuery = z.infer<typeof waitlistQuerySchema>;
+
+// ─── Profile ─────────────────────────────────────────────────────────────────
+
+export const profilePreferencesUpdateSchema = z.object({
+  notificationEmail: z.boolean().optional(),
+  notificationSms: z.boolean().optional(),
+});
+
+export const avatarFileSchema = z.object({
+  filename: z.string(),
+  mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  size: z.number().max(5 * 1024 * 1024, 'File must be under 5 MB'),
+});
+
+export const nameChangeRequestSchema = z.object({
+  requestedName: z.string().min(2).max(100),
+  reason: z.string().min(5).max(500),
+});
+
+// ─── Employee Management ─────────────────────────────────────────────────────
+
+export const inviteEmployeeSchema = z.object({
+  email: z.string().email(),
+  fullName: z.string().min(2).max(100),
+  role: z.enum(['customer', 'driver', 'carrier', 'admin', 'surewaka_admin', 'carrier_driver', 'carrier_admin']),
+  scopeType: z.string().optional(),
+  scopeId: z.string().uuid().optional(),
+});
+
+export const employeeListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().optional(),
+  role: z.enum(['customer', 'driver', 'carrier', 'admin', 'surewaka_admin', 'carrier_driver', 'carrier_admin']).optional(),
+  status: z.enum(['active', 'inactive']).optional(),
+  sortBy: z.enum(['fullName', 'email', 'role', 'createdAt']).default('createdAt'),
+  sortDir: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export const auditLogQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export type InviteEmployee = z.infer<typeof inviteEmployeeSchema>;
+export type EmployeeListQuery = z.infer<typeof employeeListQuerySchema>;
+export type AuditLogQuery = z.infer<typeof auditLogQuerySchema>;
+
+export const updateEmployeeSchema = z.object({
+  fullName: z.string().min(2).max(100).optional(),
+  phone: z.string().regex(/^\+234\d{10}$/).optional(),
+  email: z.string().email().optional(),
+  role: z.enum(['customer', 'driver', 'carrier', 'admin', 'surewaka_admin', 'carrier_driver', 'carrier_admin']).optional(),
+  scopeType: z.string().optional(),
+  scopeId: z.string().uuid().optional(),
+});
+
+export type UpdateEmployee = z.infer<typeof updateEmployeeSchema>;
+
+// ─── Name Change Requests ────────────────────────────────────────────────────
+
+export const nameChangeReviewSchema = z.object({
+  status: z.enum(['approved', 'rejected']),
+  reviewNote: z.string().max(500).optional(),
+});
+
+export type NameChangeReview = z.infer<typeof nameChangeReviewSchema>;
