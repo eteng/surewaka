@@ -3,11 +3,11 @@ import { useAuthStore } from '@surewaka/mobile-shared';
 
 export default function AuthLayout() {
   const user = useAuthStore((s) => s.user);
+  const profileExists = useAuthStore((s) => s.profileExists);
 
-  // If the user is already signed in, bounce them to the app.
-  // This covers the case where they deep-link into an auth screen
-  // or the session is restored after the onboarding check runs.
-  if (user) {
+  // Only bounce fully-provisioned users. Users with profileExists === false
+  // must complete register.tsx (which lives inside this group).
+  if (user && profileExists === true) {
     return <Redirect href="/(tabs)" />;
   }
 

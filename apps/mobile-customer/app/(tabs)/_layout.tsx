@@ -23,7 +23,8 @@ export default function TabLayout() {
   const user = useAuthStore((s) => s.user);
   const profileExists = useAuthStore((s) => s.profileExists);
 
-  if (!user || profileExists === false) {
+  // profileExists === false is handled by the root layout redirecting to /(auth)/register.
+  if (!user) {
     return <Redirect href="/(auth)/sign-in" />;
   }
 

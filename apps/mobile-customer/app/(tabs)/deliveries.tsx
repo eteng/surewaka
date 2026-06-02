@@ -34,10 +34,10 @@ export default function DeliveriesScreen() {
     if (!session?.access_token) return;
 
     const client = createAuthClient(session.access_token);
-    const { data } = await client.get<Delivery[]>('/api/v1/deliveries');
+    const { data } = await client.get<{ deliveries: Delivery[]; total: number }>('/api/v1/deliveries');
 
-    if (data) {
-      setDeliveries(data);
+    if (data?.deliveries) {
+      setDeliveries(data.deliveries);
     }
     setLoading(false);
     setRefreshing(false);
