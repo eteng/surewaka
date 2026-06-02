@@ -8,7 +8,7 @@ export type DeliveryStatus =
   | 'delivered'
   | 'cancelled';
 
-export type UserRole = 'customer' | 'driver' | 'carrier' | 'admin' | 'surewaka_admin' | 'carrier_driver' | 'carrier_admin';
+export type UserRole = 'customer' | 'driver' | 'surewaka_admin' | 'carrier_driver' | 'carrier_admin' | 'support_agent';
 
 export interface User {
   id: string;

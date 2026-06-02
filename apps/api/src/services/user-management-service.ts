@@ -51,7 +51,7 @@ export type ReactivateEmployeeParams = {
 export type EmployeeListItem = {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   verified: boolean;
   roles: { role: UserRole; scopeType: string | null; scopeId: string | null }[];

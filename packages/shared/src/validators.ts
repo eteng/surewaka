@@ -32,6 +32,11 @@ export const createDeliverySchema = z.object({
   recipientDetails: recipientDetailsSchema,
 });
 
+export const otpRegisterSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+});
+export type OtpRegister = z.infer<typeof otpRegisterSchema>;
+
 export const registerUserSchema = z.object({
   email: z.string().email(),
   phone: z.string().min(10).max(15),
@@ -115,15 +120,15 @@ export type OnboardCarrierDriver = z.infer<typeof onboardCarrierDriverSchema>;
 
 export const assignRoleSchema = z.object({
   userId: z.string().uuid(),
-  role: z.enum(['customer', 'driver', 'carrier', 'admin', 'surewaka_admin', 'carrier_driver', 'carrier_admin']),
-  scopeType: z.string().optional(),
+  role: z.enum(['customer', 'driver', 'surewaka_admin', 'carrier_driver', 'carrier_admin', 'support_agent']),
+  scopeType: z.enum(['carrier']).optional(),
   scopeId: z.string().uuid().optional(),
   reason: z.string().max(500).optional(),
 });
 
 export const revokeRoleSchema = z.object({
   userId: z.string().uuid(),
-  role: z.enum(['customer', 'driver', 'carrier', 'admin', 'surewaka_admin', 'carrier_driver', 'carrier_admin']),
+  role: z.enum(['customer', 'driver', 'surewaka_admin', 'carrier_driver', 'carrier_admin', 'support_agent']),
   scopeId: z.string().uuid().optional(),
   reason: z.string().max(500).optional(),
 });
@@ -142,7 +147,7 @@ export const notificationQuerySchema = z.object({
 
 export const createNotificationSchema = z.object({
   userId: z.string().uuid(),
-  type: z.string().min(1),
+  type: z.enum(['new_user_signup', 'delivery_issue', 'carrier_verification_request', 'carrier_verified', 'dispute_opened', 'driver_verification_request', 'system_alert']),
   title: z.string().min(1).max(200),
   message: z.string().min(1).max(1000),
   resourceLink: z.string().url().optional(),
@@ -188,8 +193,8 @@ export const nameChangeRequestSchema = z.object({
 export const inviteEmployeeSchema = z.object({
   email: z.string().email(),
   fullName: z.string().min(2).max(100),
-  role: z.enum(['customer', 'driver', 'carrier', 'admin', 'surewaka_admin', 'carrier_driver', 'carrier_admin']),
-  scopeType: z.string().optional(),
+  role: z.enum(['customer', 'driver', 'surewaka_admin', 'carrier_driver', 'carrier_admin', 'support_agent']),
+  scopeType: z.enum(['carrier']).optional(),
   scopeId: z.string().uuid().optional(),
 });
 
@@ -197,9 +202,9 @@ export const employeeListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().optional(),
-  role: z.enum(['customer', 'driver', 'carrier', 'admin', 'surewaka_admin', 'carrier_driver', 'carrier_admin']).optional(),
+  role: z.enum(['customer', 'driver', 'surewaka_admin', 'carrier_driver', 'carrier_admin', 'support_agent']).optional(),
   status: z.enum(['active', 'inactive']).optional(),
-  sortBy: z.enum(['fullName', 'email', 'role', 'createdAt']).default('createdAt'),
+  sortBy: z.enum(['name', 'email', 'createdAt', 'updatedAt']).default('createdAt'),
   sortDir: z.enum(['asc', 'desc']).default('desc'),
 });
 
@@ -216,7 +221,7 @@ export const updateEmployeeSchema = z.object({
   fullName: z.string().min(2).max(100).optional(),
   phone: z.string().regex(/^\+234\d{10}$/).optional(),
   email: z.string().email().optional(),
-  role: z.enum(['customer', 'driver', 'carrier', 'admin', 'surewaka_admin', 'carrier_driver', 'carrier_admin']).optional(),
+  role: z.enum(['customer', 'driver', 'surewaka_admin', 'carrier_driver', 'carrier_admin', 'support_agent']).optional(),
   scopeType: z.string().optional(),
   scopeId: z.string().uuid().optional(),
 });

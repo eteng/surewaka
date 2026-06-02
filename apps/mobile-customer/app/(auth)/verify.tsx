@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -32,8 +32,6 @@ export default function VerifyScreen() {
 
     if (verifyError) {
       setError(verifyError);
-    } else {
-      router.replace('/(tabs)');
     }
   };
 

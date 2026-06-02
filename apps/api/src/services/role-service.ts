@@ -24,7 +24,7 @@ export type RevokeRoleParams = {
   role: UserRole;
   revokedBy: string;
   scopeId?: string | null;
-  reason: string;
+  reason?: string;
 };
 
 export type UpgradeRoleParams = {

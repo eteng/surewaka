@@ -27,14 +27,15 @@ const slides = [
 export default function OnboardingScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const profileExists = useAuthStore((s) => s.profileExists);
   const [currentSlide, setCurrentSlide] = useState(0);
   // null = still checking, false = show slides, true = redirecting
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     async function resolveInitialRoute() {
-      // Already authenticated — skip everything and go to the app
-      if (user) {
+      // Already authenticated and provisioned — skip everything and go to the app
+      if (user && profileExists) {
         router.replace('/(tabs)');
         return;
       }

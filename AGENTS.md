@@ -28,12 +28,21 @@ pnpm dev
 
 ## Database (Schema Changes)
 
+**Database-first.** Supabase owns migrations. Drizzle schema is generated from the DB, never hand-edited.
+
 ```bash
-supabase migration new <name>           # 1. Create migration
-supabase migration fetch --yes          # 2. Sync locally
-supabase gen types --linked > packages/db/src/types.ts  # 3. Regen types
-# 4. Update packages/db/src/schema.ts manually to match
+# 1. Create and write the migration
+npx supabase@2.104.0 migration new <name>
+# → edit supabase/migrations/<timestamp>_<name>.sql
+
+# 2. Apply it (you run this — Claude does not)
+#    via Supabase dashboard, psql, or supabase db push
+
+# 3. Pull the updated schema into TypeScript
+pnpm --filter @surewaka/db db:pull
 ```
+
+`packages/db/src/schema.ts` is a generated file — do not edit it by hand.
 
 Supabase project ref: `royfgnaiiexvpxapmcdh` (EU Frankfurt)
 

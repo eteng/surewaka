@@ -8,26 +8,35 @@ type AuthState = {
   session: Session | null;
   loading: boolean;
   initialized: boolean;
+  profileExists: boolean | null;
   setUser: (user: User | null) => void;
   setSession: (session: Session | null) => void;
   setLoading: (loading: boolean) => void;
   setInitialized: (initialized: boolean) => void;
+  setProfileExists: (v: boolean | null) => void;
   signIn: (phone: string) => Promise<{ error: string | null }>;
   verifyOtp: (phone: string, token: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   initialize: () => Promise<void>;
 };
 
+async function checkProfileExists(userId: string): Promise<boolean> {
+  const { data } = await supabase.from('users').select('id').eq('id', userId).single();
+  return !!data;
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   session: null,
   loading: true,
   initialized: false,
+  profileExists: null,
 
   setUser: (user) => set({ user }),
   setSession: (session) => set({ session }),
   setLoading: (loading) => set({ loading }),
   setInitialized: (initialized) => set({ initialized }),
+  setProfileExists: (profileExists) => set({ profileExists }),
 
   initialize: async () => {
     const {
@@ -35,17 +44,20 @@ export const useAuthStore = create<AuthState>((set) => ({
     } = await supabase.auth.getSession();
 
     if (session) {
-      set({ user: session.user, session, loading: false, initialized: true });
+      const profileExists = await checkProfileExists(session.user.id);
+      set({ user: session.user, session, loading: false, initialized: true, profileExists });
       Sentry.setUser({ id: session.user.id, email: session.user.email });
     } else {
-      set({ loading: false, initialized: true });
+      set({ loading: false, initialized: true, profileExists: null });
     }
 
-    supabase.auth.onAuthStateChange((_event, newSession) => {
-      set({ user: newSession?.user ?? null, session: newSession });
+    supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (newSession?.user) {
+        const profileExists = await checkProfileExists(newSession.user.id);
+        set({ user: newSession.user, session: newSession, profileExists });
         Sentry.setUser({ id: newSession.user.id, email: newSession.user.email });
       } else {
+        set({ user: null, session: null, profileExists: null });
         Sentry.setUser(null);
       }
     });

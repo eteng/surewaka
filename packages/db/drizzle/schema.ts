@@ -22,7 +22,7 @@ export const drivers = pgTable("drivers", {
 	available: boolean().default(false).notNull(),
 	lat: real(),
 	lng: real(),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	foreignKey({
 			columns: [table.userId],
@@ -37,14 +37,14 @@ export const carriers = pgTable("carriers", {
 	contactEmail: text("contact_email").notNull(),
 	rating: real().default(0),
 	deliveryCount: real("delivery_count").default(0),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	slug: text().notNull(),
 	logoUrl: text("logo_url"),
 	isVerified: boolean("is_verified").default(false).notNull(),
 	isActive: boolean("is_active").default(true).notNull(),
-	verifiedAt: timestamp("verified_at"),
+	verifiedAt: timestamp("verified_at", { mode: 'string' }),
 	verifiedBy: uuid("verified_by"),
-	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	foreignKey({
 			columns: [table.verifiedBy],
@@ -60,8 +60,8 @@ export const waitlistSignups = pgTable("waitlist_signups", {
 	email: text().notNull(),
 	userType: waitlistUserType("user_type").notNull(),
 	source: text().default('home'),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
-	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	index("idx_waitlist_signups_created_at").using("btree", table.createdAt.desc().nullsFirst().op("timestamp_ops")),
 	index("idx_waitlist_signups_email").using("btree", table.email.asc().nullsLast().op("text_ops")),
@@ -80,8 +80,8 @@ export const nameChangeRequests = pgTable("name_change_requests", {
 	reason: text().notNull(),
 	status: nameChangeStatus().default('pending').notNull(),
 	reviewedBy: uuid("reviewed_by"),
-	reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
-	createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+	reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: 'string' }),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	index("idx_name_change_requests_status").using("btree", table.status.asc().nullsLast().op("enum_ops")),
 	index("idx_name_change_requests_user").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
@@ -104,8 +104,8 @@ export const users = pgTable("users", {
 	name: text().notNull(),
 	role: userRole().default('customer').notNull(),
 	verified: boolean().default(false).notNull(),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
-	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
 	avatarUrl: text("avatar_url"),
 	notificationEmail: boolean("notification_email").default(true).notNull(),
 	notificationSms: boolean("notification_sms").default(true).notNull(),
@@ -125,7 +125,7 @@ export const userSavedAddresses = pgTable("user_saved_addresses", {
 	state: text().notNull(),
 	lat: numeric({ precision: 10, scale:  7 }).notNull(),
 	lng: numeric({ precision: 10, scale:  7 }).notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	foreignKey({
 			columns: [table.userId],
@@ -143,7 +143,7 @@ export const recentLocations = pgTable("recent_locations", {
 	state: text().notNull(),
 	lat: numeric({ precision: 10, scale:  7 }).notNull(),
 	lng: numeric({ precision: 10, scale:  7 }).notNull(),
-	usedAt: timestamp("used_at", { withTimezone: true }).defaultNow().notNull(),
+	usedAt: timestamp("used_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	foreignKey({
 			columns: [table.userId],
@@ -161,8 +161,8 @@ export const notifications = pgTable("notifications", {
 	message: text().notNull(),
 	resourceLink: text("resource_link"),
 	isRead: boolean("is_read").default(false).notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	index("idx_notifications_cleanup").using("btree", table.createdAt.asc().nullsLast().op("timestamptz_ops")),
 	index("idx_notifications_user_created").using("btree", table.userId.asc().nullsLast().op("timestamptz_ops"), table.createdAt.desc().nullsFirst().op("timestamptz_ops")),
@@ -196,8 +196,8 @@ export const deliveries = pgTable("deliveries", {
 	packageWeight: real("package_weight").notNull(),
 	packageCategory: packageCategory("package_category").notNull(),
 	price: real(),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
-	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
 	recipientName: text("recipient_name").notNull(),
 	recipientPhone: text("recipient_phone").notNull(),
 	deliveryNotes: text("delivery_notes"),
@@ -226,8 +226,8 @@ export const carrierMembers = pgTable("carrier_members", {
 	userId: uuid("user_id").notNull(),
 	role: carrierMemberRole().notNull(),
 	invitedBy: uuid("invited_by"),
-	joinedAt: timestamp("joined_at").defaultNow().notNull(),
-	leftAt: timestamp("left_at"),
+	joinedAt: timestamp("joined_at", { mode: 'string' }).defaultNow().notNull(),
+	leftAt: timestamp("left_at", { mode: 'string' }),
 	isActive: boolean("is_active").default(true).notNull(),
 }, (table) => [
 	foreignKey({
@@ -260,8 +260,8 @@ export const userRoles = pgTable("user_roles", {
 	scopeType: text("scope_type"),
 	scopeId: uuid("scope_id"),
 	assignedBy: uuid("assigned_by"),
-	assignedAt: timestamp("assigned_at").defaultNow().notNull(),
-	revokedAt: timestamp("revoked_at"),
+	assignedAt: timestamp("assigned_at", { mode: 'string' }).defaultNow().notNull(),
+	revokedAt: timestamp("revoked_at", { mode: 'string' }),
 	isActive: boolean("is_active").default(true).notNull(),
 }, (table) => [
 	index("idx_user_roles_user_active").using("btree", table.userId.asc().nullsLast().op("bool_ops"), table.isActive.asc().nullsLast().op("bool_ops")).where(sql`(is_active = true)`),
@@ -287,7 +287,7 @@ export const roleAuditLog = pgTable("role_audit_log", {
 	scopeId: uuid("scope_id"),
 	performedBy: uuid("performed_by"),
 	reason: text(),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	foreignKey({
 			columns: [table.performedBy],

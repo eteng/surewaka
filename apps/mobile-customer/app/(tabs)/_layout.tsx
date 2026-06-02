@@ -21,8 +21,9 @@ function TabIcon({ focused, title }: { focused: boolean; title: string }) {
 
 export default function TabLayout() {
   const user = useAuthStore((s) => s.user);
+  const profileExists = useAuthStore((s) => s.profileExists);
 
-  if (!user) {
+  if (!user || profileExists === false) {
     return <Redirect href="/(auth)/sign-in" />;
   }
 

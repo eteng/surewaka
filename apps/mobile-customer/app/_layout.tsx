@@ -1,7 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import '../global.css';
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, Redirect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
@@ -21,6 +21,8 @@ function InnerLayout() {
   const initialize = useAuthStore((s) => s.initialize);
   const initialized = useAuthStore((s) => s.initialized);
   const loading = useAuthStore((s) => s.loading);
+  const user = useAuthStore((s) => s.user);
+  const profileExists = useAuthStore((s) => s.profileExists);
 
   useEffect(() => {
     initialize();
@@ -28,6 +30,10 @@ function InnerLayout() {
 
   if (loading || !initialized) {
     return null;
+  }
+
+  if (user && profileExists === false) {
+    return <Redirect href="/(auth)/register" />;
   }
 
   return (

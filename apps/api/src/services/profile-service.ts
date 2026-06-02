@@ -19,7 +19,7 @@ import {
 export type ProfileResponse = {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string;
   role: string;
   avatarUrl: string | null;
