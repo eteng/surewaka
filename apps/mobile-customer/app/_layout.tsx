@@ -5,6 +5,8 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Toaster } from 'sonner-native';
 import { ThemeProvider, useAuthStore } from '@surewaka/mobile-shared';
 
 Sentry.init({
@@ -59,10 +61,13 @@ function InnerLayout() {
 
 function RootLayout() {
   return (
-    <ThemeProvider>
-      <StatusBar style="auto" />
-      <InnerLayout />
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <StatusBar style="auto" />
+        <InnerLayout />
+        <Toaster position="bottom-center" richColors />
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 
