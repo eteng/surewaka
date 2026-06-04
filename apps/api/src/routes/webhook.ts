@@ -12,22 +12,22 @@ webhookRoutes.post('/paystack', async (c) => {
   const signature = c.req.header('x-paystack-signature') ?? '';
 
   if (!verifyWebhookSignature(rawBody, signature)) {
-    return c.json({ error: 'Invalid signature' }, 400);
+    return c.json({ data: null, error: { code: 'INVALID_SIGNATURE', message: 'Invalid signature' }, meta: null }, 400);
   }
 
   let payload: unknown;
   try {
     payload = JSON.parse(rawBody);
   } catch {
-    return c.json({ error: 'Invalid JSON' }, 400);
+    return c.json({ data: null, error: { code: 'INVALID_JSON', message: 'Invalid JSON body' }, meta: null }, 400);
   }
 
   const parsed = paystackWebhookSchema.safeParse(payload);
-  if (!parsed.success) return c.json({ ok: true });
+  if (!parsed.success) return c.json({ data: { ok: true }, error: null, meta: null });
 
   const { event, data } = parsed.data;
 
-  if (event !== 'charge.success') return c.json({ ok: true });
+  if (event !== 'charge.success') return c.json({ data: { ok: true }, error: null, meta: null });
 
   // Idempotency: skip if reference was already processed
   const existing = await db
@@ -35,11 +35,12 @@ webhookRoutes.post('/paystack', async (c) => {
     .from(walletTransactions)
     .where(eq(walletTransactions.reference, data.reference));
 
-  if (existing.length > 0) return c.json({ ok: true });
+  if (existing.length > 0) return c.json({ data: { ok: true }, error: null, meta: null });
 
   try {
     // Prefer user_id from metadata (set at transaction initialization) to avoid extra DB lookup
-    const userId = (data.metadata as Record<string, unknown>)?.user_id as string | undefined;
+    const rawUserId = data.metadata?.['user_id'];
+    const userId = typeof rawUserId === 'string' ? rawUserId : undefined;
 
     let resolvedUserId: string | undefined = userId;
 
@@ -52,7 +53,7 @@ webhookRoutes.post('/paystack', async (c) => {
 
       if (!user) {
         console.error(`[webhook] No user found for email ${data.customer.email}`);
-        return c.json({ ok: true });
+        return c.json({ data: { ok: true }, error: null, meta: null });
       }
 
       resolvedUserId = user.id;
@@ -71,7 +72,7 @@ webhookRoutes.post('/paystack', async (c) => {
     console.error('[webhook] Failed to process charge.success', err);
   }
 
-  return c.json({ ok: true });
+  return c.json({ data: { ok: true }, error: null, meta: null });
 });
 
 export default webhookRoutes;
