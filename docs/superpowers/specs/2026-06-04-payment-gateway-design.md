@@ -42,11 +42,11 @@ Mobile → GET /api/v1/wallet/dva (provisions on first call)
 ### Booking payment (escrow)
 
 ```
-review.tsx → POST /api/v1/deliveries (creates delivery, status=pending, payment_status=unpaid)
+review.tsx → POST /api/v1/deliveries (creates delivery, status=draft, payment_status=unpaid)
            → POST /api/v1/wallet/check { amount }
            → If sufficient: POST /api/v1/booking/confirm { delivery_id, amount }
                → Single atomic DB transaction: wallet debit + escrow_hold insert
-               → delivery.payment_status = escrowed
+               → delivery.status = pending, delivery.payment_status = escrowed
                → Navigate to confirmed.tsx
            → If insufficient: inline BottomSheet (booking context + delivery_id preserved)
                Option A: "Top Up ₦X" — pre-filled shortfall → Paystack WebView
@@ -54,7 +54,8 @@ review.tsx → POST /api/v1/deliveries (creates delivery, status=pending, paymen
                Option B: "Pay ₦X now" — exact card payment
                          On webhook success: single atomic transaction —
                            wallet credit (fund) + wallet debit (escrow_hold)
-                           net ₦0 balance change, delivery.payment_status = escrowed
+                           delivery.status = pending, delivery.payment_status = escrowed
+                           net ₦0 balance change
                          Navigate to confirmed.tsx
 ```
 
@@ -72,15 +73,19 @@ Delivery status → delivered
 
 ### Cancellation & refund (tiered)
 
-| Stage at cancellation | Who cancels | Refund to customer wallet |
+| Delivery status at cancellation | Who cancels | Refund to customer wallet |
 |---|---|---|
-| pending (before match) | customer | 100% |
-| matched (before en route) | customer | 100% |
-| en_route_to_pickup | customer | 85% (15% fee) |
-| picked_up / in_transit | customer | 50% (driver returning package) |
+| `pending` (paid, unassigned) | customer | 100% |
+| `accepted` (before en route) | customer | 100% |
+| `en_route_pickup` | customer | 85% (15% cancellation fee) |
+| `arrived_pickup` | customer | 85% (driver already committed, at location) |
+| `picked_up` / `en_route_dropoff` / `arrived_dropoff` | customer | 50% (driver must return package) |
+| `failed` | system | 100% |
 | any stage | driver / system | 100% |
+| `draft` | customer | N/A — no payment taken yet |
 
-Refunds are wallet credits (`type=refund`). No Paystack reversals needed.
+Refunds are wallet credits (`type=refund`). No Paystack reversals needed.  
+`returned` status is set by the driver after completing a failed delivery return — no additional refund action (already refunded at `failed` stage).
 
 ---
 
@@ -158,14 +163,50 @@ payout_requests (
 ### Changes to existing tables
 
 ```sql
--- deliveries: add payment tracking
+-- deliveries: add payment tracking columns
 ALTER TABLE deliveries
   ADD COLUMN payment_status text DEFAULT 'unpaid',  -- unpaid/escrowed/released/refunded
   ADD COLUMN escrow_hold_id uuid REFERENCES escrow_holds(id),
   ADD COLUMN amount_paid bigint;  -- kobo
 
--- delivery_status enum: new state for driver en route before pickup
-ALTER TYPE delivery_status ADD VALUE 'en_route_to_pickup' AFTER 'matched';
+-- delivery_status enum: full replacement (Postgres cannot remove enum values)
+-- Migration strategy: create new type → alter column → drop old type
+CREATE TYPE delivery_status_new AS ENUM (
+  'draft',           -- booking started, not yet paid
+  'pending',         -- paid, awaiting driver/carrier assignment
+  'accepted',        -- driver/carrier accepted the job
+  'en_route_pickup', -- driver heading to pickup location
+  'arrived_pickup',  -- driver at pickup, waiting for sender
+  'picked_up',       -- package collected, heading to recipient
+  'en_route_dropoff',-- heading to recipient
+  'arrived_dropoff', -- at recipient location
+  'delivered',       -- recipient confirmed receipt
+  'cancelled',       -- cancelled by sender, driver, or system
+  'failed',          -- delivery attempt failed (recipient unavailable, etc.)
+  'returned'         -- package returned to sender after failure
+);
+
+ALTER TABLE deliveries
+  ALTER COLUMN status TYPE delivery_status_new
+  USING status::text::delivery_status_new;
+
+DROP TYPE delivery_status;
+ALTER TYPE delivery_status_new RENAME TO delivery_status;
+```
+
+**Status state machine:**
+```
+draft → pending (on payment confirmed)
+pending → accepted (driver accepts job)
+accepted → en_route_pickup (driver starts moving)
+en_route_pickup → arrived_pickup (driver at location)
+arrived_pickup → picked_up (package collected)
+picked_up → en_route_dropoff
+en_route_dropoff → arrived_dropoff
+arrived_dropoff → delivered (recipient confirms)
+                → failed (recipient unavailable)
+failed → returned (driver returns package to sender)
+any non-terminal → cancelled
 ```
 
 ### Auto-wallet trigger
