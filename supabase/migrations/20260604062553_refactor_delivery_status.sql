@@ -1,6 +1,10 @@
 -- Migration: Refactor delivery_status enum (12 states) + add payment columns
 -- Postgres cannot remove enum values, so we use a temp-column swap approach.
 
+-- Cleanup any partial run from a previous failed attempt
+ALTER TABLE public.deliveries DROP COLUMN IF EXISTS status_temp;
+DROP TYPE IF EXISTS delivery_status_new;
+
 -- Step 1: Add temp column to preserve status as text
 ALTER TABLE public.deliveries ADD COLUMN status_temp TEXT;
 UPDATE public.deliveries SET status_temp = status::text;
@@ -25,6 +29,9 @@ CREATE TYPE delivery_status_new AS ENUM (
   'returned'
 );
 
+-- Drop default before type change (required — Postgres cannot auto-cast the old default)
+ALTER TABLE public.deliveries ALTER COLUMN status DROP DEFAULT;
+
 -- Step 3: Swap the type using the temp column
 ALTER TABLE public.deliveries
   ALTER COLUMN status TYPE delivery_status_new
@@ -41,9 +48,9 @@ ALTER TYPE delivery_status_new RENAME TO delivery_status;
 
 -- Add payment columns to deliveries
 ALTER TABLE public.deliveries
-  ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'unpaid'
+  ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'unpaid'
     CHECK (payment_status IN ('unpaid', 'escrowed', 'released', 'refunded')),
-  ADD COLUMN escrow_hold_id UUID REFERENCES public.escrow_holds(id),
-  ADD COLUMN amount_paid BIGINT CHECK (amount_paid > 0);
+  ADD COLUMN IF NOT EXISTS escrow_hold_id UUID REFERENCES public.escrow_holds(id),
+  ADD COLUMN IF NOT EXISTS amount_paid BIGINT CHECK (amount_paid > 0);
 
-CREATE INDEX idx_deliveries_payment_status ON public.deliveries(payment_status);
+CREATE INDEX IF NOT EXISTS idx_deliveries_payment_status ON public.deliveries(payment_status);
