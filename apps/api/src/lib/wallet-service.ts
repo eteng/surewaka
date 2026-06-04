@@ -10,6 +10,9 @@ export type TransactionType =
   | 'commission'
   | 'adjustment';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TxOrDb = any;
+
 export async function getWalletByUserId(userId: string) {
   const [wallet] = await db.select().from(wallets).where(eq(wallets.userId, userId));
   if (!wallet) throw new Error('WALLET_NOT_FOUND');
@@ -23,8 +26,9 @@ export async function creditWallet(
   reference: string,
   description: string,
   metadata: Record<string, unknown> = {},
+  passedTx?: TxOrDb,
 ) {
-  return db.transaction(async (tx) => {
+  const run = async (tx: TxOrDb) => {
     const [wallet] = await tx
       .select({ balance: wallets.balance })
       .from(wallets)
@@ -53,7 +57,9 @@ export async function creditWallet(
       .returning();
 
     return txn;
-  });
+  };
+
+  return passedTx ? run(passedTx) : db.transaction(run);
 }
 
 export async function debitWallet(
@@ -63,8 +69,9 @@ export async function debitWallet(
   reference: string,
   description: string,
   metadata: Record<string, unknown> = {},
+  passedTx?: TxOrDb,
 ) {
-  return db.transaction(async (tx) => {
+  const run = async (tx: TxOrDb) => {
     const [wallet] = await tx
       .select({ balance: wallets.balance })
       .from(wallets)
@@ -94,7 +101,9 @@ export async function debitWallet(
       .returning();
 
     return txn;
-  });
+  };
+
+  return passedTx ? run(passedTx) : db.transaction(run);
 }
 
 export async function checkBalance(walletId: string, amount: number) {

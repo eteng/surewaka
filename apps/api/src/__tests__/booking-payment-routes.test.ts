@@ -17,11 +17,19 @@ vi.mock('../lib/wallet-service', () => ({
 
 const mockDbUpdate = { set: vi.fn().mockReturnThis(), where: vi.fn().mockResolvedValue([]) };
 const mockDbInsert = { values: vi.fn().mockReturnThis(), returning: vi.fn().mockResolvedValue([{ id: 'escrow-1' }]) };
-const mockDbSelect = { from: vi.fn().mockReturnThis(), where: vi.fn().mockResolvedValue([{ id: 'delivery-1', status: 'pending', customerId: 'user-123', amountPaid: 350000, escrowHoldId: null }]) };
+const mockDbSelect = { from: vi.fn().mockReturnThis(), where: vi.fn().mockResolvedValue([{ id: 'delivery-1', status: 'draft', customerId: 'user-123', amountPaid: 350000, escrowHoldId: null }]) };
+
+const mockTx = {
+  insert: vi.fn(() => mockDbInsert),
+  update: vi.fn(() => mockDbUpdate),
+  select: vi.fn(() => mockDbSelect),
+  from: vi.fn().mockReturnThis(),
+  where: vi.fn().mockReturnThis(),
+};
 
 vi.mock('@surewaka/db', () => ({
   db: {
-    transaction: vi.fn(async (fn: unknown) => (fn as (tx: unknown) => Promise<unknown>)(mockDbSelect)),
+    transaction: vi.fn(async (fn: unknown) => (fn as (tx: typeof mockTx) => Promise<unknown>)(mockTx)),
     select: vi.fn(() => mockDbSelect),
     update: vi.fn(() => mockDbUpdate),
     insert: vi.fn(() => mockDbInsert),

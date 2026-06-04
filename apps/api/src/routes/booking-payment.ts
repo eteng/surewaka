@@ -27,11 +27,27 @@ bookingPaymentRoutes.post('/booking/confirm', async (c) => {
   const { delivery_id, amount } = parsed.data;
 
   try {
+    const [delivery] = await db
+      .select({ id: deliveries.id, customerId: deliveries.customerId, status: deliveries.status })
+      .from(deliveries)
+      .where(eq(deliveries.id, delivery_id));
+
+    if (!delivery || delivery.customerId !== user.id) {
+      return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Delivery not found' }, meta: null }, 404);
+    }
+
+    if (delivery.status !== 'draft') {
+      return c.json(
+        { data: null, error: { code: 'INVALID_STATUS', message: `Cannot confirm a delivery in status: ${delivery.status}` }, meta: null },
+        422,
+      );
+    }
+
     const wallet = await getWalletByUserId(user.id);
     const reference = `escrow_${delivery_id}_${randomUUID().slice(0, 8)}`;
 
     await db.transaction(async (tx) => {
-      await debitWallet(wallet.id, amount, 'escrow_hold', reference, `Escrow for delivery ${delivery_id}`);
+      await debitWallet(wallet.id, amount, 'escrow_hold', reference, `Escrow for delivery ${delivery_id}`, {}, tx);
 
       const [escrow] = await tx
         .insert(escrowHolds)
@@ -111,6 +127,8 @@ bookingPaymentRoutes.post('/deliveries/:id/cancel', async (c) => {
     const amountPaid = Number(delivery.amountPaid ?? 0);
     const refundAmount = Math.floor(amountPaid * rate);
 
+    const wallet = refundAmount > 0 ? await getWalletByUserId(user.id) : null;
+
     await db.transaction(async (tx) => {
       await tx
         .update(deliveries)
@@ -127,8 +145,7 @@ bookingPaymentRoutes.post('/deliveries/:id/cancel', async (c) => {
           .where(eq(escrowHolds.id, delivery.escrowHoldId));
       }
 
-      if (refundAmount > 0) {
-        const wallet = await getWalletByUserId(user.id);
+      if (refundAmount > 0 && wallet) {
         await creditWallet(
           wallet.id,
           refundAmount,
@@ -136,6 +153,7 @@ bookingPaymentRoutes.post('/deliveries/:id/cancel', async (c) => {
           `refund_${deliveryId}_${Date.now()}`,
           `Cancellation refund for delivery ${deliveryId} (${Math.round(rate * 100)}%)`,
           { delivery_id: deliveryId, original_amount: amountPaid, refund_rate: rate },
+          tx,
         );
       }
     });
