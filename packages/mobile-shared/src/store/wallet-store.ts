@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { createAuthClient } from '../api/client';
 
 export type WalletTransaction = {
   id: string;
@@ -23,22 +24,6 @@ export type WalletState = {
   reset: () => void;
 };
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
-
-async function apiFetch<T>(path: string, token: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
-  if (!res.ok) throw new Error(`API error ${res.status}`);
-  const json = (await res.json()) as { data: T };
-  return json.data;
-}
-
 export const useWalletStore = create<WalletState>((set) => ({
   balance: 0,
   currency: 'NGN',
@@ -50,33 +35,42 @@ export const useWalletStore = create<WalletState>((set) => ({
   fetchBalance: async (token) => {
     set({ loading: true });
     try {
-      const data = await apiFetch<{ balance: number; currency: string }>(
+      const { data } = await createAuthClient(token).get<{ balance: number; currency: string }>(
         '/api/v1/wallet/balance',
-        token,
       );
-      set({ balance: data.balance, currency: data.currency });
+      if (data) set({ balance: data.balance, currency: data.currency });
     } finally {
       set({ loading: false });
     }
   },
 
   fetchTransactions: async (token) => {
-    const data = await apiFetch<WalletTransaction[]>('/api/v1/wallet/transactions', token);
-    set({ transactions: data });
+    set({ loading: true });
+    try {
+      const { data } = await createAuthClient(token).get<WalletTransaction[]>(
+        '/api/v1/wallet/transactions',
+      );
+      if (data) set({ transactions: data });
+    } finally {
+      set({ loading: false });
+    }
   },
 
   fetchDva: async (token) => {
     try {
-      const data = await apiFetch<{ bank: string; account_number: string }>(
+      const { data } = await createAuthClient(token).get<{ bank: string; account_number: string }>(
         '/api/v1/wallet/dva',
-        token,
       );
-      set({ dvaBank: data.bank, dvaAccountNo: data.account_number });
-      return data;
+      if (data) {
+        set({ dvaBank: data.bank, dvaAccountNo: data.account_number });
+        return data;
+      }
+      return null;
     } catch {
       return null;
     }
   },
 
-  reset: () => set({ balance: 0, transactions: [], dvaBank: null, dvaAccountNo: null }),
+  reset: () =>
+    set({ balance: 0, currency: 'NGN', transactions: [], dvaBank: null, dvaAccountNo: null, loading: false }),
 }));
