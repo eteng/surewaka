@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useBookingStore, useAuthStore, createAuthClient } from '@surewaka/mobile-shared';
+import PaymentShortfallSheet from './payment-shortfall';
 
 type DeliveryResponse = {
   id: string;
@@ -28,8 +29,42 @@ export default function ReviewScreen() {
   const packageDetails = useBookingStore((s) => s.packageDetails);
   const recipientDetails = useBookingStore((s) => s.recipientDetails);
   const selectedCarrier = useBookingStore((s) => s.selectedCarrier);
+  const resetBooking = useBookingStore((s) => s.reset);
   const session = useAuthStore((s) => s.session);
   const [submitting, setSubmitting] = useState(false);
+  const [showShortfall, setShowShortfall] = useState(false);
+  const [shortfallData, setShortfallData] = useState<{
+    shortfall: number;
+    deliveryId: string;
+    totalAmount: number;
+  } | null>(null);
+  const [pendingDeliveryId, setPendingDeliveryId] = useState<string | null>(null);
+
+  const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+  const confirmBooking = async (deliveryId: string, amount: number) => {
+    if (!session?.access_token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/v1/booking/confirm`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ delivery_id: deliveryId, amount }),
+      });
+      const json = (await res.json()) as { data: unknown; error?: { message: string } };
+      if (!res.ok) {
+        Alert.alert('Booking Failed', json.error?.message ?? 'Something went wrong');
+        return;
+      }
+      resetBooking();
+      router.push({ pathname: '/booking/confirmed', params: { deliveryId } });
+    } catch (err) {
+      Alert.alert('Booking Failed', 'Something went wrong. Please try again.');
+      console.error('[confirm-booking]', err);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!session?.access_token) {
@@ -73,17 +108,49 @@ export default function ReviewScreen() {
       },
     });
 
-    setSubmitting(false);
-
     if (error || !data) {
+      setSubmitting(false);
       Alert.alert('Booking Failed', error?.message ?? 'Something went wrong');
       return;
     }
 
-    router.push({
-      pathname: '/booking/confirmed',
-      params: { deliveryId: data.id },
-    });
+    const deliveryId = data.id;
+    setPendingDeliveryId(deliveryId);
+
+    // TODO: replace with real price from carrier selection
+    const deliveryAmount = 350000; // kobo placeholder
+
+    try {
+      const checkRes = await fetch(`${API_URL}/api/v1/wallet/check`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amount: deliveryAmount }),
+      });
+      const checkJson = (await checkRes.json()) as {
+        data: { sufficient: boolean; shortfall?: number };
+      };
+
+      if (!checkJson.data.sufficient) {
+        setShortfallData({
+          shortfall: checkJson.data.shortfall ?? deliveryAmount,
+          deliveryId,
+          totalAmount: deliveryAmount,
+        });
+        setShowShortfall(true);
+        setSubmitting(false);
+        return;
+      }
+
+      setSubmitting(false);
+      await confirmBooking(deliveryId, deliveryAmount);
+    } catch (err) {
+      setSubmitting(false);
+      Alert.alert('Error', 'Could not verify wallet balance. Please try again.');
+      console.error('[wallet-check]', err);
+    }
   };
 
   return (
@@ -155,6 +222,24 @@ export default function ReviewScreen() {
           <Text className="text-white text-lg font-semibold">Confirm & Pay</Text>
         )}
       </Pressable>
+
+      <Modal visible={showShortfall} transparent animationType="slide">
+        <View className="flex-1 justify-end bg-black/40">
+          {shortfallData && (
+            <PaymentShortfallSheet
+              shortfall={shortfallData.shortfall}
+              deliveryId={shortfallData.deliveryId}
+              totalAmount={shortfallData.totalAmount}
+              onSuccess={() => {
+                setShowShortfall(false);
+                if (pendingDeliveryId)
+                  confirmBooking(pendingDeliveryId, shortfallData.totalAmount);
+              }}
+              onDismiss={() => setShowShortfall(false)}
+            />
+          )}
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
