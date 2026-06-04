@@ -5,6 +5,8 @@ import { useRouter } from 'expo-router';
 import { useBookingStore, useAuthStore, createAuthClient } from '@surewaka/mobile-shared';
 import { PaymentShortfallSheet } from './payment-shortfall';
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
+
 type DeliveryResponse = {
   id: string;
   customerId: string;
@@ -38,9 +40,6 @@ export default function ReviewScreen() {
     deliveryId: string;
     totalAmount: number;
   } | null>(null);
-  const [pendingDeliveryId, setPendingDeliveryId] = useState<string | null>(null);
-
-  const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
 
   const confirmBooking = async (deliveryId: string, amount: number) => {
     if (!session?.access_token) return;
@@ -115,7 +114,6 @@ export default function ReviewScreen() {
     }
 
     const deliveryId = data.id;
-    setPendingDeliveryId(deliveryId);
 
     // TODO: replace with real price from carrier selection
     const deliveryAmount = 350000; // kobo placeholder
@@ -232,8 +230,7 @@ export default function ReviewScreen() {
               totalAmount={shortfallData.totalAmount}
               onSuccess={() => {
                 setShowShortfall(false);
-                if (pendingDeliveryId)
-                  confirmBooking(pendingDeliveryId, shortfallData.totalAmount);
+                void confirmBooking(shortfallData.deliveryId, shortfallData.totalAmount);
               }}
               onDismiss={() => setShowShortfall(false)}
             />

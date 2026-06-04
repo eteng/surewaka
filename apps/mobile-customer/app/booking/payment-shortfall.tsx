@@ -62,20 +62,24 @@ export function PaymentShortfallSheet({
               { headers: { Authorization: `Bearer ${session.access_token}` } },
             );
             const statusJson = (await statusRes.json()) as { data: { status: string } };
-            if (statusJson.data?.status === 'success' || attempts >= 8) {
+            if (statusJson.data?.status === 'success') {
               clearInterval(interval);
               onSuccess();
+            } else if (attempts >= 8) {
+              clearInterval(interval);
+              setLoading(false);
+              Alert.alert('Payment Timeout', 'We could not confirm your payment. Please check your wallet and try again.');
             }
           } catch {
             clearInterval(interval);
+            setLoading(false);
           }
         })();
       }, 2000);
     } catch (err) {
+      setLoading(false);
       Alert.alert('Payment Failed', 'Please try again');
       console.error('[shortfall-pay]', err);
-    } finally {
-      setLoading(false);
     }
   }
 
