@@ -50,6 +50,7 @@ deliveryRoutes.post('/', async (c) => {
       .insert(deliveries)
       .values({
         customerId:         user.id,
+        status:             'draft',
         pickupAddress:      pickup.address,
         pickupCity:         pickup.city,
         pickupLat:          pickup.lat,
