@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -17,6 +17,13 @@ export default function TopupScreen() {
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
   const [loading, setLoading] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current !== null) clearInterval(pollRef.current);
+    };
+  }, []);
 
   const resolvedAmount = selectedPreset ?? (customAmount ? Math.round(parseFloat(customAmount) * 100) : 0);
 
@@ -37,27 +44,34 @@ export default function TopupScreen() {
 
       if (error || !data?.authorization_url) {
         Alert.alert('Error', error?.message ?? 'Could not initialize payment');
+        setLoading(false);
         return;
       }
 
       await WebBrowser.openAuthSessionAsync(data.authorization_url, 'surewaka://wallet/topup');
 
-      // Poll for confirmation (max 8 attempts × 2s = 16s)
       let attempts = 0;
-      const poll = setInterval(async () => {
+      pollRef.current = setInterval(async () => {
         attempts++;
         const { data: statusData } = await client.get<{ status: string }>(
           `/api/v1/wallet/fund/${data.reference}`,
         );
-        if (statusData?.status === 'success' || attempts >= 8) {
-          clearInterval(poll);
+        if (statusData?.status === 'success') {
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          setLoading(false);
           router.replace('/wallet/topup-success');
+        } else if (attempts >= 8) {
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          setLoading(false);
+          Alert.alert('Payment Pending', 'We could not confirm your payment. Check your wallet balance in a few minutes.');
+          router.back();
         }
       }, 2000);
     } catch (err) {
       Alert.alert('Payment Failed', 'Please try again');
       console.error('[topup]', err);
-    } finally {
       setLoading(false);
     }
   };
