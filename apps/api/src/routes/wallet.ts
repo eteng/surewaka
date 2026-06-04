@@ -107,12 +107,12 @@ walletRoutes.post('/fund', async (c) => {
   const parsed = initializeTopupSchema.safeParse(body);
   if (!parsed.success) {
     return c.json(
-      { data: null, error: { code: 'VALIDATION_ERROR', message: parsed.error.message }, meta: null },
+      { data: null, error: { code: 'VALIDATION_ERROR', message: parsed.error.issues.map(i => i.message).join(', ') }, meta: null },
       400,
     );
   }
   try {
-    const result = await initializeTransaction(parsed.data.amount, parsed.data.email, {
+    const result = await initializeTransaction(parsed.data.amount, user.email ?? '', {
       topup_type: parsed.data.topup_type,
       delivery_id: parsed.data.delivery_id,
       user_id: user.id,
@@ -136,7 +136,7 @@ walletRoutes.get('/fund/:reference', async (c) => {
     const txnData = await verifyTransaction(reference);
     return c.json({ data: { status: txnData.status, amount: txnData.amount }, error: null, meta: null });
   } catch {
-    return c.json({ data: { status: 'pending' }, error: null, meta: null });
+    return c.json({ data: null, error: { code: 'PAYMENT_VERIFY_ERROR', message: 'Could not verify payment status' }, meta: null }, 502);
   }
 });
 
@@ -146,7 +146,7 @@ walletRoutes.post('/check', async (c) => {
   const parsed = walletCheckSchema.safeParse(body);
   if (!parsed.success) {
     return c.json(
-      { data: null, error: { code: 'VALIDATION_ERROR', message: parsed.error.message }, meta: null },
+      { data: null, error: { code: 'VALIDATION_ERROR', message: parsed.error.issues.map(i => i.message).join(', ') }, meta: null },
       400,
     );
   }

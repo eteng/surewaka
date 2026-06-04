@@ -24,7 +24,7 @@ vi.mock('../lib/paystack', () => ({
   createDedicatedVirtualAccount: vi.fn(),
 }));
 
-vi.mock('@surewaka/db', () => ({ db: {}, wallets: 'wallets', eq: vi.fn() }));
+vi.mock('@surewaka/db', () => ({ db: {}, wallets: 'wallets', walletTransactions: 'walletTransactions' }));
 
 function authUser() {
   return { id: 'user-123', email: 'test@example.com', user_metadata: { name: 'Test User' }, app_metadata: {} };
