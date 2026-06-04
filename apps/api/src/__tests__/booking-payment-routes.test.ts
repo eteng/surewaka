@@ -17,7 +17,12 @@ vi.mock('../lib/wallet-service', () => ({
 
 const mockDbUpdate = { set: vi.fn().mockReturnThis(), where: vi.fn().mockResolvedValue([]) };
 const mockDbInsert = { values: vi.fn().mockReturnThis(), returning: vi.fn().mockResolvedValue([{ id: 'escrow-1' }]) };
-const mockDbSelect = { from: vi.fn().mockReturnThis(), where: vi.fn().mockResolvedValue([{ id: 'delivery-1', status: 'draft', customerId: 'user-123', amountPaid: 350000, escrowHoldId: null }]) };
+// .for('update') is the terminal call in the locked-select chain; it resolves the row array.
+const mockDbSelect = {
+  from: vi.fn().mockReturnThis(),
+  where: vi.fn().mockReturnThis(),
+  for: vi.fn().mockResolvedValue([{ id: 'delivery-1', status: 'draft', customerId: 'user-123', amountPaid: 350000, escrowHoldId: null }]),
+};
 
 const mockTx = {
   insert: vi.fn(() => mockDbInsert),
@@ -25,6 +30,7 @@ const mockTx = {
   select: vi.fn(() => mockDbSelect),
   from: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
+  for: vi.fn().mockReturnThis(),
 };
 
 vi.mock('@surewaka/db', () => ({
@@ -82,7 +88,9 @@ describe('Booking payment routes', () => {
 
   it('POST /deliveries/:id/cancel returns 422 for non-cancellable status', async () => {
     mockGetUser.mockResolvedValue({ data: { user: authUser() }, error: null });
-    mockDbSelect.where.mockResolvedValueOnce([{ id: 'del-1', status: 'delivered', customerId: 'user-123', amountPaid: 350000, escrowHoldId: null }]);
+    mockGetWalletByUserId.mockResolvedValue({ id: 'wallet-1' });
+    // The locked select resolves at .for('update') — override for this test
+    mockDbSelect.for.mockResolvedValueOnce([{ id: 'del-1', status: 'delivered', customerId: 'user-123', amountPaid: 350000, escrowHoldId: null }]);
     const res = await app.request('/api/v1/deliveries/del-1/cancel', {
       method: 'POST',
       headers: { Authorization: 'Bearer valid', 'Content-Type': 'application/json' },
