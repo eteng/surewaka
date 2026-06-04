@@ -25,14 +25,12 @@ export async function creditWallet(
   metadata: Record<string, unknown> = {},
 ) {
   return db.transaction(async (tx) => {
-    const rows = await tx
+    const [wallet] = await tx
       .select({ balance: wallets.balance })
       .from(wallets)
       .where(eq(wallets.id, walletId))
-      .for('update')
-      .returning();
+      .for('update');
 
-    const [wallet] = rows as Array<{ balance: number }>;
     if (!wallet) throw new Error('WALLET_NOT_FOUND');
     const newBalance = Number(wallet.balance) + amount;
 
@@ -67,14 +65,12 @@ export async function debitWallet(
   metadata: Record<string, unknown> = {},
 ) {
   return db.transaction(async (tx) => {
-    const rows = await tx
+    const [wallet] = await tx
       .select({ balance: wallets.balance })
       .from(wallets)
       .where(eq(wallets.id, walletId))
-      .for('update')
-      .returning();
+      .for('update');
 
-    const [wallet] = rows as Array<{ balance: number }>;
     if (!wallet) throw new Error('WALLET_NOT_FOUND');
     if (Number(wallet.balance) < amount) throw new Error('INSUFFICIENT_BALANCE');
     const newBalance = Number(wallet.balance) - amount;
