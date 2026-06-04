@@ -1,12 +1,5 @@
 // Core domain types for SureWaka
-
-export type DeliveryStatus =
-  | 'pending'
-  | 'matched'
-  | 'picked_up'
-  | 'in_transit'
-  | 'delivered'
-  | 'cancelled';
+// Note: DeliveryStatus is now defined as a Zod enum in validators.ts (source of truth)
 
 export type UserRole = 'customer' | 'driver' | 'surewaka_admin' | 'carrier_driver' | 'carrier_admin' | 'support_agent';
 
@@ -26,7 +19,7 @@ export interface DeliveryRequest {
   pickup: Location;
   dropoff: Location;
   packageDetails: PackageDetails;
-  status: DeliveryStatus;
+  status: 'draft' | 'pending' | 'accepted' | 'en_route_pickup' | 'arrived_pickup' | 'picked_up' | 'en_route_dropoff' | 'arrived_dropoff' | 'delivered' | 'cancelled' | 'failed' | 'returned';
   price?: number;
   driverId?: string;
   carrierId?: string;

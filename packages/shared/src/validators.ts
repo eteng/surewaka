@@ -170,6 +170,28 @@ export const waitlistQuerySchema = z.object({
 
 export type WaitlistQuery = z.infer<typeof waitlistQuerySchema>;
 
+// ─── Customer Mobile Profile ─────────────────────────────────────────────────
+
+export const GENDER_VALUES = ['woman', 'man', 'prefer_not_to_disclose'] as const;
+export type Gender = (typeof GENDER_VALUES)[number];
+
+export const GENDER_LABELS: Record<Gender, string> = {
+  woman: 'Woman',
+  man: 'Man',
+  prefer_not_to_disclose: 'Prefer not to disclose',
+};
+
+export const customerProfileUpdateSchema = z.object({
+  name: z
+    .string()
+    .min(2, 'Name must be at least 2 characters')
+    .refine((v) => v.trim().length > 0, 'Name cannot be whitespace only')
+    .optional(),
+  gender: z.enum(GENDER_VALUES).nullable().optional(),
+});
+
+export type CustomerProfileUpdate = z.infer<typeof customerProfileUpdateSchema>;
+
 // ─── Profile ─────────────────────────────────────────────────────────────────
 
 export const profilePreferencesUpdateSchema = z.object({
@@ -236,3 +258,59 @@ export const nameChangeReviewSchema = z.object({
 });
 
 export type NameChangeReview = z.infer<typeof nameChangeReviewSchema>;
+
+// ─── Payment validators ───────────────────────────────────────────────────────
+
+export const deliveryStatusSchema = z.enum([
+  'draft', 'pending', 'accepted', 'en_route_pickup', 'arrived_pickup',
+  'picked_up', 'en_route_dropoff', 'arrived_dropoff', 'delivered',
+  'cancelled', 'failed', 'returned',
+]);
+export type DeliveryStatus = z.infer<typeof deliveryStatusSchema>;
+
+export const paymentStatusSchema = z.enum(['unpaid', 'escrowed', 'released', 'refunded']);
+export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
+
+export const initializeTopupSchema = z.object({
+  amount: z.number().int().min(50000, 'Minimum top-up is ₦500'),  // kobo
+  email: z.string().email(),
+  topup_type: z.enum(['manual', 'booking_shortfall']).default('manual'),
+  delivery_id: z.string().uuid().optional(),
+});
+export type InitializeTopup = z.infer<typeof initializeTopupSchema>;
+
+export const walletCheckSchema = z.object({
+  amount: z.number().int().positive(),  // kobo
+});
+export type WalletCheck = z.infer<typeof walletCheckSchema>;
+
+export const bookingConfirmSchema = z.object({
+  delivery_id: z.string().uuid(),
+  amount: z.number().int().positive(),  // kobo
+});
+export type BookingConfirm = z.infer<typeof bookingConfirmSchema>;
+
+export const paystackWebhookSchema = z.object({
+  event: z.string(),
+  data: z.object({
+    reference: z.string(),
+    amount: z.number(),
+    status: z.string(),
+    customer: z.object({ email: z.string() }),
+    metadata: z.record(z.unknown()).optional().default({}),
+  }),
+});
+export type PaystackWebhook = z.infer<typeof paystackWebhookSchema>;
+
+export const payoutRequestSchema = z.object({
+  amount: z.number().int().min(100000, 'Minimum payout is ₦1,000'),  // kobo
+  bank_code: z.string().min(3).max(10),
+  account_number: z.string().length(10, 'Nigerian account numbers are 10 digits'),
+  account_name: z.string().min(2).max(100),
+});
+export type PayoutRequest = z.infer<typeof payoutRequestSchema>;
+
+export const cancelDeliverySchema = z.object({
+  reason: z.string().min(5).max(200).optional(),
+});
+export type CancelDelivery = z.infer<typeof cancelDeliverySchema>;
