@@ -21,3 +21,5 @@ export type { LocationSuggestion } from './maps/locationiq';
 export { useAuthStore } from './store/auth-store';
 export { useBookingStore } from './store/booking-store';
 export { useAddressStore } from './store/address-store';
+export { useWalletStore } from './store/wallet-store';
+export type { WalletTransaction, WalletState } from './store/wallet-store';
