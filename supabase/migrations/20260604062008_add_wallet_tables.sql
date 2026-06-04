@@ -41,29 +41,30 @@ CREATE TABLE public.wallet_transactions (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   wallet_id     UUID NOT NULL REFERENCES public.wallets(id),
   type          transaction_type NOT NULL,
-  amount        BIGINT NOT NULL,
-  balance_after BIGINT NOT NULL,
+  amount        BIGINT NOT NULL CHECK (amount <> 0),
+  balance_after BIGINT NOT NULL CHECK (balance_after >= 0),
   reference     TEXT UNIQUE,
   description   TEXT,
   metadata      JSONB NOT NULL DEFAULT '{}',
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_wallet_transactions_wallet_id   ON public.wallet_transactions(wallet_id);
-CREATE INDEX idx_wallet_transactions_reference   ON public.wallet_transactions(reference);
+CREATE INDEX idx_wallet_transactions_wallet_id      ON public.wallet_transactions(wallet_id);
+CREATE INDEX idx_wallet_transactions_wallet_created ON public.wallet_transactions(wallet_id, created_at DESC);
+CREATE INDEX idx_wallet_transactions_reference      ON public.wallet_transactions(reference);
 CREATE INDEX idx_wallet_transactions_type        ON public.wallet_transactions(type);
 CREATE INDEX idx_wallet_transactions_created_at  ON public.wallet_transactions(created_at DESC);
 
 -- ESCROW HOLDS
 CREATE TABLE public.escrow_holds (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  delivery_id       UUID NOT NULL,
+  delivery_id       UUID NOT NULL REFERENCES public.deliveries(id),
   sender_wallet_id  UUID NOT NULL REFERENCES public.wallets(id),
   driver_wallet_id  UUID REFERENCES public.wallets(id),
-  total_amount      BIGINT NOT NULL,
+  total_amount      BIGINT NOT NULL CHECK (total_amount > 0),
   commission_rate   NUMERIC(5,4) NOT NULL DEFAULT 0.1500,
-  commission_amount BIGINT NOT NULL DEFAULT 0,
-  driver_amount     BIGINT NOT NULL DEFAULT 0,
+  commission_amount BIGINT NOT NULL DEFAULT 0 CHECK (commission_amount >= 0),
+  driver_amount     BIGINT NOT NULL DEFAULT 0 CHECK (driver_amount >= 0),
   status            escrow_status NOT NULL DEFAULT 'held',
   held_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
   released_at       TIMESTAMPTZ,
@@ -85,7 +86,7 @@ CREATE TABLE public.payout_requests (
   account_name             TEXT NOT NULL,
   paystack_transfer_code   TEXT,
   paystack_recipient_code  TEXT,
-  status                   TEXT NOT NULL DEFAULT 'pending',
+  status                   TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
   failure_reason           TEXT,
   processed_at             TIMESTAMPTZ,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -103,7 +104,9 @@ BEGIN
   ON CONFLICT (user_id, currency) DO NOTHING;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public;
 
 CREATE TRIGGER on_user_created_create_wallet
   AFTER INSERT ON auth.users
@@ -131,36 +134,28 @@ ALTER TABLE public.escrow_holds ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payout_requests ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "service_role_manage_wallets"
-  ON public.wallets FOR ALL TO public
-  USING (auth.role() = 'service_role');
+  ON public.wallets FOR ALL USING (auth.role() = 'service_role');
 
 CREATE POLICY "users_read_own_wallet"
-  ON public.wallets FOR SELECT TO public
-  USING (user_id = auth.uid());
+  ON public.wallets FOR SELECT USING (user_id = auth.uid());
 
 CREATE POLICY "service_role_manage_wallet_transactions"
-  ON public.wallet_transactions FOR ALL TO public
-  USING (auth.role() = 'service_role');
+  ON public.wallet_transactions FOR ALL USING (auth.role() = 'service_role');
 
 CREATE POLICY "users_read_own_wallet_transactions"
-  ON public.wallet_transactions FOR SELECT TO public
-  USING (wallet_id IN (SELECT id FROM public.wallets WHERE user_id = auth.uid()));
+  ON public.wallet_transactions FOR SELECT USING (wallet_id IN (SELECT id FROM public.wallets WHERE user_id = auth.uid()));
 
 CREATE POLICY "service_role_manage_escrow_holds"
-  ON public.escrow_holds FOR ALL TO public
-  USING (auth.role() = 'service_role');
+  ON public.escrow_holds FOR ALL USING (auth.role() = 'service_role');
 
 CREATE POLICY "senders_read_own_escrow"
-  ON public.escrow_holds FOR SELECT TO public
-  USING (sender_wallet_id IN (SELECT id FROM public.wallets WHERE user_id = auth.uid()));
+  ON public.escrow_holds FOR SELECT USING (sender_wallet_id IN (SELECT id FROM public.wallets WHERE user_id = auth.uid()));
 
 CREATE POLICY "service_role_manage_payout_requests"
-  ON public.payout_requests FOR ALL TO public
-  USING (auth.role() = 'service_role');
+  ON public.payout_requests FOR ALL USING (auth.role() = 'service_role');
 
 CREATE POLICY "users_read_own_payout_requests"
-  ON public.payout_requests FOR SELECT TO public
-  USING (wallet_id IN (SELECT id FROM public.wallets WHERE user_id = auth.uid()));
+  ON public.payout_requests FOR SELECT USING (wallet_id IN (SELECT id FROM public.wallets WHERE user_id = auth.uid()));
 
 GRANT SELECT ON public.wallets TO authenticated;
 GRANT SELECT ON public.wallet_transactions TO authenticated;
