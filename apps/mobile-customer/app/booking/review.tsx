@@ -3,7 +3,7 @@ import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, Modal } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useBookingStore, useAuthStore, createAuthClient } from '@surewaka/mobile-shared';
-import PaymentShortfallSheet from './payment-shortfall';
+import { PaymentShortfallSheet } from './payment-shortfall';
 
 type DeliveryResponse = {
   id: string;

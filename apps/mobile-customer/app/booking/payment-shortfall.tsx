@@ -17,7 +17,7 @@ function formatNaira(kobo: number) {
   return `₦${(kobo / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
 }
 
-export default function PaymentShortfallSheet({
+export function PaymentShortfallSheet({
   shortfall,
   deliveryId,
   totalAmount,
@@ -53,17 +53,23 @@ export default function PaymentShortfallSheet({
 
       // Poll for payment status then trigger booking confirm
       let attempts = 0;
-      const interval = setInterval(async () => {
-        attempts++;
-        const statusRes = await fetch(
-          `${API_URL}/api/v1/wallet/fund/${json.data.reference}`,
-          { headers: { Authorization: `Bearer ${session.access_token}` } },
-        );
-        const statusJson = (await statusRes.json()) as { data: { status: string } };
-        if (statusJson.data?.status === 'success' || attempts >= 8) {
-          clearInterval(interval);
-          onSuccess();
-        }
+      const interval = setInterval(() => {
+        void (async () => {
+          try {
+            attempts++;
+            const statusRes = await fetch(
+              `${API_URL}/api/v1/wallet/fund/${json.data.reference}`,
+              { headers: { Authorization: `Bearer ${session.access_token}` } },
+            );
+            const statusJson = (await statusRes.json()) as { data: { status: string } };
+            if (statusJson.data?.status === 'success' || attempts >= 8) {
+              clearInterval(interval);
+              onSuccess();
+            }
+          } catch {
+            clearInterval(interval);
+          }
+        })();
       }, 2000);
     } catch (err) {
       Alert.alert('Payment Failed', 'Please try again');
@@ -101,13 +107,19 @@ export default function PaymentShortfallSheet({
         disabled={loading}
         className="border border-primary py-4 rounded-xl items-center mb-3"
       >
-        <Text className="text-primary font-semibold text-base">
-          Pay {formatNaira(totalAmount)} now (card only)
-        </Text>
-        <Text className="text-xs text-gray-400 mt-1">Funds wallet then immediately deducts</Text>
+        {loading ? (
+          <ActivityIndicator color="#16a34a" />
+        ) : (
+          <>
+            <Text className="text-primary font-semibold text-base">
+              Pay {formatNaira(totalAmount)} now (card only)
+            </Text>
+            <Text className="text-xs text-gray-400 mt-1">Funds wallet then immediately deducts</Text>
+          </>
+        )}
       </Pressable>
 
-      <Pressable onPress={onDismiss} className="items-center py-2">
+      <Pressable onPress={onDismiss} disabled={loading} className="items-center py-2">
         <Text className="text-sm text-gray-400">Cancel</Text>
       </Pressable>
     </View>
