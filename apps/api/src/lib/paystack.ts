@@ -1,8 +1,17 @@
+import { createHmac } from 'crypto';
+
 const BASE = 'https://api.paystack.co';
+const DVA_DEFAULT_BANK = 'wema-bank' as const;
+
+function getSecretKey(): string {
+  const key = process.env.PAYSTACK_SECRET_KEY;
+  if (!key) throw new Error('PAYSTACK_SECRET_KEY is not set');
+  return key;
+}
 
 function headers() {
   return {
-    Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+    Authorization: `Bearer ${getSecretKey()}`,
     'Content-Type': 'application/json',
   };
 }
@@ -63,11 +72,14 @@ export async function createCustomer(
   return json.data;
 }
 
-export async function createDedicatedVirtualAccount(customerCode: string): Promise<DVAData> {
+export async function createDedicatedVirtualAccount(
+  customerCode: string,
+  preferredBank: string = DVA_DEFAULT_BANK,
+): Promise<DVAData> {
   const res = await fetch(`${BASE}/dedicated_account`, {
     method: 'POST',
     headers: headers(),
-    body: JSON.stringify({ customer: customerCode, preferred_bank: 'wema-bank' }),
+    body: JSON.stringify({ customer: customerCode, preferred_bank: preferredBank }),
   });
   const json = (await res.json()) as { status: boolean; data: DVAData };
   if (!json.status) throw new Error('Paystack DVA creation failed');
@@ -75,9 +87,7 @@ export async function createDedicatedVirtualAccount(customerCode: string): Promi
 }
 
 export function verifyWebhookSignature(rawBody: string, signature: string): boolean {
-  const crypto = require('crypto') as typeof import('crypto');
-  const hash = crypto
-    .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY ?? '')
+  const hash = createHmac('sha512', getSecretKey())
     .update(rawBody)
     .digest('hex');
   return hash === signature;
