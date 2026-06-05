@@ -139,6 +139,14 @@ walletRoutes.get('/fund/:reference', async (c) => {
     const txnData = await verifyTransaction(reference);
 
     if (txnData.status === 'success') {
+      // Verify this reference was initialized by the calling user.
+      // metadata.user_id is written at /fund initialization time.
+      // Without this check, any authenticated user could claim another user's payment (IDOR).
+      const metaUserId = txnData.metadata?.['user_id'];
+      if (metaUserId !== user.id) {
+        return c.json({ data: null, error: { code: 'FORBIDDEN', message: 'Reference does not belong to this account' }, meta: null }, 403);
+      }
+
       // Credit immediately so the wallet is funded before the client proceeds.
       // The webhook uses the same idempotency guard, so whichever arrives first
       // wins and the second is a no-op.
