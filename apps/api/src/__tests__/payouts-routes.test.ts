@@ -9,9 +9,20 @@ vi.mock('@surewaka/supabase', () => ({
 const mockGetWalletByUserId = vi.fn();
 const mockDebitWallet = vi.fn();
 vi.mock('../lib/wallet-service', () => ({
-  getWalletByUserId: vi.fn().mockResolvedValue({ id: 'wallet-1', balance: 500000 }),
+  getWalletByUserId: (...a: unknown[]) => mockGetWalletByUserId(...a),
   debitWallet: (...a: unknown[]) => mockDebitWallet(...a),
 }));
+
+const mockTx = {
+  select: vi.fn().mockReturnThis(),
+  from: vi.fn().mockReturnThis(),
+  where: vi.fn().mockReturnThis(),
+  orderBy: vi.fn().mockReturnThis(),
+  limit: vi.fn().mockResolvedValue([]),
+  insert: vi.fn().mockReturnThis(),
+  values: vi.fn().mockReturnThis(),
+  returning: vi.fn().mockResolvedValue([{ id: 'payout-1', status: 'pending', amount: 100000 }]),
+};
 
 vi.mock('@surewaka/db', () => ({
   db: {
@@ -23,6 +34,7 @@ vi.mock('@surewaka/db', () => ({
     returning: vi.fn().mockResolvedValue([{ id: 'payout-1', status: 'pending', amount: 100000 }]),
     orderBy: vi.fn().mockReturnThis(),
     limit: vi.fn().mockResolvedValue([]),
+    transaction: vi.fn().mockImplementation((fn: (tx: unknown) => unknown) => fn(mockTx)),
   },
   payoutRequests: 'payout_requests',
   wallets: 'wallets',
@@ -46,6 +58,13 @@ describe('Payouts routes', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockGetWalletByUserId.mockResolvedValue({ id: 'wallet-1', balance: 500000 });
+    mockTx.select.mockReturnThis();
+    mockTx.from.mockReturnThis();
+    mockTx.where.mockReturnThis();
+    mockTx.insert.mockReturnThis();
+    mockTx.values.mockReturnThis();
+    mockTx.returning.mockResolvedValue([{ id: 'payout-1', status: 'pending', amount: 100000 }]);
     app = await createTestApp();
   });
 
@@ -78,6 +97,7 @@ describe('Payouts routes', () => {
       body: JSON.stringify({ amount: 100000, bank_code: '058', account_number: '0123456789', account_name: 'Test Driver' }),
     });
     expect(res.status).toBe(201);
+    expect(mockDebitWallet).toHaveBeenCalledOnce();
     const body = await res.json();
     expect(body.data.status).toBe('pending');
   });

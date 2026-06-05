@@ -32,31 +32,47 @@ payoutRoutes.post('/request', async (c) => {
 
   try {
     const wallet = await getWalletByUserId(user.id);
-    const reference = `payout_${randomUUID().slice(0, 8)}`;
+    const reference = `payout_${randomUUID()}`;
 
-    await debitWallet(
-      wallet.id,
-      parsed.data.amount,
-      'payout',
-      reference,
-      `Payout to ${parsed.data.account_name} (${parsed.data.bank_code})`,
-    );
+    const payout = await db.transaction(async (tx) => {
+      await debitWallet(
+        wallet.id,
+        parsed.data.amount,
+        'payout',
+        reference,
+        `Payout to ${parsed.data.account_name} (${parsed.data.bank_code})`,
+        {},
+        tx,
+      );
 
-    const [payout] = await db
-      .insert(payoutRequests)
-      .values({
-        walletId: wallet.id,
-        amount: parsed.data.amount,
-        bankCode: parsed.data.bank_code,
-        accountNumber: parsed.data.account_number,
-        accountName: parsed.data.account_name,
-        status: 'pending',
-      })
-      .returning();
+      const [inserted] = await tx
+        .insert(payoutRequests)
+        .values({
+          walletId: wallet.id,
+          amount: parsed.data.amount,
+          bankCode: parsed.data.bank_code,
+          accountNumber: parsed.data.account_number,
+          accountName: parsed.data.account_name,
+          status: 'pending',
+        })
+        .returning();
+
+      return inserted;
+    });
 
     return c.json({ data: payout, error: null, meta: null }, 201);
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';
+    if (msg === 'WALLET_NOT_FOUND') {
+      return c.json(
+        {
+          data: null,
+          error: { code: 'WALLET_NOT_FOUND', message: 'No wallet found for this account' },
+          meta: null,
+        },
+        404,
+      );
+    }
     if (msg === 'INSUFFICIENT_BALANCE') {
       return c.json(
         {
@@ -90,7 +106,18 @@ payoutRoutes.get('/', async (c) => {
       .orderBy(desc(payoutRequests.createdAt))
       .limit(50);
     return c.json({ data: rows, error: null, meta: null });
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (msg === 'WALLET_NOT_FOUND') {
+      return c.json(
+        {
+          data: null,
+          error: { code: 'WALLET_NOT_FOUND', message: 'No wallet found for this account' },
+          meta: null,
+        },
+        404,
+      );
+    }
     return c.json(
       { data: null, error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch payouts' }, meta: null },
       500,
