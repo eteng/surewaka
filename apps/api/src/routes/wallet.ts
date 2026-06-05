@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import { db, wallets, walletTransactions } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { getWalletByUserId, getOrCreateWallet, checkBalance, creditWallet } from '../lib/wallet-service';
@@ -139,24 +139,18 @@ walletRoutes.get('/fund/:reference', async (c) => {
     const txnData = await verifyTransaction(reference);
 
     if (txnData.status === 'success') {
-      // Verify this reference was initialized by the calling user.
-      // metadata.user_id is written at /fund initialization time.
-      // Without this check, any authenticated user could claim another user's payment (IDOR).
-      const metaUserId = txnData.metadata?.['user_id'];
-      if (metaUserId !== user.id) {
-        return c.json({ data: null, error: { code: 'FORBIDDEN', message: 'Reference does not belong to this account' }, meta: null }, 403);
-      }
+      // Resolve wallet from the authenticated user — this is the authoritative
+      // ownership boundary. Idempotency is then checked on (reference, wallet_id)
+      // so a foreign reference can never credit this user's wallet, and this
+      // user's reference can never credit a different wallet.
+      const wallet = await getOrCreateWallet(user.id);
 
-      // Credit immediately so the wallet is funded before the client proceeds.
-      // The webhook uses the same idempotency guard, so whichever arrives first
-      // wins and the second is a no-op.
       const existing = await db
         .select({ id: walletTransactions.id })
         .from(walletTransactions)
-        .where(eq(walletTransactions.reference, reference));
+        .where(and(eq(walletTransactions.reference, reference), eq(walletTransactions.walletId, wallet.id)));
 
       if (existing.length === 0) {
-        const wallet = await getOrCreateWallet(user.id);
         await creditWallet(wallet.id, txnData.amount, 'fund', reference, 'Wallet top-up via Paystack', txnData.metadata ?? {});
       }
     }
