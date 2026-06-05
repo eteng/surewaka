@@ -12,6 +12,10 @@ import adminNameChangeRoutes from './routes/admin/name-change-requests';
 import adminRoleRoutes from './routes/admin/roles';
 import adminUserRoutes from './routes/admin/users';
 import adminWaitlistRoutes from './routes/admin/waitlist';
+import walletRoutes from './routes/wallet';
+import webhookRoutes from './routes/webhook';
+import bookingPaymentRoutes from './routes/booking-payment';
+import payoutRoutes from './routes/payouts';
 
 const app = new Hono();
 
@@ -34,6 +38,10 @@ app.route('/api/v1/admin/name-change-requests', adminNameChangeRoutes);
 app.route('/api/v1/admin/roles', adminRoleRoutes);
 app.route('/api/v1/admin/users', adminUserRoutes);
 app.route('/api/v1/admin/waitlist', adminWaitlistRoutes);
+app.route('/api/v1/wallet', walletRoutes);
+app.route('/api/v1/webhook', webhookRoutes);
+app.route('/api/v1', bookingPaymentRoutes);
+app.route('/api/v1/payouts', payoutRoutes);
 
 // Start server
 const port = Number(process.env.PORT) || 4000;
