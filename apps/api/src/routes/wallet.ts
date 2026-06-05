@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { eq, desc } from 'drizzle-orm';
 import { db, wallets, walletTransactions } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
-import { getWalletByUserId, getOrCreateWallet, checkBalance } from '../lib/wallet-service';
+import { getWalletByUserId, getOrCreateWallet, checkBalance, creditWallet } from '../lib/wallet-service';
 import {
   initializeTransaction,
   verifyTransaction,
@@ -133,11 +133,29 @@ walletRoutes.post('/fund', async (c) => {
 });
 
 walletRoutes.get('/fund/:reference', async (c) => {
+  const user = c.get('user');
   const reference = c.req.param('reference');
   try {
     const txnData = await verifyTransaction(reference);
+
+    if (txnData.status === 'success') {
+      // Credit immediately so the wallet is funded before the client proceeds.
+      // The webhook uses the same idempotency guard, so whichever arrives first
+      // wins and the second is a no-op.
+      const existing = await db
+        .select({ id: walletTransactions.id })
+        .from(walletTransactions)
+        .where(eq(walletTransactions.reference, reference));
+
+      if (existing.length === 0) {
+        const wallet = await getOrCreateWallet(user.id);
+        await creditWallet(wallet.id, txnData.amount, 'fund', reference, 'Wallet top-up via Paystack', txnData.metadata ?? {});
+      }
+    }
+
     return c.json({ data: { status: txnData.status, amount: txnData.amount }, error: null, meta: null });
-  } catch {
+  } catch (err) {
+    console.error('[GET /wallet/fund/:reference]', err);
     return c.json({ data: null, error: { code: 'PAYMENT_VERIFY_ERROR', message: 'Could not verify payment status' }, meta: null }, 502);
   }
 });
