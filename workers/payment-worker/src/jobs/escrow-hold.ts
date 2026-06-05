@@ -3,21 +3,23 @@ import { eq } from 'drizzle-orm';
 import type { EscrowHoldJobData } from '../queue';
 
 export async function handleEscrowHold(data: EscrowHoldJobData) {
-  const [hold] = await db
-    .insert(escrowHolds)
-    .values({
-      deliveryId: data.deliveryId,
-      senderWalletId: data.walletId,
-      totalAmount: data.amount,
-      status: 'held',
-      heldAt: new Date(),
-    })
-    .returning();
+  return db.transaction(async (tx) => {
+    const [hold] = await tx
+      .insert(escrowHolds)
+      .values({
+        deliveryId: data.deliveryId,
+        senderWalletId: data.walletId,
+        totalAmount: data.amount,
+        status: 'held',
+        heldAt: new Date(),
+      })
+      .returning();
 
-  await db
-    .update(deliveries)
-    .set({ paymentStatus: 'escrowed', escrowHoldId: hold.id, amountPaid: data.amount })
-    .where(eq(deliveries.id, data.deliveryId));
+    await tx
+      .update(deliveries)
+      .set({ paymentStatus: 'escrowed', escrowHoldId: hold.id, amountPaid: data.amount })
+      .where(eq(deliveries.id, data.deliveryId));
 
-  return { escrowHoldId: hold.id };
+    return { escrowHoldId: hold.id };
+  });
 }

@@ -36,17 +36,17 @@ export async function handleProvisionDva(data: ProvisionDvaJobData) {
     .from(wallets)
     .where(eq(wallets.userId, data.userId));
 
-  if (wallet) {
-    await db
-      .update(wallets)
-      .set({
-        dvaBank: dvaData.bank.name,
-        dvaAccountNo: dvaData.account_number,
-        dvaCustomerCode: customerCode,
-        updatedAt: new Date(),
-      })
-      .where(eq(wallets.id, wallet.id));
-  }
+  if (!wallet) throw new Error(`Wallet not found for userId: ${data.userId}`);
+
+  await db
+    .update(wallets)
+    .set({
+      dvaBank: dvaData.bank.name,
+      dvaAccountNo: dvaData.account_number,
+      dvaCustomerCode: customerCode,
+      updatedAt: new Date(),
+    })
+    .where(eq(wallets.id, wallet.id));
 
   return { account_number: dvaData.account_number };
 }

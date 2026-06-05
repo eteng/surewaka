@@ -1,4 +1,4 @@
-import { db, wallets, escrowHolds, deliveries } from '@surewaka/db';
+import { db, wallets, escrowHolds, deliveries, walletTransactions } from '@surewaka/db';
 import { eq, sql } from 'drizzle-orm';
 import type { RefundJobData } from '../queue';
 
@@ -7,11 +7,24 @@ export async function handleRefund(data: RefundJobData) {
   if (refundAmount <= 0) return { refundAmount: 0 };
 
   await db.transaction(async (tx) => {
-    // Refund to sender wallet
-    await tx
+    // Refund to sender wallet and capture new balance for audit
+    const [updatedWallet] = await tx
       .update(wallets)
       .set({ balance: sql`balance + ${refundAmount}`, updatedAt: new Date() })
-      .where(eq(wallets.id, data.walletId));
+      .where(eq(wallets.id, data.walletId))
+      .returning({ balance: wallets.balance });
+
+    // Insert wallet transaction audit record
+    await tx
+      .insert(walletTransactions)
+      .values({
+        walletId: data.walletId,
+        type: 'refund',
+        amount: refundAmount,
+        balanceAfter: updatedWallet.balance,
+        description: `Refund for delivery ${data.deliveryId}`,
+        reference: `refund_${data.deliveryId}`,
+      });
 
     // Mark escrow hold as refunded if deliveryId links to one
     await tx
