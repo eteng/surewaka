@@ -14,6 +14,8 @@ export async function handleRefund(data: RefundJobData) {
       .where(eq(wallets.id, data.walletId))
       .returning({ balance: wallets.balance });
 
+    if (!updatedWallet) throw new Error(`Sender wallet not found: ${data.walletId}`);
+
     // Insert wallet transaction audit record
     await tx
       .insert(walletTransactions)

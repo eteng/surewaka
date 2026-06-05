@@ -30,6 +30,8 @@ export async function handleEscrowRelease(data: EscrowReleaseJobData) {
       .where(eq(wallets.id, data.driverWalletId))
       .returning({ balance: wallets.balance });
 
+    if (!updatedWallet) throw new Error(`Driver wallet not found: ${data.driverWalletId}`);
+
     // Insert wallet transaction audit record
     await tx
       .insert(walletTransactions)
