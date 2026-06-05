@@ -5,19 +5,33 @@ import { handleEscrowRelease } from './jobs/escrow-release';
 import { handleRefund } from './jobs/refund';
 import { handleProvisionDva } from './jobs/provision-dva';
 import { handleNotifyTopup } from './jobs/notify-topup';
-import type { PaymentJobName } from './queue';
+import type {
+  PaymentJobName,
+  EscrowHoldJobData,
+  EscrowReleaseJobData,
+  RefundJobData,
+  ProvisionDvaJobData,
+  NotifyTopupJobData,
+} from './queue';
 
-const worker = new Worker<unknown, unknown, PaymentJobName>(
+type PaymentJobData =
+  | EscrowHoldJobData
+  | EscrowReleaseJobData
+  | RefundJobData
+  | ProvisionDvaJobData
+  | NotifyTopupJobData;
+
+const worker = new Worker<PaymentJobData, void, PaymentJobName>(
   'payment',
   async (job) => {
     switch (job.name) {
-      case 'escrow-hold':    return handleEscrowHold(job.data as never);
-      case 'escrow-release': return handleEscrowRelease(job.data as never);
-      case 'refund':         return handleRefund(job.data as never);
-      case 'provision-dva':  return handleProvisionDva(job.data as never);
-      case 'notify-topup':   return handleNotifyTopup(job.data as never);
+      case 'escrow-hold':    return handleEscrowHold(job.data as EscrowHoldJobData);
+      case 'escrow-release': return handleEscrowRelease(job.data as EscrowReleaseJobData);
+      case 'refund':         return handleRefund(job.data as RefundJobData);
+      case 'provision-dva':  return handleProvisionDva(job.data as ProvisionDvaJobData);
+      case 'notify-topup':   return handleNotifyTopup(job.data as NotifyTopupJobData);
       default:
-        console.warn(`Unknown job: ${job.name}`);
+        throw new Error(`Unknown job name: ${String(job.name)}`);
     }
   },
   { connection, concurrency: 5 },
