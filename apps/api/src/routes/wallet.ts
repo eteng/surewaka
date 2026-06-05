@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { eq, desc } from 'drizzle-orm';
 import { db, wallets, walletTransactions } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
-import { getWalletByUserId, checkBalance } from '../lib/wallet-service';
+import { getWalletByUserId, getOrCreateWallet, checkBalance } from '../lib/wallet-service';
 import {
   initializeTransaction,
   verifyTransaction,
@@ -111,14 +111,16 @@ walletRoutes.post('/fund', async (c) => {
       400,
     );
   }
+  const email = user.email || `user_${user.id}@wallet.surewaka.com`;
   try {
-    const result = await initializeTransaction(parsed.data.amount, user.email ?? '', {
+    const result = await initializeTransaction(parsed.data.amount, email, {
       topup_type: parsed.data.topup_type,
       delivery_id: parsed.data.delivery_id,
       user_id: user.id,
     });
     return c.json({ data: result, error: null, meta: null });
-  } catch {
+  } catch (err) {
+    console.error('[POST /wallet/fund]', err);
     return c.json(
       {
         data: null,
@@ -151,10 +153,11 @@ walletRoutes.post('/check', async (c) => {
     );
   }
   try {
-    const wallet = await getWalletByUserId(user.id);
+    const wallet = await getOrCreateWallet(user.id);
     const result = await checkBalance(wallet.id, parsed.data.amount);
     return c.json({ data: result, error: null, meta: null });
-  } catch {
+  } catch (err) {
+    console.error('[POST /wallet/check]', err);
     return c.json(
       {
         data: null,

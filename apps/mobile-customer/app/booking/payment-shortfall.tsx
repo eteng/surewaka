@@ -39,15 +39,17 @@ export function PaymentShortfallSheet({
         },
         body: JSON.stringify({
           amount,
-          email: session.user.email,
           topup_type: topupType,
           delivery_id: deliveryId,
         }),
       });
       const json = (await res.json()) as {
-        data: { authorization_url: string; reference: string };
+        data: { authorization_url: string; reference: string } | null;
+        error: { code: string; message: string } | null;
       };
-      if (!json.data?.authorization_url) throw new Error('No authorization URL');
+      if (!res.ok || !json.data?.authorization_url) {
+        throw new Error(json.error?.message ?? 'No authorization URL');
+      }
 
       await WebBrowser.openAuthSessionAsync(json.data.authorization_url, 'surewaka://booking');
 

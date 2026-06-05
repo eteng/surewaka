@@ -273,7 +273,6 @@ export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
 
 export const initializeTopupSchema = z.object({
   amount: z.number().int().min(50000, 'Minimum top-up is ₦500'),  // kobo
-  email: z.string().email(),
   topup_type: z.enum(['manual', 'booking_shortfall']).default('manual'),
   delivery_id: z.string().uuid().optional(),
 });

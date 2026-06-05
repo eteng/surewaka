@@ -19,6 +19,21 @@ export async function getWalletByUserId(userId: string) {
   return wallet;
 }
 
+export async function getOrCreateWallet(userId: string) {
+  const existing = await db.select().from(wallets).where(eq(wallets.userId, userId));
+  if (existing[0]) return existing[0];
+  const [created] = await db
+    .insert(wallets)
+    .values({ userId, currency: 'NGN' })
+    .onConflictDoNothing()
+    .returning();
+  if (created) return created;
+  // race: another request created it between our select and insert
+  const [wallet] = await db.select().from(wallets).where(eq(wallets.userId, userId));
+  if (!wallet) throw new Error('WALLET_NOT_FOUND');
+  return wallet;
+}
+
 export async function creditWallet(
   walletId: string,
   amount: number,

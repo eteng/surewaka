@@ -128,8 +128,13 @@ export default function ReviewScreen() {
         body: JSON.stringify({ amount: deliveryAmount }),
       });
       const checkJson = (await checkRes.json()) as {
-        data: { sufficient: boolean; shortfall?: number };
+        data: { sufficient: boolean; shortfall?: number } | null;
+        error: { code: string; message: string } | null;
       };
+
+      if (!checkRes.ok || !checkJson.data) {
+        throw new Error(checkJson.error?.message ?? 'Failed to check balance');
+      }
 
       if (!checkJson.data.sufficient) {
         setShortfallData({
