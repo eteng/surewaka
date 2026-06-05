@@ -1,30 +1,29 @@
-/**
- * Payment worker for SureWaka.
- * Handles: Paystack webhook processing, commission calculations, payouts.
- */
+import { Worker } from 'bullmq';
+import { connection } from './queue';
+import { handleEscrowHold } from './jobs/escrow-hold';
+import { handleEscrowRelease } from './jobs/escrow-release';
+import { handleRefund } from './jobs/refund';
+import { handleProvisionDva } from './jobs/provision-dva';
+import { handleNotifyTopup } from './jobs/notify-topup';
+import type { PaymentJobName } from './queue';
 
-interface PaymentEvent {
-  type: 'charge.success' | 'transfer.success' | 'transfer.failed';
-  data: Record<string, unknown>;
-}
+const worker = new Worker<unknown, unknown, PaymentJobName>(
+  'payment',
+  async (job) => {
+    switch (job.name) {
+      case 'escrow-hold':    return handleEscrowHold(job.data as never);
+      case 'escrow-release': return handleEscrowRelease(job.data as never);
+      case 'refund':         return handleRefund(job.data as never);
+      case 'provision-dva':  return handleProvisionDva(job.data as never);
+      case 'notify-topup':   return handleNotifyTopup(job.data as never);
+      default:
+        console.warn(`Unknown job: ${job.name}`);
+    }
+  },
+  { connection, concurrency: 5 },
+);
 
-export async function processPaymentEvent(event: PaymentEvent) {
-  console.log(`💰 Processing payment event: ${event.type}`);
+worker.on('completed', (job) => console.log(`✅ Job ${job.id} (${job.name}) completed`));
+worker.on('failed', (job, err) => console.error(`❌ Job ${job?.id} (${job?.name}) failed:`, err));
 
-  switch (event.type) {
-    case 'charge.success':
-      // Customer paid for delivery
-      // TODO: Update delivery status, notify driver
-      break;
-    case 'transfer.success':
-      // Driver/carrier payout completed
-      // TODO: Update payout records
-      break;
-    case 'transfer.failed':
-      // Payout failed — retry or alert
-      // TODO: Retry logic, alert ops team
-      break;
-  }
-
-  return { processed: true, type: event.type };
-}
+console.log('💰 Payment worker started');
