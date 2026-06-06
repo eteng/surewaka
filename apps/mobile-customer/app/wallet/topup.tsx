@@ -28,7 +28,7 @@ export default function TopupScreen() {
   const resolvedAmount = selectedPreset ?? (customAmount ? Math.round(parseFloat(customAmount) * 100) : 0);
 
   const handlePay = async () => {
-    if (!session?.access_token || !session.user?.email) return;
+    if (!session?.access_token) return;
     if (resolvedAmount < MIN_TOPUP) {
       Alert.alert('Too low', 'Minimum top-up is ₦500');
       return;
@@ -39,7 +39,7 @@ export default function TopupScreen() {
       const client = createAuthClient(session.access_token);
       const { data, error } = await client.post<{ reference: string; authorization_url: string }>(
         '/api/v1/wallet/fund',
-        { amount: resolvedAmount, email: session.user.email, topup_type: 'manual' },
+        { amount: resolvedAmount, topup_type: 'manual' },
       );
 
       if (error || !data?.authorization_url) {
