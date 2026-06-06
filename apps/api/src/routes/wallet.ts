@@ -139,18 +139,23 @@ walletRoutes.get('/fund/:reference', async (c) => {
     const txnData = await verifyTransaction(reference);
 
     if (txnData.status === 'success') {
-      // Resolve wallet from the authenticated user — this is the authoritative
-      // ownership boundary. Idempotency is then checked on (reference, wallet_id)
-      // so a foreign reference can never credit this user's wallet, and this
-      // user's reference can never credit a different wallet.
       const wallet = await getOrCreateWallet(user.id);
 
+      // Global uniqueness check on reference — not scoped to wallet_id.
+      // Scoping to wallet_id would allow a foreign reference to pass the
+      // idempotency guard and credit a second wallet for the same payment.
       const existing = await db
-        .select({ id: walletTransactions.id })
+        .select({ id: walletTransactions.id, walletId: walletTransactions.walletId })
         .from(walletTransactions)
-        .where(and(eq(walletTransactions.reference, reference), eq(walletTransactions.walletId, wallet.id)));
+        .where(eq(walletTransactions.reference, reference));
 
-      if (existing.length === 0) {
+      if (existing.length > 0) {
+        // Already processed — if it's for a different wallet, reject as a replay attempt.
+        if (existing[0].walletId !== wallet.id) {
+          return c.json({ data: null, error: { code: 'FORBIDDEN', message: 'Reference does not belong to this account' }, meta: null }, 403);
+        }
+        // Same wallet — idempotent, nothing to do.
+      } else {
         await creditWallet(wallet.id, txnData.amount, 'fund', reference, 'Wallet top-up via Paystack', txnData.metadata ?? {});
       }
     }
