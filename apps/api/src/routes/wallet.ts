@@ -73,7 +73,8 @@ walletRoutes.get('/dva', async (c) => {
     }
     const name = (user.user_metadata?.name as string | undefined) ?? '';
     const [firstName, ...rest] = name.split(' ');
-    const customer = await createCustomer(user.email ?? '', firstName ?? '', rest.join(' '));
+    const email = user.email || `user_${user.id}@wallet.surewaka.com`;
+    const customer = await createCustomer(email, firstName ?? '', rest.join(' '));
     const dva = await createDedicatedVirtualAccount(customer.customer_code);
     await db
       .update(wallets)

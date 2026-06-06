@@ -68,8 +68,8 @@ export async function createCustomer(
     headers: headers(),
     body: JSON.stringify({ email, first_name: firstName, last_name: lastName }),
   });
-  const json = (await res.json()) as { status: boolean; data: { customer_code: string } };
-  if (!json.status) throw new Error('Paystack customer creation failed');
+  const json = (await res.json()) as { status: boolean; message?: string; data: { customer_code: string } };
+  if (!json.status) throw new Error(`Paystack customer creation failed: ${json.message ?? res.status}`);
   return json.data;
 }
 
