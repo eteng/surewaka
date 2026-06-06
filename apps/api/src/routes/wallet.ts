@@ -90,15 +90,12 @@ walletRoutes.get('/dva', async (c) => {
       meta: null,
     });
   } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('not available for your business')) {
+      return c.json({ data: null, error: { code: 'DVA_UNAVAILABLE', message: 'Bank transfer not available yet' }, meta: null }, 503);
+    }
     console.error('[GET /wallet/dva]', err);
-    return c.json(
-      {
-        data: null,
-        error: { code: 'INTERNAL_ERROR', message: 'Failed to provision virtual account' },
-        meta: null,
-      },
-      500,
-    );
+    return c.json({ data: null, error: { code: 'INTERNAL_ERROR', message: 'Failed to provision virtual account' }, meta: null }, 500);
   }
 });
 

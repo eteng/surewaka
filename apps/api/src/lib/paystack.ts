@@ -82,8 +82,8 @@ export async function createDedicatedVirtualAccount(
     headers: headers(),
     body: JSON.stringify({ customer: customerCode, preferred_bank: preferredBank }),
   });
-  const json = (await res.json()) as { status: boolean; data: DVAData };
-  if (!json.status) throw new Error('Paystack DVA creation failed');
+  const json = (await res.json()) as { status: boolean; message?: string; data: DVAData };
+  if (!json.status) throw new Error(`Paystack DVA creation failed: ${json.message ?? res.status}`);
   return json.data;
 }
 
