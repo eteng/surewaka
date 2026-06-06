@@ -50,7 +50,7 @@ bookingPaymentRoutes.post('/booking/confirm', async (c) => {
         throw Object.assign(new Error('ALREADY_CONFIRMED'), { code: 'ALREADY_CONFIRMED' });
       }
 
-      await debitWallet(wallet.id, amount, 'escrow_hold', reference, `Escrow for delivery ${delivery_id}`, {}, tx);
+      await debitWallet(wallet.id, amount, 'escrow_hold', reference, `Escrow for delivery ${delivery_id}`, { delivery_id, user_id: wallet.userId }, tx);
 
       const [escrow] = await tx
         .insert(escrowHolds)
