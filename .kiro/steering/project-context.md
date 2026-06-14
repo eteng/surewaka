@@ -27,7 +27,7 @@ SureWaka is a logistics platform for Nigeria connecting senders with verified ca
 | `packages/shared` | Domain types, Zod validators, constants |
 | `packages/ui` | Shared UI components (shadcn/ui pattern) |
 | `packages/db` | Database schema and client (Drizzle ORM + Supabase Postgres) |
-| `packages/supabase` | Supabase client (auth, storage, realtime) |
+| `packages/supabase` | Supabase client (auth and realtime only — file storage handled by Cloudinary/R2 via `apps/api/src/lib/storage/`) |
 | `packages/ai` | LLM client abstraction (Vercel AI SDK) |
 | `packages/mobile-shared` | Shared RN components, hooks, stores |
 | `agents/*` | AI agents (customer-support, onboarding, internal-ops) |
@@ -55,12 +55,25 @@ SureWaka is a logistics platform for Nigeria connecting senders with verified ca
 ## API Conventions
 
 - Framework: Hono with `@hono/node-server`
-- Middleware: CORS and logger enabled globally
+- Middleware: CORS and request logger enabled globally (`apps/api/src/middleware/logging.ts`)
 - Auth: Supabase JWT via `requireAuth` middleware (`apps/api/src/middleware/auth.ts`)
 - Route prefix: `/api/v1`
 - Validation: Zod schemas from `@surewaka/shared`
 - Response shape: `{ data, error, meta }`
 - Health check at `GET /health`
+
+### API Log Files (dev only)
+
+When `NODE_ENV !== 'production'`, the API writes daily-rotating logs to `logs/api/` at the repo root. Files are kept for 14 days then pruned automatically.
+
+| Path | Format | Contains |
+|------|--------|----------|
+| `logs/api/access/YYYY-MM-DD.log` | Apache Combined + `ms` | Every request |
+| `logs/api/error/YYYY-MM-DD.log` | JSON (one object per line) | ≥400 responses and thrown exceptions |
+
+Error log fields: `time`, `level` (`warn`/`error`/`fatal`), `method`, `path`, `status`, `ms`, `userId`, `ip`, `ua`, and for fatals: `error` + `stack`.
+
+To investigate a problem: read the error log first (small, targeted), then cross-reference the access log by `time` for surrounding context.
 
 ## Database & Backend Services (Supabase)
 
