@@ -7,12 +7,12 @@ import { db, users, nameChangeRequests } from '@surewaka/db';
 import { eq, and } from 'drizzle-orm';
 import { createServiceClient } from '@surewaka/supabase';
 import {
-  ALLOWED_AVATAR_EXTENSIONS,
   ALLOWED_AVATAR_TYPES,
   MAX_AVATAR_SIZE_BYTES,
   type ProfilePreferencesUpdate,
   type NameChangeRequest,
 } from '@surewaka/shared';
+import { avatarStorage } from '../lib/storage';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -56,20 +56,6 @@ export function maskPhone(phone: string): string {
   const preserved = phone.slice(-4);
   const masked = phone.slice(0, phone.length - 4).replace(/\d/g, '*');
   return masked + preserved;
-}
-
-/**
- * Generate a storage path for an avatar file.
- * Format: `{userId}/{timestamp}.{extension}`
- * Extension is sanitized to only allow jpg/jpeg/png/webp, defaults to 'jpg'.
- */
-export function generateAvatarPath(userId: string, extension: string): string {
-  const timestamp = Date.now();
-  const normalizedExt = extension.toLowerCase().replace(/[^a-z]/g, '');
-  const safeExt = (ALLOWED_AVATAR_EXTENSIONS as readonly string[]).includes(normalizedExt)
-    ? normalizedExt
-    : 'jpg';
-  return `${userId}/${timestamp}.${safeExt}`;
 }
 
 /**
@@ -187,14 +173,13 @@ export async function updatePreferences(
 
 /**
  * Upload a new avatar image.
- * Flow: validate → upload to storage → delete old avatar (if exists) → update DB → sync auth metadata
+ * Flow: validate → upload to Cloudinary (overwrite) → update DB → sync auth metadata
  * Storage failure does NOT modify the DB (atomicity guarantee).
  */
 export async function uploadAvatar(
   userId: string,
   file: { buffer: Buffer; mimeType: string; filename: string; size: number },
 ): Promise<ServiceResult<ProfileResponse>> {
-  // Validate file metadata
   if (!(ALLOWED_AVATAR_TYPES as readonly string[]).includes(file.mimeType)) {
     return {
       data: null,
@@ -206,12 +191,16 @@ export async function uploadAvatar(
   if (file.size > MAX_AVATAR_SIZE_BYTES) {
     return {
       data: null,
-      error: { code: 'VALIDATION_ERROR', message: 'File must be 2 MB or smaller' },
+      error: { code: 'VALIDATION_ERROR', message: 'File must be 5 MB or smaller' },
       meta: null,
     };
   }
 
-  if (file.filename.includes('..') || file.filename.includes('/') || file.filename.includes('\\')) {
+  if (
+    file.filename.includes('..') ||
+    file.filename.includes('/') ||
+    file.filename.includes('\\')
+  ) {
     return {
       data: null,
       error: { code: 'VALIDATION_ERROR', message: 'Invalid filename' },
@@ -219,27 +208,15 @@ export async function uploadAvatar(
     };
   }
 
-  // Determine extension from mime type
-  const extMap: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-  };
-  const extension = extMap[file.mimeType] || 'jpg';
-  const storagePath = generateAvatarPath(userId, extension);
-
-  const supabase = createServiceClient();
-
-  // Upload to storage FIRST (atomicity: if this fails, DB is not modified)
-  const { error: uploadError } = await supabase.storage
-    .from('avatars')
-    .upload(storagePath, file.buffer, {
-      contentType: file.mimeType,
-      upsert: false,
+  let avatarUrl: string;
+  try {
+    const result = await avatarStorage.upload({
+      buffer: file.buffer,
+      mimeType: file.mimeType,
+      path: `avatars/${userId}`,
     });
-
-  if (uploadError) {
-    console.error('[ProfileService] Storage upload failed:', { userId, error: uploadError.message });
+    avatarUrl = result.url;
+  } catch {
     return {
       data: null,
       error: { code: 'STORAGE_ERROR', message: 'Failed to upload avatar' },
@@ -247,31 +224,7 @@ export async function uploadAvatar(
     };
   }
 
-  // Get the public URL for the uploaded file
-  const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(storagePath);
-  const avatarUrl = publicUrlData.publicUrl;
-
-  // Delete old avatar from storage (if exists) — non-critical, log errors
-  const [currentUser] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  if (currentUser?.avatarUrl) {
-    try {
-      // Extract the path from the full URL
-      const oldUrl = new URL(currentUser.avatarUrl);
-      const pathParts = oldUrl.pathname.split('/storage/v1/object/public/avatars/');
-      if (pathParts.length > 1) {
-        const oldPath = decodeURIComponent(pathParts[1]);
-        await supabase.storage.from('avatars').remove([oldPath]);
-      }
-    } catch (err) {
-      console.error('[ProfileService] Failed to delete old avatar:', { userId, err });
-      // Non-critical: continue with the update
-    }
-  }
-
-  // Update DB with new avatar URL
   await db.update(users).set({ avatarUrl, updatedAt: new Date() }).where(eq(users.id, userId));
-
-  // Sync auth metadata (fire-and-forget)
   await syncAvatarMetadata(userId, avatarUrl);
 
   return getProfile(userId);
@@ -279,7 +232,7 @@ export async function uploadAvatar(
 
 /**
  * Remove the user's avatar.
- * Deletes from storage, sets avatar_url to null in DB, syncs auth metadata.
+ * Deletes from Cloudinary, sets avatar_url to null in DB, syncs auth metadata.
  */
 export async function removeAvatar(userId: string): Promise<ServiceResult<ProfileResponse>> {
   const [currentUser] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
@@ -292,29 +245,19 @@ export async function removeAvatar(userId: string): Promise<ServiceResult<Profil
     };
   }
 
-  // Delete from storage if avatar exists
   if (currentUser.avatarUrl) {
     try {
-      const supabase = createServiceClient();
-      const oldUrl = new URL(currentUser.avatarUrl);
-      const pathParts = oldUrl.pathname.split('/storage/v1/object/public/avatars/');
-      if (pathParts.length > 1) {
-        const oldPath = decodeURIComponent(pathParts[1]);
-        await supabase.storage.from('avatars').remove([oldPath]);
-      }
+      await avatarStorage.delete(`avatars/${userId}`);
     } catch (err) {
       console.error('[ProfileService] Failed to delete avatar from storage:', { userId, err });
-      // Continue with DB update even if storage delete fails
     }
   }
 
-  // Set avatar_url to null in DB
   await db
     .update(users)
     .set({ avatarUrl: null, updatedAt: new Date() })
     .where(eq(users.id, userId));
 
-  // Sync auth metadata (fire-and-forget)
   await syncAvatarMetadata(userId, null);
 
   return getProfile(userId);
