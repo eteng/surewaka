@@ -16,6 +16,8 @@ function validateEnv(): void {
 export function createCloudinaryProvider(): PublicStorageProvider {
   validateEnv();
 
+  // cloudinary.config() mutates a process-level singleton in the SDK.
+  // Safe here because createCloudinaryProvider() is called once at startup via the singleton index.
   cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -35,7 +37,8 @@ export function createCloudinaryProvider(): PublicStorageProvider {
           transformation: [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }],
         });
         return { url: result.secure_url, path: result.public_id };
-      } catch {
+      } catch (err) {
+        console.error('[CloudinaryStorage] Upload failed:', err);
         throw new StorageError('UPLOAD_FAILED', 'Failed to upload image to Cloudinary');
       }
     },
@@ -43,7 +46,8 @@ export function createCloudinaryProvider(): PublicStorageProvider {
     async delete(path: string): Promise<void> {
       try {
         await cloudinary.uploader.destroy(path, { resource_type: 'image' });
-      } catch {
+      } catch (err) {
+        console.error('[CloudinaryStorage] Delete failed:', err);
         throw new StorageError('DELETE_FAILED', 'Failed to delete image from Cloudinary');
       }
     },

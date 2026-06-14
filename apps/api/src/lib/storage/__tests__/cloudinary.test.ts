@@ -27,6 +27,17 @@ describe('createCloudinaryProvider', () => {
     provider = createCloudinaryProvider();
   });
 
+  it('throws when CLOUDINARY_CLOUD_NAME is missing', async () => {
+    const original = process.env.CLOUDINARY_CLOUD_NAME;
+    delete process.env.CLOUDINARY_CLOUD_NAME;
+    try {
+      const { createCloudinaryProvider } = await import('../cloudinary');
+      expect(() => createCloudinaryProvider()).toThrow('Missing Cloudinary env vars');
+    } finally {
+      process.env.CLOUDINARY_CLOUD_NAME = original;
+    }
+  });
+
   describe('upload', () => {
     it('encodes buffer as base64 data URI and calls cloudinary upload with correct options', async () => {
       mockUpload.mockResolvedValueOnce({
@@ -45,6 +56,7 @@ describe('createCloudinaryProvider', () => {
         expect.objectContaining({
           public_id: 'avatars/user-abc',
           overwrite: true,
+          resource_type: 'image',
           format: 'webp',
           quality: 'auto',
           transformation: [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }],
