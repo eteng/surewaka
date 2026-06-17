@@ -59,7 +59,7 @@ done
 
 echo "Installing dependencies..."
 cd "$DEST"
-pnpm install --frozen-lockfile
+pnpm install
 
 echo ""
 echo "Worktree ready at $DEST"
