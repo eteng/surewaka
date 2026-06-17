@@ -1,7 +1,7 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logger } from 'hono/logger';
+import { requestLogger } from './middleware/logging';
 import authRoutes from './routes/auth';
 import addressRoutes from './routes/addresses';
 import carrierRoutes from './routes/carriers';
@@ -20,7 +20,7 @@ import payoutRoutes from './routes/payouts';
 const app = new Hono();
 
 // Middleware
-app.use('*', logger());
+app.use('*', requestLogger);
 app.use('*', cors());
 
 // Health check
