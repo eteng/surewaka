@@ -25,6 +25,14 @@ description: TypeScript, API, database, AI agent, and file naming conventions fo
 - **NEVER use `drizzle-kit push`** — Supabase is the migration source of truth
 - Migration workflow: `supabase migration new <name>` → `supabase migration fetch --yes` → regenerate types → sync Drizzle schema manually
 
+**RLS is mandatory for every new table — include in the same migration file:**
+1. `ALTER TABLE <table> ENABLE ROW LEVEL SECURITY;`
+2. Service role bypass: `CREATE POLICY "service_role_manage_<table>" ON <table> FOR ALL USING (auth.role() = 'service_role');`
+3. User-scoped policies (own rows, read-only catalog, etc.) — never expose other users' data
+4. `GRANT` only minimum needed privileges to `authenticated` — omit INSERT/UPDATE/DELETE unless the client writes directly (most mutations go through the API as service role)
+
+Missing grants are silent: RLS policies exist but `permission denied` is returned before they're evaluated. Always verify both the policy AND the grant exist.
+
 ## AI Agents
 - System prompts in markdown files (version controlled)
 - All tools defined with Zod parameter schemas

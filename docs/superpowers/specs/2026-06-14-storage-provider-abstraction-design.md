@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-14
 **Status:** Approved
-**Author:** Eteng + Claude
+**Author:** Eteng
 
 ## Context
 

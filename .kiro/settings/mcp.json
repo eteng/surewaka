@@ -10,7 +10,7 @@
         "GOOGLE_PROJECT_ID": "gowakawell",
         "GOOGLE_APPLICATION_CREDENTIALS": "/home/allfather/.config/gowakawell/service-account.json"
       },
-      "disabled": false,
+      "disabled": true,
       "autoApprove": [
         "sheets_batch_get_values"
       ]
