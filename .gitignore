@@ -39,6 +39,9 @@ supabase/.temp/
 # Expo / React Native
 .expo/
 
+# Runtime logs (daily-rotating, dev-only — logs/api/access/ and logs/api/error/)
+/logs/
+
 # Misc
 *.log
 *.tsbuildinfo
@@ -58,3 +61,4 @@ GoogleService-Info.plist
 *.apk
 *.aab
 *.ipa
+.worktrees/
