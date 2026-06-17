@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,12 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner-native';
+import { Ionicons } from '@expo/vector-icons';
 import { GENDER_VALUES, GENDER_LABELS } from '@surewaka/shared';
 import type { Gender } from '@surewaka/shared';
 import { useCustomerProfile } from '~/hooks/use-customer-profile';
+import { AvatarPicker } from '~/components/avatar-picker';
+import { useAvatarPicker } from '~/hooks/use-avatar-picker';
 
 const editSchema = z.object({
   name: z
@@ -31,7 +34,8 @@ type FormData = z.infer<typeof editSchema>;
 export default function EditProfileScreen() {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
-  const { profile, isLoading, updateName, updateEmail, updateGender } = useCustomerProfile();
+  const { profile, isLoading, updateName, updateEmail, updateGender, updateAvatar, removeAvatar, isUploadingAvatar } = useCustomerProfile();
+  const { pickFromLibrary, pickFromCamera, isSheetOpen, openSheet, closeSheet } = useAvatarPicker();
   const [saving, setSaving] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [genderPickerOpen, setGenderPickerOpen] = useState(false);
@@ -42,6 +46,32 @@ export default function EditProfileScreen() {
     defaultValues: { name: '', email: '' },
   });
 
+  // Avatar picker callbacks
+  const handlePickFromLibrary = useCallback(async () => {
+    closeSheet();
+    const uri = await pickFromLibrary();
+    if (uri) {
+      await updateAvatar(uri);
+    }
+  }, [pickFromLibrary, updateAvatar, closeSheet]);
+
+  const handlePickFromCamera = useCallback(async () => {
+    closeSheet();
+    const uri = await pickFromCamera();
+    if (uri) {
+      await updateAvatar(uri);
+    }
+  }, [pickFromCamera, updateAvatar, closeSheet]);
+
+  const handleRemoveAvatar = useCallback(async () => {
+    closeSheet();
+    await removeAvatar();
+  }, [removeAvatar, closeSheet]);
+
+  const handleAvatarPress = useCallback(() => {
+    openSheet();
+  }, [openSheet]);
+
   // Populate form once profile data arrives
   useEffect(() => {
     if (profile) {
@@ -51,6 +81,12 @@ export default function EditProfileScreen() {
   }, [profile, reset]);
 
   const onSubmit = async (data: FormData) => {
+    // Wait for any pending avatar upload to complete before submitting
+    if (isUploadingAvatar) {
+      toast.info('Please wait for the avatar upload to finish.');
+      return;
+    }
+
     setSaving(true);
 
     const tasks: Promise<{ error: string | null }>[] = [];
@@ -100,11 +136,14 @@ export default function EditProfileScreen() {
         <Text className="text-2xl font-bold text-gray-900">Edit Profile</Text>
       </View>
 
-      {/* Avatar placeholder — upload deferred */}
+      {/* Avatar picker */}
       <View className="items-center mb-8">
-        <View className="w-24 h-24 rounded-full bg-green-100 items-center justify-center">
-          <Text className="text-4xl">👤</Text>
-        </View>
+        <AvatarPicker
+          avatarUrl={profile?.avatarUrl ?? null}
+          isUploading={isUploadingAvatar}
+          onPickImage={handleAvatarPress}
+          size={96}
+        />
       </View>
 
       {/* Name */}
@@ -187,8 +226,8 @@ export default function EditProfileScreen() {
       {!emailSent && (
         <Pressable
           onPress={handleSubmit(onSubmit)}
-          disabled={saving}
-          className={`py-4 rounded-xl items-center mb-8 ${saving ? 'bg-primary/50' : 'bg-primary'}`}
+          disabled={saving || isUploadingAvatar}
+          className={`py-4 rounded-xl items-center mb-8 ${saving || isUploadingAvatar ? 'bg-primary/50' : 'bg-primary'}`}
         >
           {saving ? (
             <ActivityIndicator color="#fff" />
@@ -232,6 +271,54 @@ export default function EditProfileScreen() {
                 <Text className="text-base text-gray-400">Clear selection</Text>
               </Pressable>
             )}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Avatar action sheet modal */}
+      <Modal visible={isSheetOpen} transparent animationType="slide">
+        <Pressable
+          className="flex-1 bg-black/40 justify-end"
+          onPress={closeSheet}
+        >
+          <View className="bg-white rounded-t-2xl px-6 pt-4" style={{ paddingBottom: bottom + 32 }}>
+            <View className="items-center mb-2">
+              <View className="w-10 h-1 rounded-full bg-gray-300" />
+            </View>
+            <Text className="text-base font-semibold text-gray-900 mb-4">Profile Photo</Text>
+
+            <Pressable
+              onPress={handlePickFromLibrary}
+              className="py-4 border-b border-gray-100 flex-row items-center gap-3"
+            >
+              <Ionicons name="images-outline" size={22} color="#374151" />
+              <Text className="text-base text-gray-900">Choose from Library</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handlePickFromCamera}
+              className="py-4 border-b border-gray-100 flex-row items-center gap-3"
+            >
+              <Ionicons name="camera-outline" size={22} color="#374151" />
+              <Text className="text-base text-gray-900">Take Photo</Text>
+            </Pressable>
+
+            {profile?.avatarUrl && (
+              <Pressable
+                onPress={handleRemoveAvatar}
+                className="py-4 border-b border-gray-100 flex-row items-center gap-3"
+              >
+                <Ionicons name="trash-outline" size={22} color="#dc2626" />
+                <Text className="text-base text-red-600">Remove Photo</Text>
+              </Pressable>
+            )}
+
+            <Pressable
+              onPress={closeSheet}
+              className="py-4 items-center"
+            >
+              <Text className="text-base font-medium text-gray-400">Cancel</Text>
+            </Pressable>
           </View>
         </Pressable>
       </Modal>

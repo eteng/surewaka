@@ -12,6 +12,9 @@
       "@/*": [
         "./src/*"
       ],
+      "~/*": [
+        "./app/*"
+      ],
       "@surewaka/shared": [
         "../../packages/shared/src"
       ],

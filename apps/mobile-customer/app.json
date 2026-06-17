@@ -94,7 +94,8 @@
             "./assets/fonts/Inter_700Bold.ttf"
           ]
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }

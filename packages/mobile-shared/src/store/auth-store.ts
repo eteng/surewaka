@@ -25,7 +25,7 @@ async function checkProfileExists(userId: string): Promise<boolean> {
   return !!data;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   session: null,
   loading: true,
@@ -51,10 +51,23 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ loading: false, initialized: true, profileExists: null });
     }
 
-    supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (newSession?.user) {
-        const profileExists = await checkProfileExists(newSession.user.id);
-        set({ user: newSession.user, session: newSession, profileExists });
+        // Only re-check profile existence on SIGNED_IN (new login) or INITIAL_SESSION
+        // when profileExists is still unknown. TOKEN_REFRESHED and subsequent
+        // INITIAL_SESSION events must not overwrite a correctly-set profileExists —
+        // a transient DB error during a redundant check would flip profileExists to
+        // false and boot the user back to the register screen.
+        const shouldCheckProfile =
+          event === 'SIGNED_IN' ||
+          (event === 'INITIAL_SESSION' && get().profileExists === null);
+
+        if (shouldCheckProfile) {
+          const profileExists = await checkProfileExists(newSession.user.id);
+          set({ user: newSession.user, session: newSession, profileExists });
+        } else {
+          set({ user: newSession.user, session: newSession });
+        }
         Sentry.setUser({ id: newSession.user.id, email: newSession.user.email });
       } else {
         set({ user: null, session: null, profileExists: null });

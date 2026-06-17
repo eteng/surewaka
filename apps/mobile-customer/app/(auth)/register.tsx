@@ -19,7 +19,10 @@ export default function RegisterScreen() {
   });
 
   const onSubmit = async (data: OtpRegister) => {
-    if (!session?.access_token) return;
+    if (!session?.access_token) {
+      setError('Session expired. Please sign out and sign in again.');
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
