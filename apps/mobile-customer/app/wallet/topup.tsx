@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/expo';
 import { useState, useRef, useEffect } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -13,7 +14,7 @@ function formatNaira(kobo: number) {
 
 export default function TopupScreen() {
   const router = useRouter();
-  const session = useAuthStore((s) => s.session);
+  const { getToken } = useAuth();
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,7 +29,7 @@ export default function TopupScreen() {
   const resolvedAmount = selectedPreset ?? (customAmount ? Math.round(parseFloat(customAmount) * 100) : 0);
 
   const handlePay = async () => {
-    if (!session?.access_token) return;
+    if (!await getToken()) return;
     if (resolvedAmount < MIN_TOPUP) {
       Alert.alert('Too low', 'Minimum top-up is ₦500');
       return;
@@ -36,7 +37,7 @@ export default function TopupScreen() {
 
     setLoading(true);
     try {
-      const client = createAuthClient(session.access_token);
+      const client = createAuthClient((await getToken())!);
       const { data, error } = await client.post<{ reference: string; authorization_url: string }>(
         '/api/v1/wallet/fund',
         { amount: resolvedAmount, topup_type: 'manual' },

@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/expo';
 import { useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,7 +33,7 @@ export default function ReviewScreen() {
   const recipientDetails = useBookingStore((s) => s.recipientDetails);
   const selectedCarrier = useBookingStore((s) => s.selectedCarrier);
   const resetBooking = useBookingStore((s) => s.reset);
-  const session = useAuthStore((s) => s.session);
+  const { getToken } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [showShortfall, setShowShortfall] = useState(false);
   const [shortfallData, setShortfallData] = useState<{
@@ -42,12 +43,12 @@ export default function ReviewScreen() {
   } | null>(null);
 
   const confirmBooking = async (deliveryId: string, amount: number) => {
-    if (!session?.access_token) return;
+    if (!await getToken()) return;
     try {
       const res = await fetch(`${API_URL}/api/v1/booking/confirm`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${(await getToken())!}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ delivery_id: deliveryId, amount }),
@@ -66,7 +67,7 @@ export default function ReviewScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!session?.access_token) {
+    if (!await getToken()) {
       Alert.alert('Error', 'You must be logged in to book a delivery');
       return;
     }
@@ -78,7 +79,7 @@ export default function ReviewScreen() {
 
     setSubmitting(true);
 
-    const client = createAuthClient(session.access_token);
+    const client = createAuthClient((await getToken())!);
 
     const { data, error } = await client.post<DeliveryResponse>('/api/v1/deliveries', {
       pickup: {
@@ -122,7 +123,7 @@ export default function ReviewScreen() {
       const checkRes = await fetch(`${API_URL}/api/v1/wallet/check`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${(await getToken())!}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ amount: deliveryAmount }),

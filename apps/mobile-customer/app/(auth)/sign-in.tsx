@@ -20,7 +20,7 @@ type FormData = {
 
 export default function SignInScreen() {
   const router = useRouter();
-  const { signIn, isLoaded } = useSignIn();
+  const { signIn } = useSignIn();
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,24 +34,28 @@ export default function SignInScreen() {
   });
 
   const onSubmit = async (data: FormData) => {
-    if (!isLoaded || !signIn) return;
+    if (!signIn) return;
 
     setSending(true);
     setError(null);
 
     try {
-      // Create a sign-in attempt with phone number
-      const result = await signIn.create({
+      // Create a sign-in attempt with phone number and request OTP
+      await signIn.create({
         identifier: data.phone,
       });
 
       // Prepare the phone code verification
-      await result.prepareFirstFactor({
-        strategy: 'phone_code',
-        phoneNumberId: result.supportedFirstFactors?.find(
-          (f) => f.strategy === 'phone_code',
-        )?.phoneNumberId ?? '',
-      });
+      const phoneCodeFactor = ((signIn as any).supportedFirstFactors)?.find(
+        (f: { strategy: string }) => f.strategy === 'phone_code',
+      );
+
+      if (phoneCodeFactor && 'phoneNumberId' in phoneCodeFactor) {
+        await (signIn as any).prepareFirstFactor({
+          strategy: 'phone_code',
+          phoneNumberId: (phoneCodeFactor as { phoneNumberId: string }).phoneNumberId,
+        });
+      }
 
       router.push({
         pathname: '/(auth)/verify',

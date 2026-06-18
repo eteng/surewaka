@@ -1,16 +1,16 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '@surewaka/mobile-shared';
+import { useUser } from '@clerk/expo';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
+  const { user } = useUser();
 
   return (
     <ScrollView className="flex-1 bg-white">
       <View className="px-6 pt-6 pb-4 bg-primary">
         <Text className="text-white text-xl font-bold">
-          Hi, {user?.user_metadata?.name ?? 'there'} 👋
+          Hi, {user?.firstName ?? 'there'} 👋
         </Text>
         <Text className="text-white/80 text-base mt-1">
           Move goods across Nigeria

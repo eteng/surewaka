@@ -17,12 +17,12 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import Mapbox from '@rnmapbox/maps';
+import { useAuth } from '@clerk/expo';
 import {
   useBookingStore,
   searchAddress,
   reverseGeocode,
   createAddressesClient,
-  useAuthStore,
 } from '@surewaka/mobile-shared';
 import type { LocationSuggestion } from '@surewaka/mobile-shared';
 import type { SavedAddress, RecentLocation } from '@surewaka/shared';
@@ -35,10 +35,11 @@ const ADDRESS_CAP = 25;
 
 export default function PickupScreen() {
   const router = useRouter();
+  const { getToken } = useAuth();
   const pickup = useBookingStore((s) => s.pickup);
   const setPickup = useBookingStore((s) => s.setPickup);
   const setStep = useBookingStore((s) => s.setStep);
-  const token = useAuthStore((s) => s.session?.access_token ?? '');
+  const [token, setToken] = useState('');
   const client = createAddressesClient(token);
 
   const [query, setQuery] = useState('');
@@ -102,6 +103,10 @@ export default function PickupScreen() {
       setLoading(false);
     })();
   }, []);
+
+  useEffect(() => {
+    getToken().then((t) => { if (t) setToken(t); });
+  }, [getToken]);
 
   useEffect(() => {
     if (!token) return;

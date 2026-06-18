@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/expo';
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
@@ -33,16 +34,17 @@ const statusOrder: Delivery['status'][] = ['pending', 'matched', 'picked_up', 'i
 
 export default function TrackingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const session = useAuthStore((s) => s.session);
+  const { getToken } = useAuth();
   const [delivery, setDelivery] = useState<Delivery | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchDelivery = useCallback(async () => {
-    if (!session?.access_token || !id) return;
+    const token = await getToken();
+    if (!token || !id) return;
 
-    const client = createAuthClient(session.access_token);
+    const client = createAuthClient(token);
     const { data, error: apiError } = await client.get<Delivery>(`/api/v1/deliveries/${id}`);
 
     if (apiError) {
@@ -53,7 +55,7 @@ export default function TrackingScreen() {
     }
     setLoading(false);
     setRefreshing(false);
-  }, [id, session?.access_token]);
+  }, [id, getToken]);
 
   useEffect(() => {
     fetchDelivery();

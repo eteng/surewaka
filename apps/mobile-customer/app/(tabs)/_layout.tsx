@@ -1,5 +1,6 @@
 import { Tabs, Redirect } from 'expo-router';
 import { View, Text } from 'react-native';
+import { useAuth } from '@clerk/expo';
 import { useAuthStore } from '@surewaka/mobile-shared';
 
 function TabIcon({ focused, title }: { focused: boolean; title: string }) {
@@ -20,11 +21,11 @@ function TabIcon({ focused, title }: { focused: boolean; title: string }) {
 }
 
 export default function TabLayout() {
-  const user = useAuthStore((s) => s.user);
+  const { isSignedIn } = useAuth();
   const profileExists = useAuthStore((s) => s.profileExists);
 
   // profileExists === false is handled by the root layout redirecting to /(auth)/register.
-  if (!user) {
+  if (!isSignedIn) {
     return <Redirect href="/(auth)/sign-in" />;
   }
 

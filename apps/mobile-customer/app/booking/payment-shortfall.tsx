@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/expo';
 import { useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -24,17 +25,18 @@ export function PaymentShortfallSheet({
   onSuccess,
   onDismiss,
 }: Props) {
-  const session = useAuthStore((s) => s.session);
+  const { getToken } = useAuth();
   const [loading, setLoading] = useState(false);
 
   async function pay(amount: number, topupType: 'manual' | 'booking_shortfall') {
-    if (!session?.access_token) return;
+    const token = await getToken();
+    if (!token) return;
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/v1/wallet/fund`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -60,8 +62,8 @@ export function PaymentShortfallSheet({
           try {
             attempts++;
             const statusRes = await fetch(
-              `${API_URL}/api/v1/wallet/fund/${json.data.reference}`,
-              { headers: { Authorization: `Bearer ${session.access_token}` } },
+              `${API_URL}/api/v1/wallet/fund/${json.data!.reference}`,
+              { headers: { Authorization: `Bearer ${token}` } },
             );
             const statusJson = (await statusRes.json()) as { data: { status: string } };
             if (statusJson.data?.status === 'success') {

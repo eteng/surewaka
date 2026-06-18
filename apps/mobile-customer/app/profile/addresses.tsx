@@ -30,7 +30,9 @@ export default function AddressesScreen() {
   useEffect(() => {
     if (fetched) return;
     (async () => {
-      const { error: err } = await fetch();
+      const token = await getToken();
+      if (!token) { setLoading(false); return; }
+      const { error: err } = await fetch(token);
       if (err) setError('Failed to load addresses');
       setLoading(false);
     })();
@@ -39,7 +41,9 @@ export default function AddressesScreen() {
   const handleRetry = async () => {
     setLoading(true);
     setError(null);
-    const { error: err } = await fetch();
+    const token = await getToken();
+    if (!token) { setLoading(false); return; }
+    const { error: err } = await fetch(token);
     if (err) setError('Failed to load addresses');
     setLoading(false);
   };

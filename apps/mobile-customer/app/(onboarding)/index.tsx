@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@clerk/expo';
 import { useAuthStore } from '@surewaka/mobile-shared';
 
 const ONBOARDING_COMPLETE_KEY = 'surewaka_onboarding_complete';
@@ -26,7 +27,7 @@ const slides = [
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
+  const { isSignedIn } = useAuth();
   const profileExists = useAuthStore((s) => s.profileExists);
   const [currentSlide, setCurrentSlide] = useState(0);
   // null = still checking, false = show slides, true = redirecting
@@ -35,7 +36,7 @@ export default function OnboardingScreen() {
   useEffect(() => {
     async function resolveInitialRoute() {
       // Already authenticated and provisioned — skip everything and go to the app
-      if (user && profileExists) {
+      if (isSignedIn && profileExists) {
         router.replace('/(tabs)');
         return;
       }
@@ -52,7 +53,7 @@ export default function OnboardingScreen() {
     }
 
     resolveInitialRoute();
-  }, [user, router]);
+  }, [isSignedIn, router]);
 
   const markOnboardingComplete = () => AsyncStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true');
 

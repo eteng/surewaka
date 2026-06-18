@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/expo';
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -25,15 +26,16 @@ const statusColors: Record<Delivery['status'], string> = {
 
 export default function DeliveriesScreen() {
   const router = useRouter();
-  const session = useAuthStore((s) => s.session);
+  const { getToken } = useAuth();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchDeliveries = useCallback(async () => {
-    if (!session?.access_token) return;
+    const token = await getToken();
+    if (!token) return;
 
-    const client = createAuthClient(session.access_token);
+    const client = createAuthClient(token);
     const { data } = await client.get<{ deliveries: Delivery[]; total: number }>('/api/v1/deliveries');
 
     if (data?.deliveries) {
@@ -41,7 +43,7 @@ export default function DeliveriesScreen() {
     }
     setLoading(false);
     setRefreshing(false);
-  }, [session?.access_token]);
+  }, [getToken]);
 
   useEffect(() => {
     fetchDeliveries();

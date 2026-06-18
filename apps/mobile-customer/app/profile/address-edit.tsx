@@ -20,7 +20,7 @@ import {
   searchAddress,
   reverseGeocode,
   apiClient,
-  useAuthStore,
+
   useAddressStore,
 } from '@surewaka/mobile-shared';
 import { useAuth } from '@clerk/expo';

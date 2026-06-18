@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/expo';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -21,7 +22,7 @@ import {
   searchAddress,
   reverseGeocode,
   createAddressesClient,
-  useAuthStore,
+
 } from '@surewaka/mobile-shared';
 import type { LocationSuggestion } from '@surewaka/mobile-shared';
 import type { SavedAddress, RecentLocation } from '@surewaka/shared';
@@ -38,7 +39,8 @@ export default function DropoffScreen() {
   const dropoff = useBookingStore((s) => s.dropoff);
   const setDropoff = useBookingStore((s) => s.setDropoff);
   const setStep = useBookingStore((s) => s.setStep);
-  const token = useAuthStore((s) => s.session?.access_token ?? '');
+  const { getToken } = useAuth();
+  const [token, setToken] = useState('');
   const client = createAddressesClient(token);
 
   const [query, setQuery] = useState('');
@@ -89,6 +91,10 @@ export default function DropoffScreen() {
       setSelectedCoords(pickupCoords);
     }
   }, [pickupCoords]);
+
+  useEffect(() => {
+    getToken().then((t) => { if (t) setToken(t); });
+  }, [getToken]);
 
   useEffect(() => {
     if (!token) return;

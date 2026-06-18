@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/expo';
 import { useEffect } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -5,12 +6,15 @@ import { useWalletStore, useAuthStore } from '@surewaka/mobile-shared';
 
 export default function TopupSuccessScreen() {
   const router = useRouter();
-  const session = useAuthStore((s) => s.session);
+  const { getToken } = useAuth();
   const fetchBalance = useWalletStore((s) => s.fetchBalance);
 
   useEffect(() => {
-    if (session?.access_token) fetchBalance(session.access_token);
-  }, [session?.access_token, fetchBalance]);
+    (async () => {
+      const token = await getToken();
+      if (token) fetchBalance(token);
+    })();
+  }, [fetchBalance]);
 
   return (
     <View className="flex-1 bg-white items-center justify-center px-6">

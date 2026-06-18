@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useAuthStore } from '@surewaka/mobile-shared';
+import { useAuth } from '@clerk/expo';
 import { GENDER_LABELS } from '@surewaka/shared';
 import { useCustomerProfile } from '~/hooks/use-customer-profile';
 
@@ -23,7 +23,7 @@ const menuItems: MenuItem[] = [
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const signOut = useAuthStore((s) => s.signOut);
+  const { signOut } = useAuth();
   const { profile, isLoading, error, refetch } = useCustomerProfile();
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 

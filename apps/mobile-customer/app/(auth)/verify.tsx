@@ -4,7 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { otpVerifySchema } from '@surewaka/shared';
-import { useSignIn } from '@clerk/expo';
+import { useSignIn, useClerk } from '@clerk/expo';
 
 type FormData = {
   otp: string;
@@ -13,7 +13,8 @@ type FormData = {
 export default function VerifyScreen() {
   const router = useRouter();
   const { phone } = useLocalSearchParams<{ phone: string }>();
-  const { signIn, setActive, isLoaded } = useSignIn();
+  const { signIn } = useSignIn();
+  const { setActive } = useClerk();
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,20 +28,19 @@ export default function VerifyScreen() {
   });
 
   const onSubmit = async (data: FormData) => {
-    if (!isLoaded || !signIn) return;
+    if (!signIn) return;
 
     setVerifying(true);
     setError(null);
 
     try {
-      const result = await signIn.attemptFirstFactor({
+      const result = await (signIn as any).attemptFirstFactor({
         strategy: 'phone_code',
         code: data.otp,
       });
 
       if (result.status === 'complete' && result.createdSessionId) {
         await setActive({ session: result.createdSessionId });
-        // Navigation is handled by the root layout's auth state listener
       } else {
         setError('Verification incomplete. Please try again.');
       }

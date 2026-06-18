@@ -3,7 +3,7 @@ import { useAuth, useUser } from '@clerk/expo';
 import { apiClient } from '@surewaka/mobile-shared';
 import { toast } from 'sonner-native';
 import type { Gender } from '@surewaka/shared';
-import { processAvatarImage } from '../utils/image-processing';
+
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -168,10 +168,14 @@ export function useCustomerProfile(): UseCustomerProfile {
       setIsUploadingAvatar(true);
 
       try {
-        const { blob: arrayBuffer, mimeType } = await processAvatarImage(localUri);
+        const mimeType = "image/jpeg";
 
         const formData = new FormData();
-        formData.append('avatar', new Blob([arrayBuffer], { type: mimeType }), 'avatar.jpg');
+        formData.append('avatar', {
+          uri: localUri,
+          type: mimeType,
+          name: 'avatar.jpg',
+        } as unknown as Blob);
 
         const res = await fetch(`${API_URL}/api/v1/profile/avatar`, {
           method: 'POST',

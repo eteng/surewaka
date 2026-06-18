@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/expo';
 import { useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -9,15 +10,18 @@ function formatNaira(kobo: number) {
 
 export default function PaymentsScreen() {
   const router = useRouter();
-  const session = useAuthStore((s) => s.session);
+  const { getToken } = useAuth();
   const { balance, dvaBank, dvaAccountNo, transactions, loading, fetchBalance, fetchTransactions, fetchDva } = useWalletStore();
 
   useEffect(() => {
-    if (!session?.access_token) return;
-    fetchBalance(session.access_token);
-    fetchTransactions(session.access_token);
-    fetchDva(session.access_token);
-  }, [session?.access_token]);
+    (async () => {
+      const token = await getToken();
+      if (!token) return;
+      fetchBalance(token);
+      fetchTransactions(token);
+      fetchDva(token);
+    })();
+  }, []);
 
   return (
     <ScrollView className="flex-1 bg-white px-6 pt-6">

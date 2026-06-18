@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/expo';
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, FlatList, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -19,13 +20,16 @@ function formatNaira(kobo: number) {
 
 export default function TransactionsScreen() {
   const router = useRouter();
-  const session = useAuthStore((s) => s.session);
+  const { getToken } = useAuth();
   const { transactions, loading, fetchTransactions } = useWalletStore();
   const [filter, setFilter] = useState<Filter>('all');
 
   useEffect(() => {
-    if (session?.access_token) fetchTransactions(session.access_token);
-  }, [session?.access_token]);
+    (async () => {
+      const token = await getToken();
+      if (token) fetchTransactions(token);
+    })();
+  }, []);
 
   const filtered = filter === 'all'
     ? transactions
