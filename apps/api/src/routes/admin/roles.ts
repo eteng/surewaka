@@ -4,7 +4,7 @@
 
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { requireAuth } from '../../middleware/auth';
+import { requireAuth, requireMfa } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
 import { assignRoleSchema, revokeRoleSchema } from '@surewaka/shared';
 import type { UserRole } from '@surewaka/shared';
@@ -21,8 +21,9 @@ type AdminRolesEnv = {
 
 const adminRoles = new Hono<AdminRolesEnv>();
 
-// All routes require authentication + surewaka_admin role
+// All routes require authentication + MFA + surewaka_admin role
 adminRoles.use('*', requireAuth);
+adminRoles.use('*', requireMfa);
 adminRoles.use('*', requireRole('surewaka_admin'));
 
 /**

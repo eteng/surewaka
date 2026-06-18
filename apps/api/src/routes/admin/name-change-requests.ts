@@ -3,7 +3,7 @@
 // Requirements: 2.5, 2.6
 
 import { Hono } from 'hono';
-import { requireAuth } from '../../middleware/auth';
+import { requireAuth, requireMfa } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
 import { nameChangeReviewSchema } from '@surewaka/shared';
 import type { UserRole } from '@surewaka/shared';
@@ -22,6 +22,7 @@ const adminNameChangeRequests = new Hono<AdminNameChangeEnv>();
 
 // All routes require authentication + MFA + surewaka_admin role
 adminNameChangeRequests.use('*', requireAuth);
+adminNameChangeRequests.use('*', requireMfa);
 adminNameChangeRequests.use('*', requireRole('surewaka_admin'));
 
 /**

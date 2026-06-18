@@ -47,6 +47,10 @@ export async function verifyToken(token: string): Promise<AuthUser | null> {
       return null;
     }
 
+    // fva = [firstFactorAge, secondFactorAge] in seconds; -1 means not verified
+    const fva = (auth.sessionClaims as Record<string, unknown>)?.fva as [number, number] | undefined;
+    const mfaVerified = Array.isArray(fva) && fva[1] !== -1;
+
     // Fetch full user details from Clerk
     const user = await clerk.users.getUser(userId);
 
@@ -59,6 +63,7 @@ export async function verifyToken(token: string): Promise<AuthUser | null> {
       role: (user.publicMetadata as Record<string, unknown>)?.primary_role as string | undefined,
       roles: ((user.publicMetadata as Record<string, unknown>)?.roles as string[]) ?? ['customer'],
       carrierId: (user.publicMetadata as Record<string, unknown>)?.carrier_id as string | undefined,
+      mfaVerified,
     };
   } catch {
     return null;

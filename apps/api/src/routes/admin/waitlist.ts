@@ -3,7 +3,7 @@
 // Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 3.3
 
 import { Hono } from 'hono';
-import { requireAuth } from '../../middleware/auth';
+import { requireAuth, requireMfa } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
 import { waitlistQuerySchema } from '@surewaka/shared';
 import type { UserRole } from '@surewaka/shared';
@@ -20,8 +20,9 @@ type WaitlistEnv = {
 
 const waitlistRoutes = new Hono<WaitlistEnv>();
 
-// All routes require authentication + surewaka_admin role
+// All routes require authentication + MFA + surewaka_admin role
 waitlistRoutes.use('*', requireAuth);
+waitlistRoutes.use('*', requireMfa);
 waitlistRoutes.use('*', requireRole('surewaka_admin'));
 
 /**

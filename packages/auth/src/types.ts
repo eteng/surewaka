@@ -14,4 +14,6 @@ export type AuthUser = {
   roles: string[];
   /** Carrier ID for org-scoped roles */
   carrierId?: string;
+  /** True when the session has a verified second factor (Clerk fva[1] !== -1) */
+  mfaVerified: boolean;
 };

@@ -42,6 +42,23 @@ export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
 });
 
 /**
+ * Requires the session to have a verified second factor (Clerk fva[1] !== -1).
+ * Must run after requireAuth.
+ */
+export const requireMfa = createMiddleware<AuthEnv>(async (c, next) => {
+  const user = c.get('user');
+
+  if (!user?.mfaVerified) {
+    return c.json(
+      { data: null, error: { code: 'MFA_REQUIRED', message: 'Multi-factor authentication required' }, meta: null },
+      403,
+    );
+  }
+
+  await next();
+});
+
+/**
  * Optional auth — attaches user if token present, continues without if not.
  */
 export const optionalAuth = createMiddleware<AuthEnv>(async (c, next) => {
