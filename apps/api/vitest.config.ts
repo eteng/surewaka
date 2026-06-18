@@ -10,7 +10,8 @@ export default defineConfig({
     alias: {
       '@surewaka/shared': path.resolve(__dirname, '../../packages/shared/src'),
       '@surewaka/db': path.resolve(__dirname, '../../packages/db/src'),
-      '@surewaka/supabase': path.resolve(__dirname, '../../packages/supabase/src'),
+      '@surewaka/auth': path.resolve(__dirname, '../../packages/auth/src'),
+      '@surewaka/realtime': path.resolve(__dirname, '../../packages/realtime/src'),
     },
   },
 });

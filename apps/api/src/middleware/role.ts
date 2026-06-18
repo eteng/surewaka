@@ -1,10 +1,10 @@
 import { createMiddleware } from 'hono/factory';
 import type { UserRole } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 
 type RoleEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: AuthUser;
     userRoles: UserRole[];
   };
 };
@@ -13,7 +13,8 @@ type RoleEnv = {
  * Role-based access control middleware.
  * Checks that the authenticated user holds at least one of the required roles.
  *
- * - Extracts roles from `user.app_metadata.roles` (defaults to ['customer'] if missing/empty)
+ * - Extracts roles from `user.roles` (populated from Clerk publicMetadata)
+ * - Defaults to ['customer'] if missing/empty
  * - `surewaka_admin` bypasses all role checks (hierarchy bypass)
  * - Returns 403 FORBIDDEN when the user lacks required roles
  * - Sets `userRoles` on Hono context for downstream middleware/handlers
@@ -23,12 +24,11 @@ type RoleEnv = {
 export function requireRole(...roles: UserRole[]) {
   return createMiddleware<RoleEnv>(async (c, next) => {
     const user = c.get('user');
-    const appMetadataRoles = user.app_metadata?.roles;
 
     // Default to ['customer'] when roles are missing or empty
     const userRoles: UserRole[] =
-      Array.isArray(appMetadataRoles) && appMetadataRoles.length > 0
-        ? (appMetadataRoles as UserRole[])
+      Array.isArray(user.roles) && user.roles.length > 0
+        ? (user.roles as UserRole[])
         : ['customer'];
 
     c.set('userRoles', userRoles);
@@ -52,7 +52,7 @@ export function requireRole(...roles: UserRole[]) {
           },
           meta: null,
         },
-        403
+        403,
       );
     }
 

@@ -8,14 +8,14 @@ import { requireRole } from '../middleware/role';
 import { requireCarrierScope } from '../middleware/carrier-scope';
 import { onboardCarrierDriverSchema } from '@surewaka/shared';
 import type { UserRole } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 import { db, users, userRoles, carrierMembers, carriers, roleAuditLog } from '@surewaka/db';
 import { eq } from 'drizzle-orm';
 import { syncRolesToAuth } from '../services/role-service';
 
 type CarrierRoutesEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: AuthUser;
     accessToken: string;
     userRoles: UserRole[];
     carrierMembership: typeof carrierMembers.$inferSelect;
@@ -61,7 +61,7 @@ carrierRoutes.get('/carriers', async (c) => {
  *   2. Assign carrier_driver role (scoped to carrier)
  *   3. Insert carrier_members record
  *   4. Insert audit log entry
- *   5. Sync roles to Supabase Auth
+ *   5. Sync roles to Clerk
  */
 carrierRoutes.post(
   '/carriers/:carrierId/drivers/invite',
@@ -148,7 +148,7 @@ carrierRoutes.post(
           reason: 'Onboarded by carrier admin',
         });
 
-        // Step 5: Sync roles to Supabase Auth
+        // Step 5: Sync roles to Clerk
         await syncRolesToAuth(user.id);
 
         return { user, roleRecord };

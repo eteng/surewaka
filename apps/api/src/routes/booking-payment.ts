@@ -4,10 +4,10 @@ import { db, deliveries, escrowHolds } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { getWalletByUserId, creditWallet, debitWallet } from '../lib/wallet-service';
 import { bookingConfirmSchema, cancelDeliverySchema } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 import { randomUUID } from 'crypto';
 
-type Env = { Variables: { user: SupabaseUser; accessToken: string } };
+type Env = { Variables: { user: AuthUser; accessToken: string } };
 
 const bookingPaymentRoutes = new Hono<Env>();
 bookingPaymentRoutes.use('*', requireAuth);

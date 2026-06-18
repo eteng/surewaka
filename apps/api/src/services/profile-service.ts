@@ -5,7 +5,7 @@
 
 import { db, users, nameChangeRequests } from '@surewaka/db';
 import { eq, and } from 'drizzle-orm';
-import { createServiceClient } from '@surewaka/supabase';
+import { getClerkClient } from '@surewaka/auth';
 import {
   ALLOWED_AVATAR_TYPES,
   MAX_AVATAR_SIZE_BYTES,
@@ -59,7 +59,7 @@ export function maskPhone(phone: string): string {
 }
 
 /**
- * Sync avatar_url to Supabase Auth user_metadata.
+ * Sync avatar_url to Clerk user_metadata.
  * Fire-and-forget: logs errors but does not throw.
  */
 export async function syncAvatarMetadata(
@@ -67,14 +67,10 @@ export async function syncAvatarMetadata(
   avatarUrl: string | null,
 ): Promise<void> {
   try {
-    const supabase = createServiceClient();
-    const { error } = await supabase.auth.admin.updateUserById(userId, {
-      user_metadata: { avatar_url: avatarUrl },
+    const clerk = getClerkClient();
+    await clerk.users.updateUserMetadata(userId, {
+      publicMetadata: { avatar_url: avatarUrl },
     });
-
-    if (error) {
-      console.error('[ProfileService] Auth metadata sync failed:', { userId, error: error.message });
-    }
   } catch (err) {
     console.error('[ProfileService] Unexpected error syncing avatar metadata:', { userId, err });
   }

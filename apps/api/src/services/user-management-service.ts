@@ -5,7 +5,7 @@
 
 import { db, users, userRoles, carriers, roleAuditLog } from '@surewaka/db';
 import { eq, ne, and, ilike, or, asc, desc, count, sql, type SQL } from 'drizzle-orm';
-import { createServiceClient } from '@surewaka/supabase';
+import { getClerkClient } from '@surewaka/auth';
 import type { UserRole } from '@surewaka/shared';
 import { assignRole, syncRolesToAuth } from './role-service';
 
@@ -89,7 +89,7 @@ export type ServiceResult<T> = {
 /**
  * Invite a new employee via email.
  * - Checks email uniqueness (409 CONFLICT if exists)
- * - Calls Supabase Auth inviteUserByEmail (502 INVITATION_FAILED on failure)
+ * - Calls Clerk inviteUserByEmail (502 INVITATION_FAILED on failure)
  * - Creates user record + assigns role in a DB transaction
  * - Returns created employee detail
  *
@@ -115,22 +115,20 @@ export async function inviteEmployee(
     };
   }
 
-  // 2. Call Supabase Auth inviteUserByEmail (Requirement 1.1, 1.7)
+  // 2. Create invitation via Clerk (Requirement 1.1, 1.7)
   // This is called BEFORE the DB transaction — fail-fast pattern
-  const supabaseAdmin = createServiceClient();
-  const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-    data: {
-      name: fullName,
-      role,
-    },
-  });
-
-  if (inviteError) {
+  const clerk = getClerkClient();
+  try {
+    await clerk.invitations.createInvitation({
+      emailAddress: email,
+      publicMetadata: { name: fullName, role },
+    });
+  } catch (err) {
     return {
       data: null,
       error: {
         code: 'INVITATION_FAILED',
-        message: `Failed to send invitation email: ${inviteError.message}`,
+        message: `Failed to send invitation email: ${err instanceof Error ? err.message : 'Unknown error'}`,
       },
       meta: null,
     };
@@ -556,7 +554,7 @@ export async function updateEmployee(
  * - Sets verified=false on user record
  * - Revokes all active roles (isActive=false)
  * - Creates audit log entry for each revoked role
- * - Updates Supabase Auth app_metadata to clear roles (non-throwing)
+ * - Updates Clerk app_metadata to clear roles (non-throwing)
  * - All DB changes wrapped in a single transaction
  *
  * Requirements: 4.1, 4.2, 4.3, 4.6, 4.7
@@ -634,7 +632,7 @@ export async function deactivateEmployee(
     }
   });
 
-  // 5. Sync roles to Supabase Auth via RoleService (Requirement 4.2, 5.7)
+  // 5. Sync roles to Clerk via RoleService (Requirement 4.2, 5.7)
   // After revoking all roles in the DB, syncRolesToAuth reads the (now empty)
   // active roles and updates app_metadata accordingly. Fire-and-forget: non-throwing.
   try {

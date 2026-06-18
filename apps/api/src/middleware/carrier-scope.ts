@@ -2,11 +2,11 @@ import { createMiddleware } from 'hono/factory';
 import { db, carrierMembers } from '@surewaka/db';
 import { and, eq } from 'drizzle-orm';
 import type { UserRole } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 
 type CarrierScopeEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: AuthUser;
     userRoles: UserRole[];
     carrierMembership: typeof carrierMembers.$inferSelect;
   };
@@ -26,7 +26,7 @@ type CarrierScopeEnv = {
  */
 export const requireCarrierScope = createMiddleware<CarrierScopeEnv>(async (c, next) => {
   const user = c.get('user');
-  const userRoles: UserRole[] = c.get('userRoles') ?? user.app_metadata?.roles ?? [];
+  const userRoles: UserRole[] = c.get('userRoles') ?? (user.roles as UserRole[]) ?? [];
   const carrierId = c.req.param('carrierId');
 
   // surewaka_admin bypasses scope check
@@ -42,7 +42,7 @@ export const requireCarrierScope = createMiddleware<CarrierScopeEnv>(async (c, n
         error: { code: 'BAD_REQUEST', message: 'Missing carrierId parameter' },
         meta: null,
       },
-      400
+      400,
     );
   }
 
@@ -54,8 +54,8 @@ export const requireCarrierScope = createMiddleware<CarrierScopeEnv>(async (c, n
       and(
         eq(carrierMembers.userId, user.id),
         eq(carrierMembers.carrierId, carrierId),
-        eq(carrierMembers.isActive, true)
-      )
+        eq(carrierMembers.isActive, true),
+      ),
     )
     .limit(1);
 
@@ -66,7 +66,7 @@ export const requireCarrierScope = createMiddleware<CarrierScopeEnv>(async (c, n
         error: { code: 'FORBIDDEN', message: 'Not a member of this carrier' },
         meta: null,
       },
-      403
+      403,
     );
   }
 

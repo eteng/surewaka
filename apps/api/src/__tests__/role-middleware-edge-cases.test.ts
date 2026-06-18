@@ -5,12 +5,12 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { USER_ROLES, type UserRole } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 import { requireRole } from '../middleware/role';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function createMockUser(appMetadata: SupabaseUser['app_metadata']): SupabaseUser {
+function createMockUser(appMetadata: AuthUser['app_metadata']): AuthUser {
   return {
     id: '00000000-0000-4000-8000-000000000001',
     email: 'test@surewaka.com',
@@ -19,7 +19,7 @@ function createMockUser(appMetadata: SupabaseUser['app_metadata']): SupabaseUser
   };
 }
 
-function createTestApp(requiredRoles: UserRole[], user: SupabaseUser) {
+function createTestApp(requiredRoles: UserRole[], user: AuthUser) {
   const app = new Hono();
 
   // Simulate requireAuth — sets user on context

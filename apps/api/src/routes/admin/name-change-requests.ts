@@ -3,16 +3,16 @@
 // Requirements: 2.5, 2.6
 
 import { Hono } from 'hono';
-import { requireAuth, requireMfa } from '../../middleware/auth';
+import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
 import { nameChangeReviewSchema } from '@surewaka/shared';
 import type { UserRole } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 import * as nameChangeService from '../../services/name-change-service';
 
 type AdminNameChangeEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: AuthUser;
     accessToken: string;
     userRoles: UserRole[];
   };
@@ -22,7 +22,6 @@ const adminNameChangeRequests = new Hono<AdminNameChangeEnv>();
 
 // All routes require authentication + MFA + surewaka_admin role
 adminNameChangeRequests.use('*', requireAuth);
-adminNameChangeRequests.use('*', requireMfa);
 adminNameChangeRequests.use('*', requireRole('surewaka_admin'));
 
 /**

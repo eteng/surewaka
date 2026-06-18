@@ -17,7 +17,7 @@
     "@react-router/node": "^7.1.0",
     "@react-router/serve": "^7.1.0",
     "@surewaka/shared": "workspace:*",
-    "@surewaka/supabase": "workspace:*",
+    "@surewaka/db": "workspace:*",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "class-variance-authority": "^0.7.1",

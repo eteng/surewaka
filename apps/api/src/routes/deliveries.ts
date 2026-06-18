@@ -3,11 +3,11 @@ import { eq } from 'drizzle-orm';
 import { db, deliveries, users } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { createDeliverySchema } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 
 type DeliveriesEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: AuthUser;
     accessToken: string;
   };
 };

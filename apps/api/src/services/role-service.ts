@@ -4,7 +4,7 @@
 
 import { db, userRoles, roleAuditLog } from '@surewaka/db';
 import { eq, and } from 'drizzle-orm';
-import { createServiceClient } from '@surewaka/supabase';
+import { getClerkClient } from '@surewaka/auth';
 import type { UserRole, UserRoleRecord, AppMetadata } from '@surewaka/shared';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ const ORG_SCOPED_ROLES: UserRole[] = ['carrier_admin', 'carrier_driver'];
  * - Validates org-scoped roles require scope fields
  * - Enforces only surewaka_admin can assign surewaka_admin or support_agent
  * - Returns 409 Conflict on duplicate active role assignment
- * - Logs audit entry and syncs to Supabase Auth
+ * - Logs audit entry and syncs to Clerk
  */
 export async function assignRole(params: AssignRoleParams): Promise<ServiceResult<UserRoleRecord>> {
   const { userId, role, assignedBy, assignedByRoles, scopeType, scopeId, reason } = params;
@@ -130,7 +130,7 @@ export async function assignRole(params: AssignRoleParams): Promise<ServiceResul
     reason: reason ?? null,
   });
 
-  // Sync roles to Supabase Auth (fire-and-forget on failure)
+  // Sync roles to Clerk (fire-and-forget on failure)
   await syncRolesToAuth(userId);
 
   const result: UserRoleRecord = {
@@ -151,7 +151,7 @@ export async function assignRole(params: AssignRoleParams): Promise<ServiceResul
 /**
  * Revoke a role from a user.
  * Sets is_active=false and revoked_at on the matching record.
- * Logs audit entry and syncs to Supabase Auth.
+ * Logs audit entry and syncs to Clerk.
  */
 export async function revokeRole(params: RevokeRoleParams): Promise<ServiceResult<void>> {
   const { userId, role, revokedBy, scopeId, reason } = params;
@@ -188,7 +188,7 @@ export async function revokeRole(params: RevokeRoleParams): Promise<ServiceResul
     reason,
   });
 
-  // Sync roles to Supabase Auth
+  // Sync roles to Clerk
   await syncRolesToAuth(userId);
 
   return { data: null, error: null, meta: null };
@@ -250,7 +250,7 @@ export async function upgradeRole(params: UpgradeRoleParams): Promise<ServiceRes
     reason,
   });
 
-  // Sync roles to Supabase Auth
+  // Sync roles to Clerk
   await syncRolesToAuth(userId);
 
   const result: UserRoleRecord = {
@@ -352,7 +352,7 @@ export async function hasRole(
 // ─── Role Sync ───────────────────────────────────────────────────────────────
 
 /**
- * Sync all active roles from user_roles table to Supabase Auth app_metadata.
+ * Sync all active roles from user_roles table to Clerk app_metadata.
  * - Sets `roles` array, `primary_role` (first in list), and `carrier_id` for org-scoped roles
  * - Defaults to `['customer']` when no active roles exist
  * - On failure: logs error but does not throw (Requirement 6.5)
@@ -380,15 +380,10 @@ export async function syncRolesToAuth(userId: string): Promise<void> {
       ...(carrierRole?.scopeId && { carrier_id: carrierRole.scopeId }),
     };
 
-    const supabaseAdmin = createServiceClient();
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-      app_metadata: appMetadata,
+    const clerk = getClerkClient();
+    await clerk.users.updateUserMetadata(userId, {
+      publicMetadata: appMetadata,
     });
-
-    if (error) {
-      // Log error but don't throw — mutation already succeeded (Requirement 6.5)
-      console.error(`[RoleSync] Failed to sync roles for user ${userId}:`, error.message);
-    }
   } catch (err) {
     // Log error but don't throw — mutation already succeeded (Requirement 6.5)
     console.error(`[RoleSync] Unexpected error syncing roles for user ${userId}:`, err);

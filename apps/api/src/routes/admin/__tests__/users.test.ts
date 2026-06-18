@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import type { UserRole } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 
 // ─── Mock State ───────────────────────────────────────────────────────────────
 
@@ -185,7 +185,7 @@ vi.mock('@surewaka/db', () => {
   };
 });
 
-vi.mock('@surewaka/supabase', () => ({
+vi.mock('@surewaka/auth', () => ({
   createServiceClient: () => ({
     auth: {
       admin: {
@@ -519,7 +519,7 @@ describe('User Management Routes — Integration Tests', () => {
 
       // Mock requireAuth — sets user on context
       const mockAuth = createMiddleware(async (c, next) => {
-        const mockUser: SupabaseUser = {
+        const mockUser: AuthUser = {
           id: 'mock-user-id',
           email: 'admin@example.com',
           user_metadata: { name: 'Admin User' },

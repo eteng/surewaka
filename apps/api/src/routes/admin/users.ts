@@ -13,7 +13,7 @@ import {
   auditLogQuerySchema,
 } from '@surewaka/shared';
 import type { UserRole } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 import {
   inviteEmployee,
   listEmployees,
@@ -26,7 +26,7 @@ import {
 
 type UserManagementEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: AuthUser;
     accessToken: string;
     userRoles: UserRole[];
   };

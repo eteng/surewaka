@@ -12,7 +12,7 @@ import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import type { UserRole } from '@surewaka/shared';
 import { USER_ROLES } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 import { requireRole } from '../../../middleware/role';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ function createTestApp(userRoles: UserRole[]) {
 
   // Mock requireAuth — sets user on context with the specified roles
   const mockAuth = createMiddleware(async (c, next) => {
-    const mockUser: SupabaseUser = {
+    const mockUser: AuthUser = {
       id: 'mock-user-id',
       email: 'test@example.com',
       user_metadata: { name: 'Test User' },

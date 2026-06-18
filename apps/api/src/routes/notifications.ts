@@ -5,13 +5,13 @@
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import { createNotificationSchema, notificationQuerySchema } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 import * as notificationService from '../services/notification-service';
 import { z } from 'zod';
 
 type NotificationRoutesEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: AuthUser;
     accessToken: string;
   };
 };

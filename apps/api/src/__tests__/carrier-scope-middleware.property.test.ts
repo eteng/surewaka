@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fc from 'fast-check';
 import { Hono } from 'hono';
 import { USER_ROLES, type UserRole } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 
 // ─── Mock DB ─────────────────────────────────────────────────────────────────
 
@@ -57,13 +57,13 @@ const nonAdminRolesArb = fc
   .map((arr) => arr as UserRole[]);
 
 /**
- * Create a mock SupabaseUser with the given roles and optional carrier_id.
+ * Create a mock AuthUser with the given roles and optional carrier_id.
  */
 function createMockUser(
   id: string,
   roles: UserRole[],
   carrierId?: string
-): SupabaseUser {
+): AuthUser {
   return {
     id,
     email: 'test@surewaka.com',
@@ -80,7 +80,7 @@ function createMockUser(
  * Create a Hono app with the carrier scope middleware and a test route.
  * Simulates the middleware chain: requireAuth → requireRole → requireCarrierScope.
  */
-async function createTestApp(user: SupabaseUser, userRoles: UserRole[]) {
+async function createTestApp(user: AuthUser, userRoles: UserRole[]) {
   // Dynamic import to get the mocked version
   const { requireCarrierScope } = await import('../middleware/carrier-scope');
 

@@ -8,12 +8,12 @@ import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
 import { assignRoleSchema, revokeRoleSchema } from '@surewaka/shared';
 import type { UserRole } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 import { assignRole, revokeRole, getUserRoles, upgradeRole } from '../../services/role-service';
 
 type AdminRolesEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: AuthUser;
     accessToken: string;
     userRoles: UserRole[];
   };

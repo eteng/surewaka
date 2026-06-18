@@ -1,18 +1,20 @@
 {
   "name": "@surewaka/db",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts",
-    "db:pull": "drizzle-kit pull && cp drizzle/schema.ts src/schema.ts && perl -i -pe \"s/\\{ withTimezone: true, mode: 'string' \\}/{ withTimezone: true }/g; s/, \\{ mode: 'string' \\}//g\" src/schema.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.0"
+    "@neondatabase/serverless": "^1.1.0",
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
     "dotenv": "^17.4.2",

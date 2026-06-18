@@ -24,27 +24,27 @@ pnpm dev
 | `pnpm --filter @surewaka/landing dev` | Landing site (:3002) |
 | `pnpm --filter @surewaka/api dev` | API server (:4000) |
 | `pnpm --filter @surewaka/mobile-customer dev` | Mobile customer (Expo) |
-| `pnpm --filter @surewaka/db db:studio` | Drizzle Studio (read-only) |
+| `pnpm --filter @surewaka/db db:studio` | Drizzle Studio |
 
 ## Database (Schema Changes)
 
-**Database-first.** Supabase owns migrations. Drizzle schema is generated from the DB, never hand-edited.
+**Schema-first.** Drizzle schema files are the source of truth. Neon Postgres is the host.
 
 ```bash
-# 1. Create and write the migration
-npx supabase@2.104.0 migration new <name>
-# → edit supabase/migrations/<timestamp>_<name>.sql
+# 1. Edit the schema
+#    packages/db/src/schema/<table>.ts
 
-# 2. Apply it (you run this — Claude does not)
-#    via Supabase dashboard, psql, or supabase db push
+# 2. Generate a migration
+pnpm --filter @surewaka/db db:generate
 
-# 3. Pull the updated schema into TypeScript
-pnpm --filter @surewaka/db db:pull
+# 3. Apply the migration
+pnpm --filter @surewaka/db db:migrate
+
+# For initial setup or prototyping (pushes schema directly, no migration file):
+pnpm --filter @surewaka/db db:push
 ```
 
-`packages/db/src/schema.ts` is a generated file — do not edit it by hand.
-
-Supabase project ref: `royfgnaiiexvpxapmcdh` (EU Frankfurt)
+Schema lives in `packages/db/src/schema/` — one file per table/domain entity.
 
 ## Type Checking
 
@@ -70,5 +70,5 @@ git push origin <branch> && git push personal <branch>
 
 ## Notion
 
-Database ID: `collection://34fbbd69-ff4a-815e-957e-000b081ef0b7` ("Master Task Hub")  
+Database ID: `collection://34fbbd69-ff4a-815e-957e-000b081ef0b7` ("Master Task Hub")
 Engineering tasks → Workstream: **Tech**

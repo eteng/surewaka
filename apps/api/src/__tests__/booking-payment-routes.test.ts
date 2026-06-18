@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 
 const mockGetUser = vi.fn();
-vi.mock('@surewaka/supabase', () => ({
+vi.mock('@surewaka/auth', () => ({
   createServerClient: () => ({ auth: { getUser: mockGetUser } }),
 }));
 

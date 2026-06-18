@@ -1,21 +1,19 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
 import * as schema from './schema';
 
 /**
- * Database client using Drizzle ORM connected to Supabase Postgres.
+ * Database client using Drizzle ORM connected to Neon Postgres.
  *
- * Uses the pooled connection (DATABASE_POOL_URL) for server queries
- * and direct connection (DATABASE_URL) for migrations.
+ * Uses DATABASE_URL (Neon connection string) for all queries.
+ * Neon's serverless driver handles connection pooling automatically.
  */
-const connectionString = process.env.DATABASE_POOL_URL || process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
-  throw new Error('DATABASE_URL or DATABASE_POOL_URL must be set');
+  throw new Error('DATABASE_URL must be set');
 }
 
-const client = postgres(connectionString, {
-  prepare: false, // Required for Supabase connection pooling (PgBouncer)
-});
+const sql = neon(connectionString);
 
-export const db = drizzle(client, { schema });
+export const db = drizzle(sql, { schema });

@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
 import { Hono } from 'hono';
 import { USER_ROLES, type UserRole } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 import { requireRole } from '../middleware/role';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -26,9 +26,9 @@ const nonAdminRolesArb = fc
   .map((arr) => arr as UserRole[]);
 
 /**
- * Create a mock SupabaseUser with the given roles in app_metadata.
+ * Create a mock AuthUser with the given roles in app_metadata.
  */
-function createMockUser(roles: UserRole[] | undefined): SupabaseUser {
+function createMockUser(roles: UserRole[] | undefined): AuthUser {
   return {
     id: '00000000-0000-4000-8000-000000000001',
     email: 'test@surewaka.com',
@@ -44,7 +44,7 @@ function createMockUser(roles: UserRole[] | undefined): SupabaseUser {
  * Create a Hono app with requireRole middleware and a test route.
  * The `setUser` middleware simulates requireAuth by setting the user on context.
  */
-function createTestApp(requiredRoles: UserRole[], user: SupabaseUser) {
+function createTestApp(requiredRoles: UserRole[], user: AuthUser) {
   const app = new Hono();
 
   // Simulate requireAuth — sets user on context

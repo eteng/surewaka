@@ -3,11 +3,11 @@ import { eq } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth';
 import { otpRegisterSchema } from '@surewaka/shared';
 import { db, users } from '@surewaka/db';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 
 type AuthRoutesEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: AuthUser;
     accessToken: string;
   };
 };

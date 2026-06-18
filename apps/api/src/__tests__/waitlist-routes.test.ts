@@ -10,7 +10,7 @@ import { Hono } from 'hono';
 // Mock createServerClient from @surewaka/supabase
 const mockGetUser = vi.fn();
 
-vi.mock('@surewaka/supabase', () => ({
+vi.mock('@surewaka/auth', () => ({
   createServerClient: () => ({
     auth: {
       getUser: mockGetUser,

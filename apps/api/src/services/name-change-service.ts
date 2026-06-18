@@ -4,7 +4,7 @@
 
 import { db, users, nameChangeRequests } from '@surewaka/db';
 import { eq } from 'drizzle-orm';
-import { createServiceClient } from '@surewaka/supabase';
+import { getClerkClient } from '@surewaka/auth';
 import { type NameChangeReview } from '@surewaka/shared';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -31,22 +31,16 @@ type ServiceResult<T> = {
 // ─── Utility Functions ───────────────────────────────────────────────────────
 
 /**
- * Sync name to Supabase Auth user_metadata.
+ * Sync name to Clerk user_metadata.
  * Fire-and-forget: logs errors but does not throw.
  */
 async function syncNameMetadata(userId: string, name: string): Promise<void> {
   try {
-    const supabase = createServiceClient();
-    const { error } = await supabase.auth.admin.updateUserById(userId, {
-      user_metadata: { name },
+    const clerk = getClerkClient();
+    await clerk.users.updateUser(userId, {
+      firstName: name.split(' ')[0],
+      lastName: name.split(' ').slice(1).join(' ') || undefined,
     });
-
-    if (error) {
-      console.error('[NameChangeService] Auth metadata sync failed:', {
-        userId,
-        error: error.message,
-      });
-    }
   } catch (err) {
     console.error('[NameChangeService] Unexpected error syncing name metadata:', { userId, err });
   }

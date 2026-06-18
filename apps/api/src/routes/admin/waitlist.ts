@@ -7,12 +7,12 @@ import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
 import { waitlistQuerySchema } from '@surewaka/shared';
 import type { UserRole } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 import { listWaitlistSignups, getWaitlistStats } from '../../services/waitlist-service';
 
 type WaitlistEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: AuthUser;
     accessToken: string;
     userRoles: UserRole[];
   };

@@ -26,8 +26,9 @@ SureWaka is a logistics platform for Nigeria connecting senders with verified ca
 | `apps/api` | REST API (Hono, port 4000) |
 | `packages/shared` | Domain types, Zod validators, constants |
 | `packages/ui` | Shared UI components (shadcn/ui pattern) |
-| `packages/db` | Database schema and client (Drizzle ORM + Supabase Postgres) |
-| `packages/supabase` | Supabase client (auth and realtime only — file storage handled by Cloudinary/R2 via `apps/api/src/lib/storage/`) |
+| `packages/db` | Database schema and client (Drizzle ORM + Neon Postgres) |
+| `packages/auth` | Auth verification and user management (Clerk) |
+| `packages/realtime` | Realtime pub/sub abstraction (Ably provider, swappable to CF DO) |
 | `packages/ai` | LLM client abstraction (Vercel AI SDK) |
 | `packages/mobile-shared` | Shared RN components, hooks, stores |
 | `agents/*` | AI agents (customer-support, onboarding, internal-ops) |
@@ -56,7 +57,7 @@ SureWaka is a logistics platform for Nigeria connecting senders with verified ca
 
 - Framework: Hono with `@hono/node-server`
 - Middleware: CORS and request logger enabled globally (`apps/api/src/middleware/logging.ts`)
-- Auth: Supabase JWT via `requireAuth` middleware (`apps/api/src/middleware/auth.ts`)
+- Auth: Clerk JWT via `requireAuth` middleware (`apps/api/src/middleware/auth.ts`)
 - Route prefix: `/api/v1`
 - Validation: Zod schemas from `@surewaka/shared`
 - Response shape: `{ data, error, meta }`
@@ -75,25 +76,76 @@ Error log fields: `time`, `level` (`warn`/`error`/`fatal`), `method`, `path`, `s
 
 To investigate a problem: read the error log first (small, targeted), then cross-reference the access log by `time` for surrounding context.
 
-## Database & Backend Services (Supabase)
+## Database (Neon Postgres)
 
-- **Postgres**: Hosted on Supabase, queried via Drizzle ORM (not PostgREST)
-- **Auth**: Supabase Auth (phone OTP, email, OAuth) — `@surewaka/supabase`
-- **Storage**: Supabase Storage for KYC docs, profile images, delivery photos
-- **Realtime**: Supabase Realtime for delivery tracking (postgres_changes + broadcast)
-- Schema location: `packages/db/src/schema.ts`
-- Client: `packages/db/src/client.ts` (uses `prepare: false` for PgBouncer)
-- IDs: UUID with `defaultRandom()`
-- Timestamps: `created_at` and `updated_at` columns on all tables
-- Enums defined with `pgEnum` (e.g., `user_role`, `delivery_status`, `vehicle_type`)
-- Use `DATABASE_POOL_URL` for server queries, `DATABASE_URL` for migrations
-- **NEVER use `drizzle-kit push`** — Supabase is the migration source of truth
+- **Host**: Neon (serverless Postgres, AWS eu-central-1)
+- **Driver**: `@neondatabase/serverless` via Drizzle ORM `neon-http` adapter
+- **Schema location**: `packages/db/src/schema/` — one file per table
+- **Client**: `packages/db/src/client.ts`
+- **IDs**: UUID with `defaultRandom()`
+- **Timestamps**: `created_at` and `updated_at` columns on all tables
+- **Enums**: defined with `pgEnum` in `packages/db/src/schema/enums.ts`
+- **Connection**: Single `DATABASE_URL` env var (Neon handles pooling)
 
-Schema change workflow:
-1. `supabase migration new <name>` — creates the migration file
-2. `supabase migration fetch --yes` — syncs locally
-3. `supabase gen types --linked > packages/db/src/types.ts` — regenerate types
-4. Keep `packages/db/src/schema.ts` (Drizzle) in sync manually
+### Schema change workflow (Drizzle-first):
+
+```bash
+# 1. Edit schema file(s) in packages/db/src/schema/
+# 2. Generate migration SQL
+pnpm --filter @surewaka/db db:generate
+# 3. Apply migration to Neon
+pnpm --filter @surewaka/db db:migrate
+```
+
+For initial setup or rapid prototyping, `db:push` applies schema directly without generating a migration file.
+
+### Schema structure:
+
+```
+packages/db/src/schema/
+├── index.ts              (barrel re-export)
+├── enums.ts              (all pgEnums)
+├── users.ts
+├── user-roles.ts
+├── role-audit-log.ts
+├── carriers.ts           (carriers + carrier_members)
+├── drivers.ts
+├── deliveries.ts
+├── escrow-holds.ts
+├── wallets.ts            (wallets + wallet_transactions)
+├── payout-requests.ts
+├── addresses.ts          (saved + recent locations)
+├── name-change-requests.ts
+├── notifications.ts
+└── waitlist.ts
+```
+
+## Auth (Clerk)
+
+- **Provider**: Clerk (phone OTP, email/password, Google OAuth)
+- **Package**: `packages/auth` — `verifyToken()`, `getClerkClient()`, `AuthUser` type
+- **API middleware**: `requireAuth` verifies Clerk session tokens from `Authorization: Bearer <token>`
+- **Role storage**: Clerk `publicMetadata.roles` array (synced from `user_roles` table)
+- **Mobile**: `@clerk/expo` SDK
+- **Web**: `@clerk/react-router` SDK
+- **Env vars**: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`
+
+## Realtime (Ably)
+
+- **Provider**: Ably (free tier: 6M messages/mo, 200 concurrent connections)
+- **Package**: `packages/realtime` — provider abstraction for future migration to CF Durable Objects
+- **Patterns**:
+  - `delivery:${deliveryId}` — status updates (API publishes after DB mutation)
+  - `driver-location:${driverId}` — driver location broadcasts (high frequency, no DB write)
+- **Server-side**: `getRealtime().publish(channel, event, data)` from API route handlers
+- **Client-side**: `subscribe(channel, event, callback)` in mobile/web apps
+- **Env var**: `ABLY_API_KEY`
+
+## Storage
+
+- **Cloudinary**: Public images (avatars)
+- **Cloudflare R2**: Private documents (KYC docs, delivery photos)
+- **Integration**: `apps/api/src/lib/storage/`
 
 ## AI Agents
 
@@ -118,8 +170,10 @@ pnpm dev                                    # Start all services
 pnpm build                                  # Build all packages
 pnpm --filter @surewaka/web dev             # Start customer web app
 pnpm --filter @surewaka/api dev             # Start API server
-pnpm --filter @surewaka/db db:studio        # Open Drizzle Studio (read-only inspection)
-docker compose -f infra/docker/docker-compose.yml up -d  # Local DB/Redis
+pnpm --filter @surewaka/db db:studio        # Open Drizzle Studio
+pnpm --filter @surewaka/db db:generate      # Generate migration from schema changes
+pnpm --filter @surewaka/db db:migrate       # Apply pending migrations to Neon
+docker compose -f infra/docker/docker-compose.yml up -d  # Local Redis
 ```
 
 ## Key Rules
@@ -129,6 +183,7 @@ docker compose -f infra/docker/docker-compose.yml up -d  # Local DB/Redis
 - New UI components go in `packages/ui/src/` using the shadcn/ui pattern (CVA + cn utility)
 - App-specific components that won't be reused go in `apps/{app}/app/components/`
 - Zod schemas are the single source of truth for request validation
-- Environment variables are loaded from `.env.*local` files (see `turbo.json` globalDependencies)
-- Use `createServerClient` (with user JWT) for user-scoped queries; `createServiceClient` only in workers/admin ops
-- Never expose `SUPABASE_SERVICE_ROLE_KEY` to the client
+- Environment variables are loaded from `.env` files (see `turbo.json` globalDependencies)
+- Auth is handled entirely in the API layer (Clerk JWT verification in Hono middleware)
+- No RLS on the database — authorization logic lives in application code
+- Never expose `CLERK_SECRET_KEY` to the client

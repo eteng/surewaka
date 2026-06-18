@@ -21,17 +21,37 @@ description: TypeScript, API, database, AI agent, and file naming conventions fo
 ## Database
 - Use Drizzle ORM — no raw SQL unless absolutely necessary
 - All tables have `id` (uuid), `createdAt`, `updatedAt`
-- Use enums for fixed value sets
-- **NEVER use `drizzle-kit push`** — Supabase is the migration source of truth
-- Migration workflow: `supabase migration new <name>` → `supabase migration fetch --yes` → regenerate types → sync Drizzle schema manually
+- Use enums for fixed value sets (defined in `packages/db/src/schema/enums.ts`)
+- Schema is source of truth — lives in `packages/db/src/schema/`, one file per table
 
-**RLS is mandatory for every new table — include in the same migration file:**
-1. `ALTER TABLE <table> ENABLE ROW LEVEL SECURITY;`
-2. Service role bypass: `CREATE POLICY "service_role_manage_<table>" ON <table> FOR ALL USING (auth.role() = 'service_role');`
-3. User-scoped policies (own rows, read-only catalog, etc.) — never expose other users' data
-4. `GRANT` only minimum needed privileges to `authenticated` — omit INSERT/UPDATE/DELETE unless the client writes directly (most mutations go through the API as service role)
+### Migration workflow (Drizzle Kit):
 
-Missing grants are silent: RLS policies exist but `permission denied` is returned before they're evaluated. Always verify both the policy AND the grant exist.
+```bash
+# 1. Edit the relevant file in packages/db/src/schema/
+# 2. Generate migration
+pnpm --filter @surewaka/db db:generate
+# 3. Review the generated SQL in packages/db/drizzle/
+# 4. Apply to Neon
+pnpm --filter @surewaka/db db:migrate
+```
+
+- `db:push` is acceptable for initial setup or prototyping (applies schema without generating a migration file)
+- Always review generated SQL before applying to production
+- Never modify migration files after they've been applied
+
+### Adding a new table:
+
+1. Create `packages/db/src/schema/<table-name>.ts`
+2. Define the table with appropriate columns, indexes, FKs, and constraints
+3. Export from `packages/db/src/schema/index.ts`
+4. Run `db:generate` → `db:migrate`
+
+## Auth
+- Authorization is handled in the API layer (Hono middleware), not via database RLS
+- `requireAuth` middleware verifies Clerk session tokens
+- `requireRole(...roles)` middleware checks user roles from Clerk `publicMetadata`
+- Role data lives in both the `user_roles` DB table and Clerk `publicMetadata` (synced on mutation)
+- `AuthUser` type from `@surewaka/auth` is the canonical user type across the API
 
 ## AI Agents
 - System prompts in markdown files (version controlled)

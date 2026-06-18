@@ -10,9 +10,9 @@ import {
   createDedicatedVirtualAccount,
 } from '../lib/paystack';
 import { initializeTopupSchema, walletCheckSchema } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 
-type Env = { Variables: { user: SupabaseUser; accessToken: string } };
+type Env = { Variables: { user: AuthUser; accessToken: string } };
 
 const walletRoutes = new Hono<Env>();
 walletRoutes.use('*', requireAuth);
@@ -71,7 +71,7 @@ walletRoutes.get('/dva', async (c) => {
         meta: null,
       });
     }
-    const name = (user.user_metadata?.name as string | undefined) ?? '';
+    const name = (user.name) ?? '';
     const [firstName, ...rest] = name.split(' ');
     const email = user.email || `user_${user.id}@wallet.surewaka.com`;
     const customer = await createCustomer(email, firstName ?? '', rest.join(' '));

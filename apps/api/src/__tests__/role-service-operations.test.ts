@@ -78,7 +78,7 @@ vi.mock('@surewaka/db', () => {
   };
 });
 
-vi.mock('@surewaka/supabase', () => ({
+vi.mock('@surewaka/auth', () => ({
   createServiceClient: () => ({
     auth: {
       admin: {

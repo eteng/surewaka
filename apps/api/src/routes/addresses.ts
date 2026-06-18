@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import { createSavedAddressSchema, updateSavedAddressSchema, upsertRecentLocationSchema } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 import * as addressService from '../services/address-service';
 import * as recentLocationService from '../services/recent-location-service';
 
 type AddressRoutesEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: AuthUser;
     accessToken: string;
   };
 };

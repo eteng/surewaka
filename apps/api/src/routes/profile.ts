@@ -10,12 +10,12 @@ import {
   avatarFileSchema,
   nameChangeRequestSchema,
 } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 import * as profileService from '../services/profile-service';
 
 type ProfileRoutesEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: AuthUser;
     accessToken: string;
   };
 };

@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fc from 'fast-check';
 import { Hono } from 'hono';
 import type { UserRole } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { AuthUser } from '@surewaka/auth';
 
 // ─── Mock DB ─────────────────────────────────────────────────────────────────
 
@@ -41,12 +41,12 @@ const distinctCarrierIdsArb = fc
   .filter(([a, b]) => a !== b);
 
 /**
- * Create a mock SupabaseUser with carrier_driver role and a specific carrier membership.
+ * Create a mock AuthUser with carrier_driver role and a specific carrier membership.
  */
 function createCarrierDriverUser(
   id: string,
   carrierId: string
-): SupabaseUser {
+): AuthUser {
   return {
     id,
     email: 'driver@surewaka.com',
@@ -63,7 +63,7 @@ function createCarrierDriverUser(
  * Create a Hono app with the carrier scope middleware applied to a carrier-scoped route.
  * Simulates the middleware chain: requireAuth → requireRole → requireCarrierScope → handler.
  */
-async function createTestApp(user: SupabaseUser, userRoles: UserRole[]) {
+async function createTestApp(user: AuthUser, userRoles: UserRole[]) {
   const { requireCarrierScope } = await import('../middleware/carrier-scope');
 
   const app = new Hono();
