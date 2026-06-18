@@ -1,10 +1,18 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { phoneOtpSchema } from '@surewaka/shared';
-import { useAuthStore } from '@surewaka/mobile-shared';
+import { useSignIn } from '@clerk/expo';
 
 type FormData = {
   phone: string;
@@ -12,30 +20,49 @@ type FormData = {
 
 export default function SignInScreen() {
   const router = useRouter();
-  const signIn = useAuthStore((s) => s.signIn);
+  const { signIn, isLoaded } = useSignIn();
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { control, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<FormData>({
     resolver: zodResolver(phoneOtpSchema),
     defaultValues: { phone: '+234' },
   });
 
   const onSubmit = async (data: FormData) => {
+    if (!isLoaded || !signIn) return;
+
     setSending(true);
     setError(null);
 
-    const { error: signInError } = await signIn(data.phone);
+    try {
+      // Create a sign-in attempt with phone number
+      const result = await signIn.create({
+        identifier: data.phone,
+      });
 
-    setSending(false);
+      // Prepare the phone code verification
+      await result.prepareFirstFactor({
+        strategy: 'phone_code',
+        phoneNumberId: result.supportedFirstFactors?.find(
+          (f) => f.strategy === 'phone_code',
+        )?.phoneNumberId ?? '',
+      });
 
-    if (signInError) {
-      setError(signInError);
-    } else {
       router.push({
         pathname: '/(auth)/verify',
         params: { phone: data.phone },
       });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to send OTP. Please try again.';
+      setError(message);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -45,9 +72,7 @@ export default function SignInScreen() {
       className="flex-1 bg-white"
     >
       <View className="flex-1 px-6 justify-center">
-        <Text className="text-3xl font-bold text-gray-900 mb-2">
-          Welcome to SureWaka
-        </Text>
+        <Text className="text-3xl font-bold text-gray-900 mb-2">Welcome to SureWaka</Text>
         <Text className="text-base text-gray-500 mb-8">
           Enter your phone number to continue
         </Text>
@@ -64,6 +89,7 @@ export default function SignInScreen() {
                 placeholder="+2348012345678"
                 className="border border-gray-300 rounded-xl px-4 py-4 text-base text-gray-900"
                 placeholderClassName="text-gray-400"
+                aria-invalid={!!errors.phone}
               />
               {errors.phone && (
                 <Text className="text-error text-sm mt-1">{errors.phone.message}</Text>

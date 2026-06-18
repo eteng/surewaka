@@ -4,7 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { otpVerifySchema } from '@surewaka/shared';
-import { useAuthStore } from '@surewaka/mobile-shared';
+import { useSignIn } from '@clerk/expo';
 
 type FormData = {
   otp: string;
@@ -13,46 +13,55 @@ type FormData = {
 export default function VerifyScreen() {
   const router = useRouter();
   const { phone } = useLocalSearchParams<{ phone: string }>();
-  const verifyOtp = useAuthStore((s) => s.verifyOtp);
+  const { signIn, setActive, isLoaded } = useSignIn();
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { control, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<FormData>({
     resolver: zodResolver(otpVerifySchema),
     defaultValues: { otp: '' },
   });
 
   const onSubmit = async (data: FormData) => {
+    if (!isLoaded || !signIn) return;
+
     setVerifying(true);
     setError(null);
 
-    const { error: verifyError } = await verifyOtp(phone, data.otp);
+    try {
+      const result = await signIn.attemptFirstFactor({
+        strategy: 'phone_code',
+        code: data.otp,
+      });
 
-    setVerifying(false);
-
-    if (verifyError) {
-      setError(verifyError);
+      if (result.status === 'complete' && result.createdSessionId) {
+        await setActive({ session: result.createdSessionId });
+        // Navigation is handled by the root layout's auth state listener
+      } else {
+        setError('Verification incomplete. Please try again.');
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to verify OTP. Please try again.';
+      setError(message);
+    } finally {
+      setVerifying(false);
     }
   };
 
   return (
     <View className="flex-1 bg-white px-6 justify-center">
-      <Pressable
-        onPress={() => router.back()}
-        className="absolute top-12 left-6"
-      >
+      <Pressable onPress={() => router.back()} className="absolute top-12 left-6">
         <Text className="text-primary text-base">← Back</Text>
       </Pressable>
 
-      <Text className="text-3xl font-bold text-gray-900 mb-2">
-        Verify OTP
-      </Text>
-      <Text className="text-base text-gray-500 mb-2">
-        Enter the 6-digit code sent to
-      </Text>
-      <Text className="text-base text-gray-900 font-medium mb-8">
-        {phone}
-      </Text>
+      <Text className="text-3xl font-bold text-gray-900 mb-2">Verify OTP</Text>
+      <Text className="text-base text-gray-500 mb-2">Enter the 6-digit code sent to</Text>
+      <Text className="text-base text-gray-900 font-medium mb-8">{phone}</Text>
 
       <Controller
         control={control}
@@ -68,6 +77,7 @@ export default function VerifyScreen() {
               textAlign="center"
               className="border border-gray-300 rounded-xl px-4 py-4 text-2xl text-gray-900 tracking-widest"
               placeholderClassName="text-gray-400"
+              aria-invalid={!!errors.otp}
             />
             {errors.otp && (
               <Text className="text-error text-sm mt-1">{errors.otp.message}</Text>

@@ -4,30 +4,38 @@ import { useRouter, Stack } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { otpRegisterSchema, type OtpRegister } from '@surewaka/shared';
-import { useAuthStore, createAuthClient } from '@surewaka/mobile-shared';
+import { useAuth } from '@clerk/expo';
+import { createAuthClient, useAuthStore } from '@surewaka/mobile-shared';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const session = useAuthStore((s) => s.session);
+  const { getToken } = useAuth();
   const setProfileExists = useAuthStore((s) => s.setProfileExists);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { control, handleSubmit, formState: { errors } } = useForm<OtpRegister>({
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<OtpRegister>({
     resolver: zodResolver(otpRegisterSchema),
     defaultValues: { name: '' },
   });
 
   const onSubmit = async (data: OtpRegister) => {
-    if (!session?.access_token) {
-      setError('Session expired. Please sign out and sign in again.');
-      return;
-    }
-
     setSubmitting(true);
     setError(null);
 
-    const client = createAuthClient(session.access_token);
+    const token = await getToken();
+
+    if (!token) {
+      setError('Session expired. Please sign out and sign in again.');
+      setSubmitting(false);
+      return;
+    }
+
+    const client = createAuthClient(token);
     const { error: apiError } = await client.post('/api/v1/auth/register', { name: data.name });
 
     setSubmitting(false);
@@ -61,6 +69,7 @@ export default function RegisterScreen() {
                 autoFocus
                 className="border border-gray-300 rounded-xl px-4 py-4 text-lg text-gray-900"
                 placeholderClassName="text-gray-400"
+                aria-invalid={!!errors.name}
               />
               {errors.name && (
                 <Text className="text-error text-sm mt-1">{errors.name.message}</Text>

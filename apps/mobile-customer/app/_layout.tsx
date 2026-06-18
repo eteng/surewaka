@@ -7,7 +7,10 @@ import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';
-import { ThemeProvider, useAuthStore } from '@surewaka/mobile-shared';
+import { ClerkProvider, useAuth, useUser } from '@clerk/expo';
+import { ThemeProvider, tokenCache, useAuthStore } from '@surewaka/mobile-shared';
+
+const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
@@ -21,27 +24,38 @@ Sentry.init({
 
 function InnerLayout() {
   const router = useRouter();
-  const initialize = useAuthStore((s) => s.initialize);
-  const initialized = useAuthStore((s) => s.initialized);
-  const loading = useAuthStore((s) => s.loading);
-  const user = useAuthStore((s) => s.user);
+  const { isSignedIn, isLoaded, getToken } = useAuth();
+  const { user } = useUser();
   const profileExists = useAuthStore((s) => s.profileExists);
+  const checkProfile = useAuthStore((s) => s.checkProfile);
+  const setLoading = useAuthStore((s) => s.setLoading);
+  const reset = useAuthStore((s) => s.reset);
 
+  // Check profile existence once signed in
   useEffect(() => {
-    initialize();
-  }, [initialize]);
+    if (!isLoaded) return;
 
-  // Navigate imperatively so the Stack is always in the tree.
-  // Rendering <Redirect> instead of <Stack> tears down the navigation context,
-  // which causes Zustand's useSyncExternalStore to loop with expo-router's
-  // ContextNavigator during the commit phase.
+    if (isSignedIn) {
+      getToken().then((token) => {
+        if (token) {
+          checkProfile(token);
+          Sentry.setUser({ id: user?.id, email: user?.primaryEmailAddress?.emailAddress });
+        }
+      });
+    } else {
+      reset();
+      setLoading(false);
+    }
+  }, [isLoaded, isSignedIn]);
+
+  // Redirect new users to register
   useEffect(() => {
-    if (!loading && initialized && user && profileExists === false) {
+    if (isLoaded && isSignedIn && profileExists === false) {
       router.replace('/(auth)/register');
     }
-  }, [loading, initialized, user, profileExists]);
+  }, [isLoaded, isSignedIn, profileExists]);
 
-  if (loading || !initialized) {
+  if (!isLoaded) {
     return null;
   }
 
@@ -61,13 +75,15 @@ function InnerLayout() {
 
 function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <StatusBar style="auto" />
-        <InnerLayout />
-        <Toaster position="bottom-center" richColors />
-      </ThemeProvider>
-    </GestureHandlerRootView>
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ThemeProvider>
+          <StatusBar style="auto" />
+          <InnerLayout />
+          <Toaster position="bottom-center" richColors />
+        </ThemeProvider>
+      </GestureHandlerRootView>
+    </ClerkProvider>
   );
 }
 

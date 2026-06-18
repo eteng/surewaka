@@ -1,13 +1,14 @@
 import { Redirect, Stack } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { useAuthStore } from '@surewaka/mobile-shared';
 
 export default function AuthLayout() {
-  const user = useAuthStore((s) => s.user);
+  const { isSignedIn } = useAuth();
   const profileExists = useAuthStore((s) => s.profileExists);
 
   // Only bounce fully-provisioned users. Users with profileExists === false
   // must complete register.tsx (which lives inside this group).
-  if (user && profileExists === true) {
+  if (isSignedIn && profileExists === true) {
     return <Redirect href="/(tabs)" />;
   }
 

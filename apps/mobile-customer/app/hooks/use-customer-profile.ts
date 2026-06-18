@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase, useAuthStore } from '@surewaka/mobile-shared';
+import { useAuth, useUser } from '@clerk/expo';
+import { apiClient } from '@surewaka/mobile-shared';
 import { toast } from 'sonner-native';
 import type { Gender } from '@surewaka/shared';
 import { processAvatarImage } from '../utils/image-processing';
@@ -38,41 +39,51 @@ type UseCustomerProfile = {
 };
 
 export function useCustomerProfile(): UseCustomerProfile {
-  const userId = useAuthStore((s) => s.user?.id);
+  const { getToken } = useAuth();
+  const { user } = useUser();
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   const fetchProfile = useCallback(async () => {
-    if (!userId) return;
+    const token = await getToken();
+    if (!token) return;
+
     setIsLoading(true);
     setError(null);
 
-    const [{ data: row, error: dbError }, { data: authData }] = await Promise.all([
-      supabase.from('users').select('*').eq('id', userId).single(),
-      supabase.auth.getUser(),
-    ]);
+    const response = await apiClient.get<{
+      id: string;
+      name: string;
+      phone: string;
+      email: string | null;
+      avatarUrl: string | null;
+      notificationEmail: boolean;
+      notificationSms: boolean;
+      verified: boolean;
+    }>('/api/v1/profile', token);
 
-    if (dbError || !row) {
+    if (response.error || !response.data) {
       setError('Failed to load profile. Please try again.');
       setIsLoading(false);
       return;
     }
 
+    const data = response.data;
     setProfile({
-      id: row.id,
-      name: row.name,
-      phone: row.phone,
-      email: row.email ?? null,
-      gender: (row.gender as Gender) ?? null,
-      notificationEmail: row.notification_email ?? true,
-      notificationSms: row.notification_sms ?? true,
-      pendingEmail: authData.user?.new_email ?? null,
-      avatarUrl: row.avatar_url ?? null,
+      id: data.id,
+      name: data.name,
+      phone: data.phone,
+      email: data.email,
+      gender: null, // TODO: expose gender in profile API response
+      notificationEmail: data.notificationEmail,
+      notificationSms: data.notificationSms,
+      pendingEmail: null,
+      avatarUrl: data.avatarUrl,
     });
     setIsLoading(false);
-  }, [userId]);
+  }, [getToken]);
 
   useEffect(() => {
     fetchProfile();
@@ -80,54 +91,44 @@ export function useCustomerProfile(): UseCustomerProfile {
 
   const updateName = useCallback(
     async (name: string): Promise<MutationResult> => {
-      if (!userId) return { error: 'Not authenticated' };
+      const token = await getToken();
+      if (!token) return { error: 'Not authenticated' };
 
-      const { error: dbError } = await supabase
-        .from('users')
-        .update({ name, updated_at: new Date().toISOString() })
-        .eq('id', userId);
-
-      if (dbError) return { error: 'Failed to update name. Please try again.' };
-
-      // Keep auth metadata consistent — best-effort, non-blocking
-      supabase.auth.updateUser({ data: { name } }).catch(() => {});
+      const response = await apiClient.patch('/api/v1/profile/preferences', { name }, token);
+      if (response.error) return { error: 'Failed to update name. Please try again.' };
 
       setProfile((prev) => (prev ? { ...prev, name } : prev));
       return { error: null };
     },
-    [userId],
+    [getToken],
   );
 
   const updateEmail = useCallback(
     async (email: string): Promise<MutationResult> => {
-      const { error: authError } = await supabase.auth.updateUser({ email });
-      if (authError) return { error: 'Failed to send verification email. Please try again.' };
-
-      // Reflect the pending state immediately from the updated session
-      const { data: authData } = await supabase.auth.getUser();
-      setProfile((prev) =>
-        prev ? { ...prev, pendingEmail: authData.user?.new_email ?? email } : prev,
-      );
-      return { error: null };
+      // Update email through Clerk directly
+      try {
+        await user?.createEmailAddress({ email });
+        setProfile((prev) => (prev ? { ...prev, pendingEmail: email } : prev));
+        return { error: null };
+      } catch {
+        return { error: 'Failed to update email. Please try again.' };
+      }
     },
-    [],
+    [user],
   );
 
   const updateGender = useCallback(
     async (gender: Gender | null): Promise<MutationResult> => {
-      if (!userId) return { error: 'Not authenticated' };
+      const token = await getToken();
+      if (!token) return { error: 'Not authenticated' };
 
-      const { error: dbError } = await supabase
-        .from('users')
-        .update({ gender, updated_at: new Date().toISOString() })
-        .eq('id', userId);
-
-      if (dbError) return { error: 'Failed to update gender. Please try again.' };
+      const response = await apiClient.patch('/api/v1/profile/preferences', { gender }, token);
+      if (response.error) return { error: 'Failed to update gender. Please try again.' };
 
       setProfile((prev) => (prev ? { ...prev, gender } : prev));
       return { error: null };
     },
-    [userId],
+    [getToken],
   );
 
   const updateNotifications = useCallback(
@@ -135,15 +136,11 @@ export function useCustomerProfile(): UseCustomerProfile {
       notificationEmail?: boolean;
       notificationSms?: boolean;
     }): Promise<MutationResult> => {
-      if (!userId) return { error: 'Not authenticated' };
+      const token = await getToken();
+      if (!token) return { error: 'Not authenticated' };
 
-      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      if (prefs.notificationEmail !== undefined) patch.notification_email = prefs.notificationEmail;
-      if (prefs.notificationSms !== undefined) patch.notification_sms = prefs.notificationSms;
-
-      const { error: dbError } = await supabase.from('users').update(patch).eq('id', userId);
-
-      if (dbError) return { error: 'Failed to update notifications. Please try again.' };
+      const response = await apiClient.patch('/api/v1/profile/preferences', prefs, token);
+      if (response.error) return { error: 'Failed to update notifications. Please try again.' };
 
       setProfile((prev) =>
         prev
@@ -160,20 +157,17 @@ export function useCustomerProfile(): UseCustomerProfile {
       );
       return { error: null };
     },
-    [userId],
+    [getToken],
   );
 
   const updateAvatar = useCallback(
     async (localUri: string): Promise<MutationResult> => {
-      if (!userId) return { error: 'Not authenticated' };
+      const token = await getToken();
+      if (!token) return { error: 'Not authenticated' };
 
       setIsUploadingAvatar(true);
 
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token;
-        if (!token) return { error: 'Not authenticated' };
-
         const { blob: arrayBuffer, mimeType } = await processAvatarImage(localUri);
 
         const formData = new FormData();
@@ -202,17 +196,14 @@ export function useCustomerProfile(): UseCustomerProfile {
         setIsUploadingAvatar(false);
       }
     },
-    [userId],
+    [getToken],
   );
 
   const removeAvatar = useCallback(async (): Promise<MutationResult> => {
-    if (!userId) return { error: 'Not authenticated' };
+    const token = await getToken();
+    if (!token) return { error: 'Not authenticated' };
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) return { error: 'Not authenticated' };
-
       const res = await fetch(`${API_URL}/api/v1/profile/avatar`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
@@ -229,7 +220,7 @@ export function useCustomerProfile(): UseCustomerProfile {
       toast.error('Failed to remove photo. Please try again.');
       return { error: 'Failed to remove photo. Please try again.' };
     }
-  }, [userId]);
+  }, [getToken]);
 
   return {
     profile,

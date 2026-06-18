@@ -9,13 +9,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { supabase, useAddressStore } from '@surewaka/mobile-shared';
+import { apiClient, useAddressStore } from '@surewaka/mobile-shared';
+import { useAuth } from '@clerk/expo';
 import type { SavedAddress } from '@surewaka/shared';
 
 const ADDRESS_CAP = 25;
 
 export default function AddressesScreen() {
   const router = useRouter();
+  const { getToken } = useAuth();
   const insets = useSafeAreaInsets();
   const addresses = useAddressStore((s) => s.addresses);
   const fetched = useAddressStore((s) => s.fetched);
@@ -52,10 +54,9 @@ export default function AddressesScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const { error: err } = await supabase
-              .from('user_saved_addresses')
-              .delete()
-              .eq('id', address.id);
+            const token = await getToken();
+            if (!token) return;
+            const { error: err } = await apiClient.delete(`/api/v1/addresses/${address.id}`, token);
             if (err) {
               Alert.alert('Error', 'Could not delete address. Please try again.');
             } else {

@@ -19,10 +19,11 @@ import Mapbox from '@rnmapbox/maps';
 import {
   searchAddress,
   reverseGeocode,
-  supabase,
+  apiClient,
   useAuthStore,
   useAddressStore,
 } from '@surewaka/mobile-shared';
+import { useAuth } from '@clerk/expo';
 import type { LocationSuggestion } from '@surewaka/mobile-shared';
 import type { SavedAddress } from '@surewaka/shared';
 
@@ -34,7 +35,7 @@ const PRESET_LABELS = ['Home', 'Office', 'Work', 'Other'];
 export default function AddressEditScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const userId = useAuthStore((s) => s.user?.id ?? '');
+  const { getToken } = useAuth();
   const addAddress = useAddressStore((s) => s.add);
   const updateAddress = useAddressStore((s) => s.update);
 
@@ -78,12 +79,14 @@ export default function AddressEditScreen() {
   useEffect(() => {
     if (!id) return;
     (async () => {
-      const { data } = await supabase
-        .from('user_saved_addresses')
-        .select('id, label, address_text, city, state, lat, lng, created_at')
-        .eq('id', id)
-        .single();
-      if (data) {
+      const token = await getToken();
+      if (!token) { setLoadingExisting(false); return; }
+      const response = await apiClient.get<{
+        id: string; label: string; address_text: string;
+        city: string; state: string; lat: number; lng: number;
+      }>(`/api/v1/addresses/${id}`, token);
+      if (response.data) {
+        const data = response.data;
         setLabel(PRESET_LABELS.includes(data.label) ? data.label : 'Other');
         setCustomLabel(PRESET_LABELS.includes(data.label) ? '' : data.label);
         setSelectedAddress(data.address_text);
@@ -173,28 +176,25 @@ export default function AddressEditScreen() {
     };
 
     if (id) {
-      const { error } = await supabase
-        .from('user_saved_addresses')
-        .update(body)
-        .eq('id', id);
+      const token = await getToken();
+      if (!token) { setSaving(false); return; }
+      const response = await apiClient.patch(`/api/v1/addresses/${id}`, body, token);
       setSaving(false);
-      if (error) {
-        Alert.alert('Error', error.message ?? 'Could not save address. Please try again.');
+      if (response.error) {
+        Alert.alert('Error', response.error.message ?? 'Could not save address. Please try again.');
       } else {
         updateAddress(id, body);
         router.back();
       }
     } else {
-      const { data, error } = await supabase
-        .from('user_saved_addresses')
-        .insert({ ...body, user_id: userId })
-        .select('id, label, address_text, city, state, lat, lng, created_at')
-        .single();
+      const token = await getToken();
+      if (!token) { setSaving(false); return; }
+      const response = await apiClient.post<SavedAddress>('/api/v1/addresses', body, token);
       setSaving(false);
-      if (error) {
-        Alert.alert('Error', error.message ?? 'Could not save address. Please try again.');
-      } else {
-        addAddress(data as SavedAddress);
+      if (response.error) {
+        Alert.alert('Error', response.error.message ?? 'Could not save address. Please try again.');
+      } else if (response.data) {
+        addAddress(response.data);
         router.back();
       }
     }

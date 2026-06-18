@@ -10,7 +10,7 @@ export { FormField } from './components/form-field';
 export { colors, darkColors, spacing, typography, gradients } from './theme';
 export { ThemeProvider, useTheme, lightTheme, darkTheme } from './theme';
 export type { Theme, ThemeColors, ThemeSpacing, ThemeTypography, ThemeGradients } from './theme';
-export { supabase } from './supabase';
+export { tokenCache } from './clerk';
 export { useAuth } from './hooks/use-auth';
 export { useLocation } from './hooks/use-location';
 export { apiClient, createAuthClient } from './api/client';
