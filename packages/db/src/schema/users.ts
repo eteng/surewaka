@@ -6,6 +6,7 @@ export const users = pgTable(
   'users',
   {
     id: uuid().defaultRandom().primaryKey().notNull(),
+    clerkId: text('clerk_id').notNull(),
     email: text(),
     phone: text().notNull(),
     name: text().notNull(),
@@ -20,6 +21,7 @@ export const users = pgTable(
   },
   (table) => [
     unique('users_email_unique').on(table.email),
+    unique('users_clerk_id_unique').on(table.clerkId),
     check(
       'users_gender_check',
       sql`gender = ANY (ARRAY['woman'::text, 'man'::text, 'prefer_not_to_disclose'::text])`,

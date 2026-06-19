@@ -1,23 +1,36 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
-import { requireAuth } from '../middleware/auth';
+import { requireClerkAuth } from '../middleware/auth';
 import { otpRegisterSchema } from '@surewaka/shared';
 import { db, users } from '@surewaka/db';
-import type { AuthUser } from '@surewaka/auth';
 
-type AuthRoutesEnv = {
+type RegisterEnv = {
   Variables: {
-    user: AuthUser;
+    clerkId: string;
+    clerkEmail?: string;
+    clerkPhone?: string;
+    clerkName?: string;
     accessToken: string;
   };
 };
 
-const authRoutes = new Hono<AuthRoutesEnv>();
+const authRoutes = new Hono<RegisterEnv>();
 
-authRoutes.post('/register', requireAuth, async (c) => {
-  const authUser = c.get('user');
+/**
+ * POST /api/v1/auth/register
+ *
+ * Called after first Clerk sign-in to create the internal user profile.
+ * Uses requireClerkAuth (not requireAuth) because the user doesn't have
+ * a DB row yet — only a valid Clerk session.
+ *
+ * Creates a new UUID-keyed row in the users table with the Clerk ID stored
+ * in the clerk_id column for future lookups.
+ */
+authRoutes.post('/register', requireClerkAuth, async (c) => {
+  const clerkId = c.get('clerkId');
+  const phone = c.get('clerkPhone');
 
-  if (!authUser.phone) {
+  if (!phone) {
     return c.json(
       { data: null, error: { code: 'MISSING_PHONE', message: 'Phone number not found on account' }, meta: null },
       400,
@@ -38,24 +51,26 @@ authRoutes.post('/register', requireAuth, async (c) => {
     );
   }
 
+  // Insert new user with clerk_id — UUID is auto-generated
   const [user] = await db
     .insert(users)
     .values({
-      id: authUser.id,
+      clerkId,
       name: parsed.data.name,
-      phone: authUser.phone,
-      email: null,
+      phone,
+      email: c.get('clerkEmail') ?? null,
       role: 'customer',
       verified: false,
     })
     .onConflictDoNothing()
     .returning();
 
-  // onConflictDoNothing returns empty array when row already exists — fetch it
-  const [existing] = user ? [user] : await db.select().from(users).where(eq(users.id, authUser.id)).limit(1);
-  const result = existing;
+  // onConflictDoNothing returns empty if row already exists — fetch it
+  const [existing] = user
+    ? [user]
+    : await db.select().from(users).where(eq(users.clerkId, clerkId)).limit(1);
 
-  if (!result) {
+  if (!existing) {
     return c.json(
       { data: null, error: { code: 'INTERNAL_ERROR', message: 'Failed to provision user' }, meta: null },
       500,
@@ -63,7 +78,7 @@ authRoutes.post('/register', requireAuth, async (c) => {
   }
 
   return c.json(
-    { data: { id: result.id, name: result.name, phone: result.phone, role: result.role }, error: null, meta: null },
+    { data: { id: existing.id, name: existing.name, phone: existing.phone, role: existing.role }, error: null, meta: null },
     200,
   );
 });

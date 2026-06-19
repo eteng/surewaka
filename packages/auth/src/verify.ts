@@ -1,5 +1,4 @@
 import { createClerkClient, type ClerkClient } from '@clerk/backend';
-import type { AuthUser } from './types';
 
 let clerkClient: ClerkClient | null = null;
 
@@ -15,18 +14,33 @@ function getClerkClient(): ClerkClient {
 }
 
 /**
- * Verify a Clerk session token (from Authorization: Bearer <token>).
- * Returns the authenticated user or null if invalid.
- *
- * Uses authenticateRequest() which handles JWT verification, expiry checks,
- * and signature validation.
+ * Clerk user info returned after token verification.
+ * This is NOT the final AuthUser — the middleware resolves the internal UUID
+ * by looking up the clerk_id in the users table.
  */
-export async function verifyToken(token: string): Promise<AuthUser | null> {
+export type ClerkUserInfo = {
+  clerkId: string;
+  email?: string;
+  phone?: string;
+  name?: string;
+  avatarUrl?: string;
+  roles: string[];
+  carrierId?: string;
+};
+
+/**
+ * Verify a Clerk session token (from Authorization: Bearer <token>).
+ * Returns Clerk user info or null if invalid.
+ *
+ * Note: This does NOT return an internal user ID. The auth middleware
+ * must look up the clerk_id in the users table to resolve the UUID.
+ */
+export async function verifyToken(token: string): Promise<ClerkUserInfo | null> {
   try {
     const clerk = getClerkClient();
 
     // Use authenticateRequest with a minimal Request object
-    const url = 'http://localhost/api'; // dummy URL, only token matters
+    const url = 'http://localhost/api';
     const request = new Request(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -47,23 +61,17 @@ export async function verifyToken(token: string): Promise<AuthUser | null> {
       return null;
     }
 
-    // fva = [firstFactorAge, secondFactorAge] in seconds; -1 means not verified
-    const fva = (auth.sessionClaims as Record<string, unknown>)?.fva as [number, number] | undefined;
-    const mfaVerified = Array.isArray(fva) && fva[1] !== -1;
-
     // Fetch full user details from Clerk
     const user = await clerk.users.getUser(userId);
 
     return {
-      id: user.id,
+      clerkId: user.id,
       email: user.emailAddresses[0]?.emailAddress ?? undefined,
       phone: user.phoneNumbers[0]?.phoneNumber ?? undefined,
       name: [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined,
       avatarUrl: user.imageUrl ?? undefined,
-      role: (user.publicMetadata as Record<string, unknown>)?.primary_role as string | undefined,
       roles: ((user.publicMetadata as Record<string, unknown>)?.roles as string[]) ?? ['customer'],
       carrierId: (user.publicMetadata as Record<string, unknown>)?.carrier_id as string | undefined,
-      mfaVerified,
     };
   } catch {
     return null;

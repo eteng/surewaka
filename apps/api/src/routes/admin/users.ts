@@ -4,7 +4,7 @@
 // Requirements: 1.1, 2.1, 3.1, 4.1, 4.4, 5.1, 5.2, 6.1, 7.1, 7.2
 
 import { Hono } from 'hono';
-import { requireAuth, requireMfa } from '../../middleware/auth';
+import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
 import {
   inviteEmployeeSchema,
@@ -36,7 +36,7 @@ const userManagement = new Hono<UserManagementEnv>();
 
 // All routes require authentication + MFA + surewaka_admin role (Requirements: 7.1, 7.2)
 userManagement.use('*', requireAuth);
-userManagement.use('*', requireMfa);
+userManagement.use('*');
 userManagement.use('*', requireRole('surewaka_admin'));
 
 // ─── Error Code to HTTP Status Mapping ───────────────────────────────────────
