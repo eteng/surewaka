@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WaitlistQuery } from '@surewaka/shared';
-import { supabase } from '~/lib/supabase';
+import { useAuth } from '@clerk/react';
 
 type WaitlistSignupRecord = {
   id: string;
@@ -41,6 +41,7 @@ function buildQueryString(params: Partial<WaitlistQuery>): string {
 }
 
 export function useWaitlistData(params: Partial<WaitlistQuery>): UseWaitlistDataResult {
+  const { getToken } = useAuth();
   const [data, setData] = useState<WaitlistSignupRecord[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,8 +64,7 @@ export function useWaitlistData(params: Partial<WaitlistQuery>): UseWaitlistData
     setError(null);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
+      const accessToken = await getToken();
 
       if (!accessToken) {
         setError('Not authenticated');

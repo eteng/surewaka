@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '~/lib/supabase';
+import { useAuth } from '@clerk/react';
 
 type EmployeeRole = {
   role: string;
@@ -58,6 +58,7 @@ function buildQueryString(params: Partial<EmployeeParams>): string {
 }
 
 export function useEmployeeData(params: Partial<EmployeeParams>): UseEmployeeDataResult {
+  const { getToken } = useAuth();
   const [data, setData] = useState<EmployeeListItem[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,8 +81,7 @@ export function useEmployeeData(params: Partial<EmployeeParams>): UseEmployeeDat
     setError(null);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
+      const accessToken = await getToken();
 
       if (!accessToken) {
         setError('Not authenticated');

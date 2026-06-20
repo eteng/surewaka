@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router';
+import { useClerk } from '@clerk/react';
 import { BadgeCheck, Bell, LogOut, Settings } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
 import {
@@ -11,12 +12,13 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
 import { Button } from '~/components/ui/button';
-import { useAuth, signOut } from '~/hooks/use-auth';
+import { useAuth } from '~/hooks/use-auth';
 import { useProfile } from '~/hooks/use-profile';
 
 export function HeaderUser() {
   const { user } = useAuth();
   const { profile } = useProfile();
+  const { signOut } = useClerk();
   const navigate = useNavigate();
 
   async function handleSignOut() {
@@ -26,14 +28,9 @@ export function HeaderUser() {
 
   if (!user) return null;
 
-  const email = user.email ?? '';
-  const name =
-    profile?.name ??
-    user.user_metadata?.full_name ??
-    user.user_metadata?.name ??
-    email.split('@')[0] ??
-    'Admin';
-  const avatar = profile?.avatarUrl ?? user.user_metadata?.avatar_url ?? '';
+  const email = user.primaryEmailAddress?.emailAddress ?? '';
+  const name = profile?.name ?? user.fullName ?? email.split('@')[0] ?? 'Admin';
+  const avatar = profile?.avatarUrl ?? user.imageUrl ?? '';
 
   const initials = name
     .split(' ')

@@ -87,9 +87,18 @@ export type NameChangeRequest = {
   reason: string;
 };
 
+export type NotificationType =
+  | 'new_user_signup'
+  | 'delivery_issue'
+  | 'carrier_verification_request'
+  | 'carrier_verified'
+  | 'dispute_opened'
+  | 'driver_verification_request'
+  | 'system_alert';
+
 export type NotificationData = {
   id: string;
-  type: string;
+  type: NotificationType;
   title: string;
   message: string;
   resourceLink: string | null;

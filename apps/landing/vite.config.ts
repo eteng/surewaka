@@ -11,7 +11,7 @@ export default defineConfig({
     },
   },
   ssr: {
-    noExternal: ['@surewaka/supabase', '@surewaka/shared'],
+    noExternal: ['@surewaka/shared'],
   },
   server: {
     port: 3002,

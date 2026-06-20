@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '~/components/ui/sidebar';
-import { signOut } from '~/hooks/use-auth';
+import { useClerk } from '@clerk/react';
 
 export function NavUser({
   user,
@@ -24,6 +24,7 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar();
   const navigate = useNavigate();
+  const { signOut } = useClerk();
 
   async function handleSignOut() {
     await signOut();

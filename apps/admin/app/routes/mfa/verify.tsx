@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useClerk, useUser } from '@clerk/react';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
-import { challengeMfa, getMfaFactors, verifyMfa } from '~/hooks/use-auth';
 
 export function meta() {
   return [{ title: 'SureWaka Admin - Verify MFA' }];
@@ -11,60 +11,45 @@ export function meta() {
 
 export default function MfaVerify() {
   const navigate = useNavigate();
+  const clerk = useClerk();
+  const { isLoaded } = useUser();
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [factorId, setFactorId] = useState<string | null>(null);
-  const [challengeId, setChallengeId] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function initChallenge() {
-      const { data: factors } = await getMfaFactors();
-      const totpFactor = factors?.totp?.[0];
-
-      if (!totpFactor) {
-        // No TOTP factor — redirect to enrollment
-        navigate('/mfa/enroll');
-        return;
-      }
-
-      setFactorId(totpFactor.id);
-      const { data: challenge, error: challengeError } = await challengeMfa(totpFactor.id);
-
-      if (challengeError) {
-        setError(challengeError.message);
-        return;
-      }
-
-      if (challenge) {
-        setChallengeId(challenge.id);
-      }
-    }
-
-    initChallenge();
-  }, [navigate]);
+  // No in-progress sign-in — send back to login
+  if (isLoaded && clerk.client.signIn.status !== 'needs_second_factor') {
+    navigate('/login', { replace: true });
+    return null;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!factorId || !challengeId) return;
+    if (!isLoaded) return;
 
     setError('');
     setLoading(true);
 
-    const { error: verifyError } = await verifyMfa(factorId, challengeId, code);
+    try {
+      const result = await clerk.client.signIn.attemptSecondFactor({
+        strategy: 'totp',
+        code,
+      });
 
-    if (verifyError) {
-      setError(verifyError.message);
-      setLoading(false);
-      // Create a new challenge for retry
-      const { data: newChallenge } = await challengeMfa(factorId);
-      if (newChallenge) {
-        setChallengeId(newChallenge.id);
+      if (result.status === 'complete') {
+        await clerk.setActive({ session: result.createdSessionId });
+        navigate('/');
+      } else {
+        setError('Verification failed. Please try again.');
       }
-      return;
+    } catch (err: unknown) {
+      const clerkError = err as { errors?: { message: string }[] };
+      const message = clerkError?.errors?.[0]?.message ?? 'Invalid code. Try again.';
+      setError(message);
+      setCode('');
+    } finally {
+      setLoading(false);
     }
-
-    navigate('/');
   }
 
   return (
@@ -107,7 +92,7 @@ export default function MfaVerify() {
             />
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading || !challengeId}>
+          <Button type="submit" className="w-full" disabled={loading || !isLoaded}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Verify
           </Button>
