@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '~/lib/supabase';
+import { useAuth } from '@clerk/react';
 
 type WaitlistStats = {
   total: number;
@@ -18,6 +18,7 @@ type UseWaitlistStatsResult = {
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 export function useWaitlistStats(): UseWaitlistStatsResult {
+  const { getToken } = useAuth();
   const [stats, setStats] = useState<WaitlistStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,8 +31,7 @@ export function useWaitlistStats(): UseWaitlistStatsResult {
       setError(null);
 
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData?.session?.access_token;
+        const accessToken = await getToken();
 
         if (!accessToken) {
           setError('Not authenticated');

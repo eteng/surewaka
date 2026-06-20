@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '~/lib/supabase';
+import { useAuth } from '@clerk/react';
 
 type EmployeeRole = {
   role: string;
@@ -88,17 +88,13 @@ type UseEmployeeDetailResult = {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
-async function getAccessToken(): Promise<string | null> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  return sessionData?.session?.access_token ?? null;
-}
-
 async function apiRequest(
+  getToken: () => Promise<string | null>,
   url: string,
   options: RequestInit = {},
   signal?: AbortSignal
 ): Promise<Response> {
-  const accessToken = await getAccessToken();
+  const accessToken = await getToken();
 
   if (!accessToken) {
     throw new Error('Not authenticated');
@@ -116,6 +112,7 @@ async function apiRequest(
 }
 
 export function useEmployeeDetail(userId: string): UseEmployeeDetailResult {
+  const { getToken } = useAuth();
   const [employee, setEmployee] = useState<EmployeeDetail | null>(null);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [auditLogMeta, setAuditLogMeta] = useState<AuditLogMeta | null>(null);
@@ -141,7 +138,7 @@ export function useEmployeeDetail(userId: string): UseEmployeeDetailResult {
     setError(null);
 
     try {
-      const accessToken = await getAccessToken();
+      const accessToken = await getToken();
 
       if (!accessToken) {
         setError('Not authenticated');
@@ -220,7 +217,7 @@ export function useEmployeeDetail(userId: string): UseEmployeeDetailResult {
   // Mutation functions
   const updateEmployee = useCallback(
     async (data: UpdateEmployeeData) => {
-      const response = await apiRequest(`${API_URL}/api/v1/admin/users/${userId}`, {
+      const response = await apiRequest(getToken,`${API_URL}/api/v1/admin/users/${userId}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       });
@@ -237,7 +234,7 @@ export function useEmployeeDetail(userId: string): UseEmployeeDetailResult {
   );
 
   const deactivate = useCallback(async () => {
-    const response = await apiRequest(`${API_URL}/api/v1/admin/users/${userId}/deactivate`, {
+    const response = await apiRequest(getToken,`${API_URL}/api/v1/admin/users/${userId}/deactivate`, {
       method: 'POST',
     });
 
@@ -253,7 +250,7 @@ export function useEmployeeDetail(userId: string): UseEmployeeDetailResult {
   }, [userId, fetchData]);
 
   const reactivate = useCallback(async () => {
-    const response = await apiRequest(`${API_URL}/api/v1/admin/users/${userId}/reactivate`, {
+    const response = await apiRequest(getToken,`${API_URL}/api/v1/admin/users/${userId}/reactivate`, {
       method: 'POST',
     });
 
@@ -272,7 +269,7 @@ export function useEmployeeDetail(userId: string): UseEmployeeDetailResult {
     async (data: AssignRoleData) => {
       // Delegates to existing RBAC role routes: POST /api/v1/admin/users/:userId/roles
       // The RoleService handles syncRolesToAuth after assignment (Requirement 5.7)
-      const response = await apiRequest(
+      const response = await apiRequest(getToken,
         `${API_URL}/api/v1/admin/users/${data.userId}/roles`,
         {
           method: 'POST',
@@ -301,7 +298,7 @@ export function useEmployeeDetail(userId: string): UseEmployeeDetailResult {
     async (data: RevokeRoleData) => {
       // Delegates to existing RBAC role routes: DELETE /api/v1/admin/users/:userId/roles
       // The RoleService handles syncRolesToAuth after revocation (Requirement 5.7)
-      const response = await apiRequest(
+      const response = await apiRequest(getToken,
         `${API_URL}/api/v1/admin/users/${data.userId}/roles`,
         {
           method: 'DELETE',

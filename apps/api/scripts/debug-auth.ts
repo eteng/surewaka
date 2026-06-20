@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { createServerClient } from '@surewaka/supabase';
+import { verifyToken } from '@surewaka/auth';
 
 const token = process.argv[2];
 
@@ -9,20 +9,21 @@ if (!token) {
 }
 
 async function main() {
-  console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? '✅ set' : '❌ missing');
-  console.log('SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? '✅ set' : '❌ missing');
+  console.log('CLERK_SECRET_KEY:', process.env.CLERK_SECRET_KEY ? '✅ set' : '❌ missing');
+  console.log('CLERK_PUBLISHABLE_KEY:', process.env.CLERK_PUBLISHABLE_KEY ? '✅ set' : '❌ missing');
   console.log('Token length:', token.length);
   console.log('');
 
-  const supabase = createServerClient(token);
-  const { data, error } = await supabase.auth.getUser();
+  const user = await verifyToken(token);
 
-  if (error) {
-    console.error('❌ getUser error:', error.message, error.status);
-  } else {
-    console.log('✅ User:', data.user?.id, data.user?.email);
-    console.log('   Roles:', data.user?.app_metadata?.roles);
+  if (!user) {
+    console.error('❌ Token invalid or expired');
+    process.exit(1);
   }
+
+  console.log('✅ User:', user.id, user.email);
+  console.log('   Roles:', user.roles);
+  console.log('   MFA verified:', user.mfaVerified);
 }
 
 main().catch(console.error);

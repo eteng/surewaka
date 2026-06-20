@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '~/lib/supabase';
+import { useAuth } from '@clerk/react';
 
 export type ProfileResponse = {
   id: string;
@@ -44,12 +44,8 @@ type UseProfileResult = {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
-async function getAccessToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  return data?.session?.access_token ?? null;
-}
-
 export function useProfile(): UseProfileResult {
+  const { getToken } = useAuth();
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -68,7 +64,7 @@ export function useProfile(): UseProfileResult {
     setError(null);
 
     try {
-      const accessToken = await getAccessToken();
+      const accessToken = await getToken();
 
       if (!accessToken) {
         setError('Not authenticated');
@@ -124,7 +120,7 @@ export function useProfile(): UseProfileResult {
     setError(null);
 
     try {
-      const accessToken = await getAccessToken();
+      const accessToken = await getToken();
 
       if (!accessToken) {
         setError('Not authenticated');
@@ -162,7 +158,7 @@ export function useProfile(): UseProfileResult {
     setError(null);
 
     try {
-      const accessToken = await getAccessToken();
+      const accessToken = await getToken();
 
       if (!accessToken) {
         setError('Not authenticated');
@@ -202,7 +198,7 @@ export function useProfile(): UseProfileResult {
     setError(null);
 
     try {
-      const accessToken = await getAccessToken();
+      const accessToken = await getToken();
 
       if (!accessToken) {
         setError('Not authenticated');
@@ -239,7 +235,7 @@ export function useProfile(): UseProfileResult {
     setError(null);
 
     try {
-      const accessToken = await getAccessToken();
+      const accessToken = await getToken();
 
       if (!accessToken) {
         setError('Not authenticated');

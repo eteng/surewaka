@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '~/lib/supabase';
+import { useAuth } from '@clerk/react';
 import type { NotificationData, PaginationMeta } from '@surewaka/shared';
 
 type FetchOptions = {
@@ -29,12 +29,8 @@ type UseNotificationsReturn = {
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const POLL_INTERVAL = 30_000; // 30 seconds
 
-async function getAccessToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  return data?.session?.access_token ?? null;
-}
-
 export function useNotifications(): UseNotificationsReturn {
+  const { getToken } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,7 +42,7 @@ export function useNotifications(): UseNotificationsReturn {
 
   const refetchUnreadCount = useCallback(async () => {
     try {
-      const accessToken = await getAccessToken();
+      const accessToken = await getToken();
       if (!accessToken) return;
 
       const response = await fetch(`${API_URL}/api/v1/notifications/unread-count`, {
@@ -77,7 +73,7 @@ export function useNotifications(): UseNotificationsReturn {
     setError(null);
 
     try {
-      const accessToken = await getAccessToken();
+      const accessToken = await getToken();
 
       if (!accessToken) {
         setError('Not authenticated');
@@ -144,7 +140,7 @@ export function useNotifications(): UseNotificationsReturn {
     );
 
     try {
-      const accessToken = await getAccessToken();
+      const accessToken = await getToken();
       if (!accessToken) {
         // Revert on auth failure
         setUnreadCount(previousCount);
@@ -181,7 +177,7 @@ export function useNotifications(): UseNotificationsReturn {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
 
     try {
-      const accessToken = await getAccessToken();
+      const accessToken = await getToken();
       if (!accessToken) {
         // Revert on auth failure
         setUnreadCount(previousCount);

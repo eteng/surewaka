@@ -1,21 +1,18 @@
 /**
  * Setup Test Admin Script
  *
- * Creates or updates a test user with surewaka_admin role in app_metadata.
- * Outputs a valid JWT token you can use to test the RBAC API endpoints.
+ * Creates or updates a test user with surewaka_admin role in Clerk and the DB.
+ * After running, sign in via the admin app UI at http://localhost:3001/login.
  *
  * Usage:
  *   pnpm --filter @surewaka/api exec tsx scripts/setup-test-admin.ts
  *
- * Requires env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ * Requires env vars: CLERK_SECRET_KEY, DATABASE_URL
  */
-
 import 'dotenv/config';
-import { createServiceClient } from '@surewaka/supabase';
+import { getClerkClient } from '@surewaka/auth';
 import { db, users } from '@surewaka/db';
 import { eq } from 'drizzle-orm';
-
-const supabase = createServiceClient();
 
 const TEST_EMAIL = 'admin-test@surewaka.com';
 const TEST_PASSWORD = 'TestAdmin123!';
@@ -23,49 +20,37 @@ const TEST_PASSWORD = 'TestAdmin123!';
 async function main() {
   console.log('🔧 Setting up test admin user...\n');
 
-  // Check if user already exists
-  const { data: existingUsers } = await supabase.auth.admin.listUsers();
-  const existing = existingUsers?.users?.find((u) => u.email === TEST_EMAIL);
+  const clerk = getClerkClient();
 
-  let userId: string;
+  // Find or create user in Clerk
+  const existingList = await clerk.users.getUserList({ emailAddress: [TEST_EMAIL] });
+  let clerkUser = existingList.data[0];
 
-  if (existing) {
-    userId = existing.id;
-    console.log(`✅ Found existing user: ${TEST_EMAIL} (${userId})`);
+  if (clerkUser) {
+    console.log(`✅ Found existing Clerk user: ${TEST_EMAIL} (${clerkUser.id})`);
   } else {
-    // Create the user
-    const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-      email: TEST_EMAIL,
+    clerkUser = await clerk.users.createUser({
+      emailAddress: [TEST_EMAIL],
       password: TEST_PASSWORD,
-      email_confirm: true,
-      user_metadata: { name: 'Test Admin' },
+      firstName: 'Test',
+      lastName: 'Admin',
+      skipPasswordChecks: true,
     });
-
-    if (createError) {
-      console.error('❌ Failed to create user:', createError.message);
-      process.exit(1);
-    }
-
-    userId = newUser.user.id;
-    console.log(`✅ Created user: ${TEST_EMAIL} (${userId})`);
+    console.log(`✅ Created Clerk user: ${TEST_EMAIL} (${clerkUser.id})`);
   }
 
-  // Update app_metadata with surewaka_admin role
-  const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
-    app_metadata: {
+  const userId = clerkUser.id;
+
+  // Set surewaka_admin role in public metadata
+  await clerk.users.updateUserMetadata(userId, {
+    publicMetadata: {
       roles: ['surewaka_admin'],
       primary_role: 'surewaka_admin',
     },
   });
+  console.log('✅ Set publicMetadata.roles = ["surewaka_admin"]');
 
-  if (updateError) {
-    console.error('❌ Failed to update app_metadata:', updateError.message);
-    process.exit(1);
-  }
-
-  console.log('✅ Set app_metadata.roles = ["surewaka_admin"]');
-
-  // Ensure user exists in the users table (for FK constraints)
+  // Ensure user exists in the DB (for FK constraints)
   const existingDbUser = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (existingDbUser.length === 0) {
     await db.insert(users).values({
@@ -81,32 +66,16 @@ async function main() {
     console.log('✅ User already exists in users table');
   }
 
-  // Generate a session token by signing in
-  const { data: session, error: signInError } = await supabase.auth.signInWithPassword({
-    email: TEST_EMAIL,
-    password: TEST_PASSWORD,
-  });
-
-  if (signInError || !session.session) {
-    console.error('❌ Failed to sign in:', signInError?.message);
-    process.exit(1);
-  }
-
-  const token = session.session.access_token;
-
   console.log('\n' + '═'.repeat(60));
-  console.log('🎉 Test admin ready! Use this token to test RBAC endpoints:');
+  console.log('🎉 Test admin ready!');
   console.log('═'.repeat(60));
   console.log(`\nUser ID: ${userId}`);
   console.log(`Email:   ${TEST_EMAIL}`);
+  console.log(`Password: ${TEST_PASSWORD}`);
   console.log(`Roles:   surewaka_admin`);
-  console.log(`\nAccess Token (expires in 1 hour):\n`);
-  console.log(token);
-  console.log('\n' + '═'.repeat(60));
-  console.log('\nExample usage:');
-  console.log(`\n  curl -H "Authorization: Bearer ${token.slice(0, 20)}..." \\`);
-  console.log(`    http://localhost:4000/api/v1/admin/users/${userId}/roles`);
-  console.log('\n' + '═'.repeat(60));
+  console.log('\nSign in at: http://localhost:3001/login');
+  console.log('\nOr use the Clerk Dashboard to impersonate this user and copy a session token.');
+  console.log('═'.repeat(60));
 }
 
 main().catch(console.error);

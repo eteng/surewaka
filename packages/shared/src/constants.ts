@@ -15,6 +15,16 @@ export const VEHICLE_TYPES = ['motorcycle', 'car', 'van', 'truck'] as const;
 export const PACKAGE_CATEGORIES = ['document', 'parcel', 'fragile', 'heavy', 'food'] as const;
 export const USER_ROLES = ['customer', 'driver', 'surewaka_admin', 'carrier_driver', 'carrier_admin', 'support_agent'] as const;
 
+export const NOTIFICATION_TYPES = [
+  'new_user_signup',
+  'delivery_issue',
+  'carrier_verification_request',
+  'carrier_verified',
+  'dispute_opened',
+  'driver_verification_request',
+  'system_alert',
+] as const;
+
 export const ALLOWED_AVATAR_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'] as const;
 export const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 export const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB

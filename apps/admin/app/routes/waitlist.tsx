@@ -8,7 +8,7 @@ import { WaitlistToolbar } from '~/components/waitlist/toolbar';
 import { WaitlistDataTable } from '~/components/waitlist/data-table';
 import { WaitlistPagination } from '~/components/waitlist/pagination';
 import { exportWaitlistCsv } from '~/lib/export-csv';
-import { supabase } from '~/lib/supabase';
+import { useAuth } from '@clerk/react';
 import { Button } from '~/components/ui/button';
 
 export function meta() {
@@ -60,6 +60,7 @@ class WaitlistErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryS
 }
 
 function WaitlistPage() {
+  const { getToken } = useAuth();
   const {
     params,
     setPage,
@@ -77,8 +78,7 @@ function WaitlistPage() {
   const handleExport = useCallback(async () => {
     setIsExporting(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
+      const accessToken = await getToken();
 
       if (!accessToken) {
         return;

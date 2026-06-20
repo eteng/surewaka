@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { USER_ROLES, inviteEmployeeSchema } from '@surewaka/shared';
-import { supabase } from '~/lib/supabase';
+import { useAuth } from '@clerk/react';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
@@ -49,6 +49,7 @@ function formatRoleLabel(role: string): string {
 }
 
 export function InviteDialog({ open, onOpenChange, onSuccess }: InviteDialogProps) {
+  const { getToken } = useAuth();
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState('');
@@ -86,8 +87,7 @@ export function InviteDialog({ open, onOpenChange, onSuccess }: InviteDialogProp
     async function fetchCarriers() {
       setIsLoadingCarriers(true);
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData?.session?.access_token;
+        const accessToken = await getToken();
 
         if (!accessToken) return;
 
@@ -166,8 +166,7 @@ export function InviteDialog({ open, onOpenChange, onSuccess }: InviteDialogProp
     setErrors({});
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
+      const accessToken = await getToken();
 
       if (!accessToken) {
         setErrors({ general: 'Not authenticated. Please sign in again.' });

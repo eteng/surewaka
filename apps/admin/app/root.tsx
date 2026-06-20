@@ -1,3 +1,4 @@
+import { ClerkProvider } from '@clerk/react';
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
 import './app.css';
 
@@ -20,5 +21,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+  if (!publishableKey) {
+    throw new Error('VITE_CLERK_PUBLISHABLE_KEY is not set');
+  }
+
+  return (
+    <ClerkProvider publishableKey={publishableKey}>
+      <Outlet />
+    </ClerkProvider>
+  );
 }

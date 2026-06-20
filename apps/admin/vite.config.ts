@@ -16,7 +16,7 @@ export default defineConfig({
       'react-dom',
       'react-router',
       'radix-ui',
-      '@supabase/supabase-js',
+      '@clerk/react',
       '@tanstack/react-table',
       'lucide-react',
       'class-variance-authority',

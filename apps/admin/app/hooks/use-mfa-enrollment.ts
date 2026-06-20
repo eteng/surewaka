@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { supabase } from '~/lib/supabase';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useUser } from '@clerk/react';
+import QRCode from 'qrcode';
 
 type MfaState = 'idle' | 'loading' | 'show-qr' | 'verify-code' | 'verified' | 'error';
 
@@ -16,7 +17,7 @@ type MfaEnrollmentResult = {
 const SESSION_KEY = 'mfa_enrollment';
 
 type StoredEnrollment = {
-  factorId: string;
+  uri: string;
   qrCode: string;
   secret: string;
 };
@@ -39,138 +40,66 @@ function clearStoredEnrollment() {
 }
 
 export function useMFAEnrollment(): MfaEnrollmentResult {
+  const { user } = useUser();
   const [state, setState] = useState<MfaState>('idle');
   const [factorId, setFactorId] = useState<string | null>(null);
-  const [challengeId, setChallengeId] = useState<string | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const initialized = useRef(false);
 
-  const createChallenge = async (fId: string): Promise<boolean> => {
-    const { data, error: challengeError } = await supabase.auth.mfa.challenge({
-      factorId: fId,
-    });
-    if (challengeError) {
-      setError(challengeError.message);
-      setState('error');
-      return false;
-    }
-    setChallengeId(data.id);
-    return true;
-  };
-
   const initialize = useCallback(async () => {
+    if (!user) return;
+
     setState('loading');
     setError(null);
 
     try {
-      const { data: factorsData, error: listError } = await supabase.auth.mfa.listFactors();
-
-      if (listError) {
-        setError(listError.message);
-        setState('error');
-        return;
-      }
-
-      const verifiedFactor = factorsData?.totp?.find((f) => f.status === 'verified');
-      const unverifiedFactor = factorsData?.totp?.find((f) => f.status === 'unverified');
-
-      // Already has a verified factor — shouldn't be on enroll page
-      if (verifiedFactor) {
+      // If already enrolled, nothing to do
+      if (user.totpEnabled) {
         setState('verified');
         return;
       }
 
-      // Resume an existing unverified factor
-      if (unverifiedFactor) {
-        setFactorId(unverifiedFactor.id);
-
-        // Try to recover QR from sessionStorage (same browser session)
-        const stored = getStoredEnrollment();
-        if (stored && stored.factorId === unverifiedFactor.id) {
-          setQrCode(stored.qrCode);
-          setSecret(stored.secret);
-          const ok = await createChallenge(unverifiedFactor.id);
-          if (ok) setState('show-qr');
-          return;
-        }
-
-        // QR is lost but factor exists — create challenge anyway
-        // User may have already scanned it on a previous page load
-        const ok = await createChallenge(unverifiedFactor.id);
-        if (ok) setState('verify-code');
+      // Resume from sessionStorage if available (page refresh resilience)
+      const stored = getStoredEnrollment();
+      if (stored) {
+        setQrCode(stored.qrCode);
+        setSecret(stored.secret);
+        setState('show-qr');
         return;
       }
 
-      // No factors at all — fresh enrollment
-      const { data: enrollData, error: enrollError } = await supabase.auth.mfa.enroll({
-        factorType: 'totp',
-      });
+      // Fresh enrollment
+      const totp = await user.createTOTP();
+      const uri = totp.uri ?? '';
+      const secret = totp.secret ?? '';
+      const qrDataUrl = await QRCode.toDataURL(uri);
 
-      if (enrollError) {
-        setError(enrollError.message);
-        setState('error');
-        return;
-      }
+      setFactorId(totp.id ?? null);
+      setQrCode(qrDataUrl);
+      setSecret(secret);
 
-      if (enrollData) {
-        setFactorId(enrollData.id);
-        setQrCode(enrollData.totp.qr_code);
-        setSecret(enrollData.totp.secret);
-
-        // Persist QR data in sessionStorage for page refresh resilience
-        storeEnrollment({
-          factorId: enrollData.id,
-          qrCode: enrollData.totp.qr_code,
-          secret: enrollData.totp.secret,
-        });
-
-        const ok = await createChallenge(enrollData.id);
-        if (ok) setState('show-qr');
-      }
+      storeEnrollment({ uri, qrCode: qrDataUrl, secret });
+      setState('show-qr');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       setError(msg);
       setState('error');
     }
-  }, []);
+  }, [user]);
 
   const verifyCode = async (code: string) => {
-    if (!factorId) return;
-
+    if (!user) return;
     setError(null);
 
-    // If we don't have a challengeId yet, create one
-    let cId = challengeId;
-    if (!cId) {
-      const { data, error: challengeError } = await supabase.auth.mfa.challenge({
-        factorId,
-      });
-      if (challengeError) {
-        setError(challengeError.message);
-        return;
-      }
-      cId = data.id;
-      setChallengeId(cId);
-    }
-
-    const { error: verifyError } = await supabase.auth.mfa.verify({
-      factorId,
-      challengeId: cId!,
-      code,
-    });
-
-    if (verifyError) {
+    try {
+      await user.verifyTOTP({ code });
+      clearStoredEnrollment();
+      setState('verified');
+    } catch (err: unknown) {
       setError('Invalid code. Check your authenticator app and try again.');
-      // Create a fresh challenge for retry
-      const { data: newChallenge } = await supabase.auth.mfa.challenge({ factorId });
-      if (newChallenge) setChallengeId(newChallenge.id);
-      return;
     }
-
-    clearStoredEnrollment();
-    setState('verified');
   };
 
   const retry = useCallback(() => {

@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useClerk, useUser } from '@clerk/react';
 import { Truck, Loader2 } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
-import { signIn } from '~/hooks/use-auth';
-import { supabase } from '~/lib/supabase';
 
 export function meta() {
   return [{ title: 'SureWaka Admin - Sign In' }];
@@ -12,6 +11,8 @@ export function meta() {
 
 export default function Login() {
   const navigate = useNavigate();
+  const clerk = useClerk();
+  const { isLoaded } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -19,42 +20,37 @@ export default function Login() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!isLoaded) return;
+
     setError('');
     setLoading(true);
 
-    const { data, error: signInError } = await signIn(email, password);
+    try {
+      const result = await clerk.client.signIn.create({
+        strategy: 'password',
+        identifier: email,
+        password,
+      });
 
-    if (signInError) {
-      setError(signInError.message);
-      setLoading(false);
-      return;
-    }
-
-    if (!data.session) {
-      setError('No session returned');
-      setLoading(false);
-      return;
-    }
-
-    // Check MFA status
-    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-
-    if (aalData) {
-      if (aalData.nextLevel === 'aal2' && aalData.currentLevel === 'aal1') {
-        // User has MFA enrolled but hasn't verified yet this session
+      if (result.status === 'needs_second_factor') {
         navigate('/mfa/verify');
-      } else if (aalData.currentLevel === 'aal1' && aalData.nextLevel === 'aal1') {
-        // User doesn't have MFA enrolled — force enrollment
-        navigate('/mfa/enroll');
-      } else {
-        // AAL2 achieved
-        navigate('/');
+        return;
       }
-    } else {
-      navigate('/');
-    }
 
-    setLoading(false);
+      if (result.status === 'complete') {
+        await clerk.setActive({ session: result.createdSessionId });
+        navigate('/');
+        return;
+      }
+
+      setError('Sign-in could not be completed. Please try again.');
+    } catch (err: unknown) {
+      const clerkError = err as { errors?: { message: string }[] };
+      const message = clerkError?.errors?.[0]?.message ?? 'Invalid email or password';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -108,7 +104,7 @@ export default function Login() {
             />
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || !isLoaded}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Sign In
           </Button>

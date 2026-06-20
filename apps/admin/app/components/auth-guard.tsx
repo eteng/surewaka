@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '~/hooks/use-auth';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading, aal } = useAuth();
+  const { user, loading, mfaEnabled } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -15,17 +15,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Check MFA status
-    if (aal) {
-      if (aal.nextLevel === 'aal2' && aal.currentLevel === 'aal1') {
-        // Has MFA enrolled but needs to verify this session
-        navigate('/mfa/verify', { replace: true });
-      } else if (aal.currentLevel === 'aal1' && aal.nextLevel === 'aal1') {
-        // No MFA enrolled — force enrollment
-        navigate('/mfa/enroll', { replace: true });
-      }
+    if (!mfaEnabled) {
+      navigate('/mfa/enroll', { replace: true });
     }
-  }, [user, loading, aal, navigate]);
+  }, [user, loading, mfaEnabled, navigate]);
 
   if (loading) {
     return (
@@ -35,12 +28,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) {
-    return null;
-  }
-
-  // If MFA is required but not at aal2, don't render children
-  if (aal && aal.currentLevel !== 'aal2' && aal.nextLevel === 'aal2') {
+  if (!user || !mfaEnabled) {
     return null;
   }
 

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Check, Clock, Loader2, ShieldAlert, Users, X } from 'lucide-react';
+import { useAuth } from '@clerk/react';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Skeleton } from '~/components/ui/skeleton';
 import { useProfile } from '~/hooks/use-profile';
-import { supabase } from '~/lib/supabase';
 
 export function meta() {
   return [{ title: 'SureWaka Admin - Name Change Requests' }];
@@ -25,10 +25,6 @@ type NameChangeRequest = {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
-async function getAccessToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  return data?.session?.access_token ?? null;
-}
 
 function NameChangesSkeleton() {
   return (
@@ -173,6 +169,7 @@ function RequestCard({
 }
 
 export default function SettingsNameChanges() {
+  const { getToken } = useAuth();
   const { profile, isLoading: isProfileLoading } = useProfile();
   const [requests, setRequests] = useState<NameChangeRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -186,7 +183,7 @@ export default function SettingsNameChanges() {
     setError(null);
 
     try {
-      const accessToken = await getAccessToken();
+      const accessToken = await getToken();
 
       if (!accessToken) {
         setError('Not authenticated');
@@ -235,7 +232,7 @@ export default function SettingsNameChanges() {
       setError(null);
 
       try {
-        const accessToken = await getAccessToken();
+        const accessToken = await getToken();
 
         if (!accessToken) {
           setError('Not authenticated');
