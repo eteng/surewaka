@@ -313,3 +313,75 @@ export const cancelDeliverySchema = z.object({
   reason: z.string().min(5).max(200).optional(),
 });
 export type CancelDelivery = z.infer<typeof cancelDeliverySchema>;
+
+// ── Carrier Application Validators ──────────────────────────────────────────
+
+export const NIGERIAN_PHONE_REGEX = /^\+234\d{10}$/;
+
+export const submitCarrierApplicationSchema = z.object({
+  businessName: z.string().min(2, 'Business name must be at least 2 characters').max(200),
+  contactName: z.string().min(2).max(100),
+  email: z.string().email(),
+  phone: z.string().regex(NIGERIAN_PHONE_REGEX, 'Must be a valid Nigerian number (+234XXXXXXXXXX)'),
+  cacNumber: z.string().max(20).optional(),
+  fleetSize: z.number().int().positive().optional(),
+  serviceAreas: z.array(z.string().min(1)).min(1, 'Select at least one service area'),
+  notes: z.string().max(1000).optional(),
+});
+
+export const approveCarrierApplicationSchema = z
+  .object({
+    carrierName: z.string().min(2).max(200),
+    slug: z
+      .string()
+      .min(2)
+      .max(100)
+      .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens only'),
+    driverVettingEnabled: z.boolean().default(false),
+    adminPhone: z.string().regex(NIGERIAN_PHONE_REGEX).optional(),
+    adminEmail: z.string().email().optional(),
+    notes: z.string().max(500).optional(),
+  })
+  .refine((d) => d.adminPhone != null || d.adminEmail != null, {
+    message: 'Either adminPhone or adminEmail is required to invite the carrier admin',
+  });
+
+export const rejectCarrierApplicationSchema = z.object({
+  reason: z.string().min(10, 'Provide at least 10 characters explaining the rejection').max(1000),
+});
+
+export const carrierApplicationListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().max(200).default(''),
+  status: z.enum(['pending', 'under_review', 'approved', 'rejected']).optional(),
+  sortBy: z.enum(['createdAt', 'businessName', 'status']).default('createdAt'),
+  sortDir: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export const createStrategicCarrierSchema = z
+  .object({
+    carrierName: z.string().min(2).max(200),
+    slug: z.string().min(2).max(100).regex(/^[a-z0-9-]+$/),
+    contactName: z.string().min(2).max(100),
+    adminPhone: z.string().regex(NIGERIAN_PHONE_REGEX).optional(),
+    adminEmail: z.string().email().optional(),
+    driverVettingEnabled: z.boolean().default(false),
+  })
+  .refine((d) => d.adminPhone != null || d.adminEmail != null, {
+    message: 'Either adminPhone or adminEmail is required',
+  });
+
+export const carrierListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().max(200).default(''),
+  isActive: z.coerce.boolean().optional(),
+});
+
+export type SubmitCarrierApplicationInput = z.infer<typeof submitCarrierApplicationSchema>;
+export type ApproveCarrierApplicationInput = z.infer<typeof approveCarrierApplicationSchema>;
+export type RejectCarrierApplicationInput = z.infer<typeof rejectCarrierApplicationSchema>;
+export type CarrierApplicationListQuery = z.infer<typeof carrierApplicationListQuerySchema>;
+export type CreateStrategicCarrierInput = z.infer<typeof createStrategicCarrierSchema>;
+export type CarrierListQuery = z.infer<typeof carrierListQuerySchema>;
