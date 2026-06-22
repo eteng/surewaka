@@ -28,3 +28,56 @@ export const NOTIFICATION_TYPES = [
 export const ALLOWED_AVATAR_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'] as const;
 export const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 export const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+// ─── Push Notifications ──────────────────────────────────────────────────────
+
+import type { PushNotificationType, PushTargetApp } from './types';
+
+export const PUSH_NOTIFICATION_TYPES = [
+  'delivery_status_change',
+  'delivery_cancelled',
+  'driver_arrived',
+  'payment_received',
+  'dispute_opened',
+  'delivery_assigned',
+  'carrier_verified',
+  'broadcast',
+] as const;
+
+export const PUSH_TARGET_APPS = ['customer', 'driver'] as const;
+
+export const HIGH_PRIORITY_PUSH_TYPES: PushNotificationType[] = [
+  'delivery_status_change',
+  'delivery_cancelled',
+  'driver_arrived',
+];
+
+export const PUSH_DEEP_LINK_MAP: Record<PushNotificationType, string> = {
+  delivery_status_change: '/delivery/:resourceId',
+  delivery_cancelled: '/delivery/:resourceId',
+  driver_arrived: '/tracking/:resourceId',
+  payment_received: '/wallet',
+  dispute_opened: '/delivery/:resourceId/dispute',
+  delivery_assigned: '/delivery/:resourceId',
+  carrier_verified: '/',
+  broadcast: '/:deepLink',
+};
+
+export const PUSH_APP_ROUTING: Record<PushNotificationType, PushTargetApp | 'all'> = {
+  delivery_status_change: 'customer',
+  delivery_cancelled: 'customer',
+  driver_arrived: 'customer',
+  payment_received: 'driver', // Driver earned the money — NOT 'customer'
+  dispute_opened: 'customer', // overridden contextually for driver via targetAppOverride
+  delivery_assigned: 'driver',
+  carrier_verified: 'driver',
+  broadcast: 'all',
+};
+
+export const MAX_PUSH_TOKENS_PER_USER_PER_APP = 10;
+export const PUSH_BATCH_SIZE = 100;
+export const PUSH_MAX_RETRIES = 3;
+export const PUSH_RETRY_BASE_MS = 1000;
+export const PUSH_QUEUE_NAME = 'push:notifications';
+export const PUSH_BROADCAST_QUEUE_NAME = 'push:broadcasts';
+export const PUSH_BROADCAST_BATCH_SIZE = 500;

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PACKAGE_CATEGORIES, VEHICLE_TYPES } from './constants';
+import { PACKAGE_CATEGORIES, PUSH_NOTIFICATION_TYPES, PUSH_TARGET_APPS, VEHICLE_TYPES } from './constants';
 
 export const locationSchema = z.object({
   address: z.string().min(5),
@@ -385,3 +385,36 @@ export type RejectCarrierApplicationInput = z.infer<typeof rejectCarrierApplicat
 export type CarrierApplicationListQuery = z.infer<typeof carrierApplicationListQuerySchema>;
 export type CreateStrategicCarrierInput = z.infer<typeof createStrategicCarrierSchema>;
 export type CarrierListQuery = z.infer<typeof carrierListQuerySchema>;
+// ─── Push Notification Validators ────────────────────────────────────────────
+
+export const registerPushTokenSchema = z.object({
+  expoPushToken: z.string().min(1).startsWith('ExponentPushToken['),
+  deviceId: z.string().min(1),
+  platform: z.enum(['ios', 'android']),
+  app: z.enum(PUSH_TARGET_APPS),
+});
+
+export type RegisterPushToken = z.infer<typeof registerPushTokenSchema>;
+
+export const pushNotificationPayloadSchema = z.object({
+  title: z.string().min(1).max(100),
+  body: z.string().min(1).max(500),
+  data: z.object({
+    type: z.enum(PUSH_NOTIFICATION_TYPES),
+    resourceId: z.string().min(1),
+    deepLink: z.string().min(1),
+    metadata: z.record(z.unknown()).optional(),
+  }),
+});
+
+export type PushNotificationPayloadInput = z.infer<typeof pushNotificationPayloadSchema>;
+
+export const broadcastSchema = z.object({
+  title: z.string().min(1).max(100),
+  body: z.string().min(1).max(500),
+  segment: z.enum(['all', 'customers', 'drivers']),
+  city: z.string().optional(),
+  deepLink: z.string().url().max(2048).optional(),
+});
+
+export type BroadcastInput = z.infer<typeof broadcastSchema>;

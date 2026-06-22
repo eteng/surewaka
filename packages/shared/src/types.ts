@@ -157,3 +157,52 @@ export type CarrierListItem = {
   applicationId: string | null;
   createdAt: string;
 };
+// ─── Push Notifications ──────────────────────────────────────────────────────
+
+export type PushNotificationType =
+  | 'delivery_status_change'
+  | 'delivery_cancelled'
+  | 'driver_arrived'
+  | 'payment_received'
+  | 'dispute_opened'
+  | 'delivery_assigned'
+  | 'carrier_verified'
+  | 'broadcast';
+
+export type PushTargetApp = 'customer' | 'driver';
+
+export type PushNotificationPayload = {
+  title: string;
+  body: string;
+  data: {
+    type: PushNotificationType;
+    resourceId: string;
+    deepLink: string;
+    metadata?: Record<string, unknown>;
+  };
+};
+
+export type PushJobData = {
+  userId: string;
+  targetApp: PushTargetApp | 'all';
+  payload: PushNotificationPayload;
+  priority: 'high' | 'normal';
+};
+
+export type BroadcastChunkJobData = {
+  userIds: string[];
+  payload: PushNotificationPayload;
+  segment: string;
+};
+
+export type PushTokenRecord = {
+  id: string;
+  userId: string;
+  expoPushToken: string;
+  deviceId: string;
+  platform: 'ios' | 'android';
+  app: PushTargetApp;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};

@@ -31,6 +31,7 @@ export * from './payout-requests';
 export * from './addresses';
 export * from './name-change-requests';
 export * from './notifications';
+export * from './push-tokens';
 
 // Pre-launch
 export * from './waitlist';

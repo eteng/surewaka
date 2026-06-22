@@ -1,4 +1,4 @@
-# Implementation Plan: Push Notifications
+ # Implementation Plan: Push Notifications
 
 ## Overview
 
@@ -6,7 +6,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
 
 ## Tasks
 
-- [ ] 1. Database migration — push_tokens table and users.notification_push column
+- [x] 1. Database migration — push_tokens table and users.notification_push column
   - Create migration file `supabase/migrations/<timestamp>_push_tokens.sql`
   - Add `push_tokens` table with columns: id (UUID PK), user_id (UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE), expo_push_token (TEXT UNIQUE), device_id (TEXT NOT NULL), platform (TEXT NOT NULL CHECK ios/android), app (TEXT NOT NULL CHECK customer/driver), is_active (BOOLEAN DEFAULT true NOT NULL), created_at (TIMESTAMPTZ DEFAULT now()), updated_at (TIMESTAMPTZ DEFAULT now())
   - Add partial indexes: idx_push_tokens_user_active and idx_push_tokens_user_app_active (WHERE is_active = true)
@@ -15,7 +15,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Run `pnpm --filter @surewaka/db db:pull` to regenerate Drizzle schema
   - **Requirements:** 1.3, 2.3, 4.1, 10.1
 
-- [ ] 2. Shared types, validators, and constants for push notifications
+- [x] 2. Shared types, validators, and constants for push notifications
   - Add `PushNotificationType`, `PushTargetApp`, `PushNotificationPayload`, `PushJobData`, `BroadcastChunkJobData`, `PushTokenRecord` types to `packages/shared/src/types.ts`. `BroadcastChunkJobData` = `{ userIds: string[], payload: PushNotificationPayload, segment: string }`. `PushNotificationType` includes: `delivery_status_change`, `delivery_cancelled`, `driver_arrived`, `payment_received`, `dispute_opened`, `delivery_assigned`, `carrier_verified`, `broadcast`.
   - Add `registerPushTokenSchema`, `pushNotificationPayloadSchema`, `broadcastSchema` to `packages/shared/src/validators.ts`
   - Add push constants to `packages/shared/src/constants.ts`: PUSH_NOTIFICATION_TYPES (include `delivery_cancelled`), PUSH_TARGET_APPS, HIGH_PRIORITY_PUSH_TYPES (add `delivery_cancelled` — cancellations are high-priority since money is involved), PUSH_DEEP_LINK_MAP (map `delivery_cancelled` → `/delivery/:resourceId`), PUSH_APP_ROUTING (map `delivery_cancelled` → `'customer'`), MAX_PUSH_TOKENS_PER_USER_PER_APP, PUSH_BATCH_SIZE, PUSH_MAX_RETRIES, PUSH_RETRY_BASE_MS, PUSH_QUEUE_NAME (`push:notifications` for transactional), PUSH_BROADCAST_QUEUE_NAME (`push:broadcasts` for chunk jobs), PUSH_BROADCAST_BATCH_SIZE
@@ -24,7 +24,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Verify build passes with `pnpm --filter @surewaka/shared build`
   - **Requirements:** 9.1, 9.3, 9.5, 10.2-10.6
 
-- [ ] 3. Push token API routes (register and deactivate)
+- [x] 3. Push token API routes (register and deactivate)
   - Create `apps/api/src/routes/push-tokens.ts` with Hono router
   - Implement `POST /` — validate body with registerPushTokenSchema, extract `user_id` from `c.get('user').id` (internal UUID — `requireAuth` middleware already resolves Clerk token → internal UUID via `users.clerk_id` lookup), upsert token with ON CONFLICT DO UPDATE
   - Implement token limit enforcement: count active tokens for (user_id, app), if >= 10 deactivate oldest
@@ -33,7 +33,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Verify API builds with `pnpm --filter @surewaka/api build`
   - **Requirements:** 1.2, 1.3, 1.4, 1.7, 2.1, 2.3
 
-- [ ] 4. Push service — enqueue logic with preference checks and app routing
+- [x] 4. Push service — enqueue logic with preference checks and app routing
   - Create `apps/api/src/services/push-service.ts`
   - Implement `enqueuePush(userId, type, payload, targetAppOverride?)` — validate payload, check user notification_push preference, determine target app from PUSH_APP_ROUTING, determine priority, add job to BullMQ queue
   - **IMPORTANT:** PUSH_APP_ROUTING must use `payment_received: 'driver'` — payment notifications target the driver's tokens (the driver earned the money). The design doc constants section incorrectly shows `'customer'`; implement the corrected routing.
@@ -43,7 +43,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Verify build passes with `pnpm --filter @surewaka/api build`
   - **Requirements:** 3.1, 3.9, 4.2, 4.3, 7.2, 7.3, 7.5, 9.1, 9.3, 9.5, 10.2-10.7
 
-- [ ] 5. Push worker — package setup and BullMQ consumer
+- [x] 5. Push worker — package setup and BullMQ consumer
   - Create `workers/push-worker/package.json` with dependencies: bullmq, expo-server-sdk, ioredis, @surewaka/db, @surewaka/shared
   - Create `workers/push-worker/tsconfig.json` extending root config
   - Create `workers/push-worker/src/index.ts` — initialize **two Workers**: one consuming `push:notifications` (transactional, concurrency from env PUSH_WORKER_CONCURRENCY, default 5) and one consuming `push:broadcasts` (chunk jobs, concurrency 2 — lower to avoid starving transactional). Handle Redis connection events with reconnect backoff (max 10 attempts then exit non-zero).
@@ -52,7 +52,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Verify worker builds with `pnpm --filter @surewaka/worker-push build`
   - **Requirements:** 8.3, 8.4, 8.6
 
-- [ ] 6. Push worker — token resolver and job processor
+- [x] 6. Push worker — token resolver and job processor
   - Create `workers/push-worker/src/token-resolver.ts` — implement `resolveTokens(userId, targetApp)` with preference check and app filter for single-user jobs. Implement `resolveTokensBulk(userIds, segment)` for broadcast chunk jobs — single DB query: `SELECT expo_push_token, user_id FROM push_tokens WHERE user_id = ANY($1) AND is_active = true` joined with `users.notification_push = true`. **Segment-aware token filtering:** when `segment = 'customers'` filter to `app = 'customer'` tokens only; when `segment = 'drivers'` filter to `app = 'driver'` tokens only; when `segment = 'all'` return all tokens regardless of app field (Req 10.4 applies only to `all` segment).
   - Create `workers/push-worker/src/processor.ts` — two processing paths:
     - **Single-user jobs** (`PushJobData`): resolve tokens → build ExpoPushMessages → chunk (max 100) → send via Expo API → process tickets → log metrics
@@ -63,13 +63,13 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Verify worker builds with `pnpm --filter @surewaka/worker-push build`
   - **Requirements:** 2.2, 2.4, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 4.4, 4.5, 7.2, 7.3, 8.1, 8.2
 
-- [ ] 7. Push worker — health check endpoint
+- [x] 7. Push worker — health check endpoint
   - Create `workers/push-worker/src/health.ts` — minimal HTTP server (port from env PUSH_WORKER_HEALTH_PORT, default 4001)
   - Implement GET /health returning per-queue metrics: transactional queue depth + broadcast queue depth, jobs processed per minute (rolling 5-min window), failure rate per queue
   - Start health server in index.ts after worker initialization
   - **Requirements:** 8.5
 
-- [ ] 8. Deep link router utility
+- [~] 8. Deep link router utility
   - Create `packages/mobile-shared/src/utils/deep-link-router.ts`
   - Implement navigateToDeepLink(data, router) — map notification type + resourceId to route using PUSH_DEEP_LINK_MAP. Includes `delivery_cancelled` → `/delivery/:resourceId` (same screen as delivery detail, shows cancellation/refund info).
   - For `payment_received`, navigate to `/wallet` — this is the **driver app's** wallet screen (payment_received targets driver tokens, so only the driver app receives this notification)
@@ -78,7 +78,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Export from packages/mobile-shared/src/index.ts
   - **Requirements:** 5.1-5.10
 
-- [ ] 9. Notification banner component
+- [~] 9. Notification banner component
   - Create `packages/mobile-shared/src/components/notification-banner.tsx`
   - Implement animated slide-in from top with safe area offset
   - Show title (1 line) and body (2 lines max) with tap and swipe-up-to-dismiss handlers
@@ -86,7 +86,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Export from packages/mobile-shared/src/index.ts
   - **Requirements:** 6.1, 6.2, 6.5
 
-- [ ] 10. Push notifications hook (shared mobile hook)
+- [~] 10. Push notifications hook (shared mobile hook)
   - Create `packages/mobile-shared/src/hooks/use-push-notifications.ts`
   - Implement permission request on mount when user is authenticated (use `useAuth().isSignedIn` from `@clerk/expo` to detect auth state)
   - Implement token registration with retry (3x exponential backoff from 1s). Use `useAuth().getToken()` to obtain the Clerk session token for API calls; pass to `apiClient` or `createAuthClient(token)`.
@@ -99,7 +99,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Add expo-notifications and expo-device as peer dependencies in packages/mobile-shared
   - **Requirements:** 1.1, 1.2, 1.5, 1.6, 2.1, 2.5, 2.6, 5.1, 5.2, 5.11, 6.1, 6.3, 6.4
 
-- [ ] 11. Integrate push notifications into Customer App
+- [~] 11. Integrate push notifications into Customer App
   - Verify expo-notifications plugin is configured in apps/mobile-customer/app.json with icon and color
   - Add usePushNotifications({ app: 'customer' }) in _layout.tsx InnerLayout
   - Render NotificationBanner conditionally when banner state is non-null
@@ -108,7 +108,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Verify app compiles with `pnpm --filter @surewaka/mobile-customer exec tsc --noEmit`
   - **Requirements:** 1.1, 2.1, 6.1, 6.2
 
-- [ ] 12. Integrate push notifications into Driver App
+- [~] 12. Integrate push notifications into Driver App
   - **Prerequisite:** Driver app currently has NO Clerk integration in `_layout.tsx`. Add `ClerkProvider` wrapping the app (same pattern as customer app) before push can work. This may already be done in a parallel driver auth task — check before duplicating.
   - Add expo-notifications plugin to apps/mobile-driver/app.json with icon and brand color
   - Install expo-notifications and expo-device dependencies in driver app
@@ -118,7 +118,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Verify app compiles with `pnpm --filter @surewaka/mobile-driver exec tsc --noEmit`
   - **Requirements:** 1.1, 2.1, 6.1, 6.2
 
-- [ ] 13. Wire push triggers into delivery and payment handlers
+- [~] 13. Wire push triggers into delivery and payment handlers
   - Add enqueuePush calls in delivery status update handler for transitions (picked_up, en_route_dropoff, delivered) → notify customer
   - Add enqueuePush in cancellation handler (`POST /deliveries/:id/cancel`) → notify customer with `delivery_cancelled` (high priority). Use `deliveryId` as resourceId. Note: if the cancellation is initiated by the customer themselves, consider skipping the push (they already know); if triggered by driver/carrier/admin, always send.
   - Add enqueuePush in driver assignment handler → notify driver with delivery_assigned
@@ -129,7 +129,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Verify API builds with `pnpm --filter @surewaka/api build`
   - **Requirements:** 3.1, 3.9, 10.2, 10.3, 10.5, 10.6
 
-- [ ] 14. Admin broadcast API route and UI
+- [~] 14. Admin broadcast API route and UI
   - Create `apps/api/src/routes/admin/broadcast.ts` — POST /api/v1/admin/broadcast and GET /api/v1/admin/broadcast/estimate
   - Validate with broadcastSchema, check surewaka_admin role, call enqueueBroadcast
   - Register route in apps/api/src/index.ts
@@ -138,13 +138,13 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Gate access to surewaka_admin role
   - **Requirements:** 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7
 
-- [ ] 15. Deep link deferred navigation for expired sessions
+- [~] 15. Deep link deferred navigation for expired sessions
   - Store intended deep link in AsyncStorage when notification is tapped and session is expired
   - Check for stored deep link after successful re-authentication and navigate
   - Clear stored deep link after navigation or after 15 minute timeout (not 5 — Nigerian 3G networks + OTP delays + possible app-switch can easily consume 5 minutes; stale links are safely handled by Req 5.10 fallback)
   - **Requirements:** 5.11
 
-- [ ] 16. Notification preference toggle in mobile profile settings
+- [~] 16. Notification preference toggle in mobile profile settings
   - **Customer app:** Add notification_push toggle to existing `apps/mobile-customer/app/profile/settings.tsx`
   - **Driver app:** Add notification_push toggle to existing `apps/mobile-driver/app/(tabs)/profile.tsx` (the profile tab is currently a placeholder — add the toggle inline, gated on auth state; no separate settings route needed)
   - Wire toggle to profile update API endpoint (PATCH /api/v1/profile)
@@ -152,7 +152,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Add notificationPush to ProfilePreferencesUpdate type in packages/shared
   - **Requirements:** 4.1, 4.2, 4.3, 4.6
 
-- [ ] 17. Environment variables and documentation
+- [~] 17. Environment variables and documentation
   - Add REDIS_URL, PUSH_WORKER_CONCURRENCY, PUSH_WORKER_HEALTH_PORT to .env.example
   - Add EXPO_PUBLIC_EAS_PROJECT_ID to .env.example
   - Add push-worker dev/start scripts to root turbo.json pipeline

@@ -17,6 +17,7 @@ export const users = pgTable(
     avatarUrl: text('avatar_url'),
     notificationEmail: boolean('notification_email').default(true).notNull(),
     notificationSms: boolean('notification_sms').default(true).notNull(),
+    notificationPush: boolean('notification_push').default(true).notNull(),
     gender: text(),
   },
   (table) => [

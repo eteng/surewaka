@@ -1,0 +1,27 @@
+{
+  "name": "@surewaka/worker-push",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --external @surewaka/db --external @surewaka/shared --external bullmq --external ioredis --external expo-server-sdk --external drizzle-orm --external @neondatabase/serverless",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "@surewaka/db": "workspace:*",
+    "@surewaka/shared": "workspace:*",
+    "bullmq": "^5.34.8",
+    "drizzle-orm": "^0.45.2",
+    "expo-server-sdk": "^3.13.0",
+    "ioredis": "^5.4.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}
