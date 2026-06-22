@@ -15,6 +15,9 @@
   },
   "peerDependencies": {
     "@sentry/react-native": "^7.0.0",
+    "expo-constants": "*",
+    "expo-device": "*",
+    "expo-notifications": "*",
     "expo-router": ">=3.0.0",
     "expo-secure-store": ">=12.0.0",
     "react": "19.2.0",

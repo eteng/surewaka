@@ -69,7 +69,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Start health server in index.ts after worker initialization
   - **Requirements:** 8.5
 
-- [~] 8. Deep link router utility
+- [x] 8. Deep link router utility
   - Create `packages/mobile-shared/src/utils/deep-link-router.ts`
   - Implement navigateToDeepLink(data, router) — map notification type + resourceId to route using PUSH_DEEP_LINK_MAP. Includes `delivery_cancelled` → `/delivery/:resourceId` (same screen as delivery detail, shows cancellation/refund info).
   - For `payment_received`, navigate to `/wallet` — this is the **driver app's** wallet screen (payment_received targets driver tokens, so only the driver app receives this notification)
@@ -78,7 +78,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Export from packages/mobile-shared/src/index.ts
   - **Requirements:** 5.1-5.10
 
-- [~] 9. Notification banner component
+- [x] 9. Notification banner component
   - Create `packages/mobile-shared/src/components/notification-banner.tsx`
   - Implement animated slide-in from top with safe area offset
   - Show title (1 line) and body (2 lines max) with tap and swipe-up-to-dismiss handlers
@@ -86,7 +86,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Export from packages/mobile-shared/src/index.ts
   - **Requirements:** 6.1, 6.2, 6.5
 
-- [~] 10. Push notifications hook (shared mobile hook)
+- [x] 10. Push notifications hook (shared mobile hook)
   - Create `packages/mobile-shared/src/hooks/use-push-notifications.ts`
   - Implement permission request on mount when user is authenticated (use `useAuth().isSignedIn` from `@clerk/expo` to detect auth state)
   - Implement token registration with retry (3x exponential backoff from 1s). Use `useAuth().getToken()` to obtain the Clerk session token for API calls; pass to `apiClient` or `createAuthClient(token)`.
