@@ -18,6 +18,9 @@ export const carriers = pgTable(
     verifiedAt: timestamp('verified_at'),
     verifiedBy: uuid('verified_by'),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    driverVettingEnabled: boolean('driver_vetting_enabled').notNull().default(false),
+    // FK to carrier_applications(id) — enforced in DB; omitted here to avoid circular import
+    applicationId: uuid('application_id'),
   },
   (table) => [
     foreignKey({

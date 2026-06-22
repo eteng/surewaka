@@ -1,6 +1,26 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
 
-export const carrierMemberRole = pgEnum('carrier_member_role', ['carrier_admin', 'carrier_driver']);
+export const carrierApplicationStatus = pgEnum('carrier_application_status', [
+  'pending',
+  'under_review',
+  'approved',
+  'rejected',
+]);
+
+export const carrierMemberAction = pgEnum('carrier_member_action', [
+  'invited',
+  'joined',
+  'role_changed',
+  'suspended',
+  'reactivated',
+  'removed',
+]);
+
+export const carrierMemberRole = pgEnum('carrier_member_role', [
+  'carrier_admin',
+  'carrier_driver',
+  'carrier_staff',
+]);
 
 export const deliveryStatus = pgEnum('delivery_status', [
   'draft',
