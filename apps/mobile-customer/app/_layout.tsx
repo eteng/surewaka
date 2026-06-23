@@ -8,7 +8,7 @@ import Constants from 'expo-constants';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';
 import { ClerkProvider, useAuth, useUser } from '@clerk/expo';
-import { ThemeProvider, tokenCache, useAuthStore } from '@surewaka/mobile-shared';
+import { ThemeProvider, tokenCache, useAuthStore, usePushNotifications, NotificationBanner } from '@surewaka/mobile-shared';
 
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -30,6 +30,7 @@ function InnerLayout() {
   const checkProfile = useAuthStore((s) => s.checkProfile);
   const setLoading = useAuthStore((s) => s.setLoading);
   const reset = useAuthStore((s) => s.reset);
+  const { banner, dismissBanner, onBannerTap } = usePushNotifications({ app: 'customer' });
 
   // Check profile existence once signed in
   useEffect(() => {
@@ -60,16 +61,25 @@ function InnerLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(onboarding)" />
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="booking" />
-      <Stack.Screen name="tracking" />
-      <Stack.Screen name="profile" />
-      <Stack.Screen name="delivery" />
-      <Stack.Screen name="driver" />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(onboarding)" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="booking" />
+        <Stack.Screen name="tracking" />
+        <Stack.Screen name="profile" />
+        <Stack.Screen name="delivery" />
+        <Stack.Screen name="driver" />
+      </Stack>
+      <NotificationBanner
+        visible={!!banner}
+        title={banner?.title ?? ''}
+        body={banner?.body ?? ''}
+        onTap={onBannerTap}
+        onDismiss={dismissBanner}
+      />
+    </>
   );
 }
 

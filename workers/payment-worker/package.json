@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsup src/index.ts --format esm",
+    "build": "tsup src/index.ts --format esm --external @surewaka/db --external @surewaka/shared --external bullmq --external ioredis --external drizzle-orm --external @neondatabase/serverless",
     "start": "node dist/index.js",
     "test": "vitest run"
   },
   "dependencies": {
     "@surewaka/db": "workspace:*",
+    "@surewaka/shared": "workspace:*",
     "bullmq": "^5.0.0",
     "ioredis": "^5.4.0"
   },

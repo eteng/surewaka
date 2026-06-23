@@ -99,7 +99,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Add expo-notifications and expo-device as peer dependencies in packages/mobile-shared
   - **Requirements:** 1.1, 1.2, 1.5, 1.6, 2.1, 2.5, 2.6, 5.1, 5.2, 5.11, 6.1, 6.3, 6.4
 
-- [~] 11. Integrate push notifications into Customer App
+- [x] 11. Integrate push notifications into Customer App
   - Verify expo-notifications plugin is configured in apps/mobile-customer/app.json with icon and color
   - Add usePushNotifications({ app: 'customer' }) in _layout.tsx InnerLayout
   - Render NotificationBanner conditionally when banner state is non-null
@@ -108,7 +108,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Verify app compiles with `pnpm --filter @surewaka/mobile-customer exec tsc --noEmit`
   - **Requirements:** 1.1, 2.1, 6.1, 6.2
 
-- [~] 12. Integrate push notifications into Driver App
+- [x] 12. Integrate push notifications into Driver App
   - **Prerequisite:** Driver app currently has NO Clerk integration in `_layout.tsx`. Add `ClerkProvider` wrapping the app (same pattern as customer app) before push can work. This may already be done in a parallel driver auth task — check before duplicating.
   - Add expo-notifications plugin to apps/mobile-driver/app.json with icon and brand color
   - Install expo-notifications and expo-device dependencies in driver app
@@ -118,7 +118,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Verify app compiles with `pnpm --filter @surewaka/mobile-driver exec tsc --noEmit`
   - **Requirements:** 1.1, 2.1, 6.1, 6.2
 
-- [~] 13. Wire push triggers into delivery and payment handlers
+- [x] 13. Wire push triggers into delivery and payment handlers
   - Add enqueuePush calls in delivery status update handler for transitions (picked_up, en_route_dropoff, delivered) → notify customer
   - Add enqueuePush in cancellation handler (`POST /deliveries/:id/cancel`) → notify customer with `delivery_cancelled` (high priority). Use `deliveryId` as resourceId. Note: if the cancellation is initiated by the customer themselves, consider skipping the push (they already know); if triggered by driver/carrier/admin, always send.
   - Add enqueuePush in driver assignment handler → notify driver with delivery_assigned

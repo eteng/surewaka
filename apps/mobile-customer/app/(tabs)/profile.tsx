@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { GENDER_LABELS } from '@surewaka/shared';
+import { deactivatePushToken } from '@surewaka/mobile-shared';
 import { useCustomerProfile } from '~/hooks/use-customer-profile';
 
 type MenuItem = {
@@ -23,8 +24,13 @@ const menuItems: MenuItem[] = [
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { signOut, getToken } = useAuth();
   const { profile, isLoading, error, refetch } = useCustomerProfile();
+  const handleSignOut = useCallback(() => {
+    // Fire-and-forget token deactivation — don't block logout
+    deactivatePushToken(getToken);
+    signOut();
+  }, [getToken, signOut]);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
   // Re-fetch whenever the tab comes back into focus (e.g. returning from edit screen)
@@ -113,7 +119,7 @@ export default function ProfileScreen() {
       {/* Sign out */}
       <View className="px-6 py-4">
         <Pressable
-          onPress={() => signOut()}
+          onPress={handleSignOut}
           className="py-4 rounded-xl items-center border border-red-500"
         >
           <Text className="text-red-500 text-base font-semibold">Sign Out</Text>

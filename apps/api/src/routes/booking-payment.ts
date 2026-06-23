@@ -6,6 +6,7 @@ import { getWalletByUserId, creditWallet, debitWallet } from '../lib/wallet-serv
 import { bookingConfirmSchema, cancelDeliverySchema } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
 import { randomUUID } from 'crypto';
+import { notifyDeliveryCancelled } from '../services/push-triggers';
 
 type Env = { Variables: { user: AuthUser; accessToken: string } };
 
@@ -181,6 +182,24 @@ bookingPaymentRoutes.post('/deliveries/:id/cancel', async (c) => {
         );
       }
     });
+
+    // Push notification: notify customer of cancellation.
+    // This endpoint is customer-initiated (requireAuth ensures user is the delivery owner),
+    // so we pass 'customer' as cancelledBy — the trigger function will skip the push
+    // since the customer already knows they cancelled.
+    // When driver/carrier/admin cancel endpoints are built, pass their role instead.
+    const [cancelledDelivery] = await db
+      .select({ customerId: deliveries.customerId })
+      .from(deliveries)
+      .where(eq(deliveries.id, deliveryId))
+      .limit(1);
+
+    if (cancelledDelivery) {
+      // Fire-and-forget — push failure should not affect the cancel response
+      notifyDeliveryCancelled(deliveryId, cancelledDelivery.customerId, 'customer').catch(
+        (err) => console.error('[PushTrigger] delivery_cancelled failed:', err),
+      );
+    }
 
     return c.json({ data: { delivery_id: deliveryId, refund_amount: refundAmount }, error: null, meta: null });
   } catch (err) {

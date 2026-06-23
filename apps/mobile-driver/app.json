@@ -30,12 +30,20 @@
     "plugins": [
       "expo-router",
       "expo-location",
-      "expo-camera"
+      "expo-camera",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#16a34a"
+        }
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "2c5b1295-a53c-4e84-ba68-1fe48c2b9953"
+        "projectId": "92aac293-ebd9-41a4-ba22-9694655e91bb"
       }
     },
     "owner": "surewaka"
