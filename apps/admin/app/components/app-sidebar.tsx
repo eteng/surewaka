@@ -52,6 +52,7 @@ const data = {
       items: [
         { title: 'Drivers', url: '/drivers' },
         { title: 'Carriers', url: '/carriers' },
+        { title: 'Applications', url: '/carriers/applications' },
         { title: 'Verifications', url: '/verifications' },
       ],
     },

@@ -112,3 +112,48 @@ export type PaginationMeta = {
   total: number;
   totalPages: number;
 };
+
+export type CarrierApplicationStatus = 'pending' | 'under_review' | 'approved' | 'rejected';
+
+export type CarrierApplicationListItem = {
+  id: string;
+  businessName: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  fleetSize: number | null;
+  serviceAreas: string[];
+  status: CarrierApplicationStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CarrierApplicationEvent = {
+  id: string;
+  fromStatus: CarrierApplicationStatus | null;
+  toStatus: CarrierApplicationStatus;
+  performedBy: { id: string; name: string } | null;
+  notes: string | null;
+  createdAt: string;
+};
+
+export type CarrierApplicationDetail = CarrierApplicationListItem & {
+  cacNumber: string | null;
+  notes: string | null;
+  reviewedBy: { id: string; name: string } | null;
+  reviewNotes: string | null;
+  reviewedAt: string | null;
+  events: CarrierApplicationEvent[];
+};
+
+export type CarrierListItem = {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  isVerified: boolean;
+  isActive: boolean;
+  driverVettingEnabled: boolean;
+  applicationId: string | null;
+  createdAt: string;
+};

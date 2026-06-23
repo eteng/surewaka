@@ -9,6 +9,8 @@ export default [
     route('deliveries', 'routes/deliveries.tsx'),
     route('drivers', 'routes/drivers.tsx'),
     route('carriers', 'routes/carriers.tsx'),
+    route('carriers/applications', 'routes/carriers.applications.tsx'),
+    route('carriers/applications/:applicationId', 'routes/carriers.applications.$applicationId.tsx'),
     route('users', 'routes/users.tsx'),
     route('users/:userId', 'routes/users.$userId.tsx'),
     route('analytics', 'routes/analytics.tsx'),
