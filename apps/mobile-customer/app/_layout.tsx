@@ -8,7 +8,7 @@ import Constants from 'expo-constants';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';
 import { ClerkProvider, useAuth, useUser } from '@clerk/expo';
-import { ThemeProvider, tokenCache, useAuthStore, usePushNotifications, NotificationBanner } from '@surewaka/mobile-shared';
+import { ThemeProvider, tokenCache, useAuthStore, usePushNotifications, NotificationBanner, consumeDeferredDeepLink, navigateToDeepLink } from '@surewaka/mobile-shared';
 
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -55,6 +55,20 @@ function InnerLayout() {
       router.replace('/(auth)/register');
     }
   }, [isLoaded, isSignedIn, profileExists]);
+
+  // Check for deferred deep link after successful re-authentication (Req 5.11)
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
+    async function checkDeferredDeepLink() {
+      const data = await consumeDeferredDeepLink();
+      if (data) {
+        navigateToDeepLink(data, router);
+      }
+    }
+
+    checkDeferredDeepLink();
+  }, [isLoaded, isSignedIn, router]);
 
   if (!isLoaded) {
     return null;

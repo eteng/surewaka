@@ -19,6 +19,11 @@ export default function SettingsScreen() {
     if (error) toast.error(error);
   };
 
+  const handlePushToggle = async (value: boolean) => {
+    const { error } = await updateNotifications({ notificationPush: value });
+    if (error) toast.error(error);
+  };
+
   return (
     <ScrollView className="flex-1 bg-white px-6 pt-6">
       {/* Header */}
@@ -57,7 +62,7 @@ export default function SettingsScreen() {
               trackColor={{ false: '#d1d5db', true: '#16a34a' }}
             />
           </View>
-          <View className="flex-row items-center justify-between p-4">
+          <View className="flex-row items-center justify-between p-4 border-b border-gray-100">
             <View className="flex-1 mr-4">
               <Text className="text-base text-gray-900">SMS Notifications</Text>
               <Text className="text-xs text-gray-400 mt-0.5">Delivery alerts via text message</Text>
@@ -65,6 +70,17 @@ export default function SettingsScreen() {
             <Switch
               value={profile?.notificationSms ?? false}
               onValueChange={handleSmsToggle}
+              trackColor={{ false: '#d1d5db', true: '#16a34a' }}
+            />
+          </View>
+          <View className="flex-row items-center justify-between p-4">
+            <View className="flex-1 mr-4">
+              <Text className="text-base text-gray-900">Push Notifications</Text>
+              <Text className="text-xs text-gray-400 mt-0.5">Real-time delivery and payment alerts</Text>
+            </View>
+            <Switch
+              value={profile?.notificationPush ?? true}
+              onValueChange={handlePushToggle}
               trackColor={{ false: '#d1d5db', true: '#16a34a' }}
             />
           </View>

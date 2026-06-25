@@ -129,7 +129,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Verify API builds with `pnpm --filter @surewaka/api build`
   - **Requirements:** 3.1, 3.9, 10.2, 10.3, 10.5, 10.6
 
-- [~] 14. Admin broadcast API route and UI
+- [x] 14. Admin broadcast API route and UI
   - Create `apps/api/src/routes/admin/broadcast.ts` — POST /api/v1/admin/broadcast and GET /api/v1/admin/broadcast/estimate
   - Validate with broadcastSchema, check surewaka_admin role, call enqueueBroadcast
   - Register route in apps/api/src/index.ts
@@ -138,13 +138,13 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Gate access to surewaka_admin role
   - **Requirements:** 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7
 
-- [~] 15. Deep link deferred navigation for expired sessions
+- [x] 15. Deep link deferred navigation for expired sessions
   - Store intended deep link in AsyncStorage when notification is tapped and session is expired
   - Check for stored deep link after successful re-authentication and navigate
   - Clear stored deep link after navigation or after 15 minute timeout (not 5 — Nigerian 3G networks + OTP delays + possible app-switch can easily consume 5 minutes; stale links are safely handled by Req 5.10 fallback)
   - **Requirements:** 5.11
 
-- [~] 16. Notification preference toggle in mobile profile settings
+- [x] 16. Notification preference toggle in mobile profile settings
   - **Customer app:** Add notification_push toggle to existing `apps/mobile-customer/app/profile/settings.tsx`
   - **Driver app:** Add notification_push toggle to existing `apps/mobile-driver/app/(tabs)/profile.tsx` (the profile tab is currently a placeholder — add the toggle inline, gated on auth state; no separate settings route needed)
   - Wire toggle to profile update API endpoint (PATCH /api/v1/profile)
@@ -152,7 +152,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
   - Add notificationPush to ProfilePreferencesUpdate type in packages/shared
   - **Requirements:** 4.1, 4.2, 4.3, 4.6
 
-- [~] 17. Environment variables and documentation
+- [x] 17. Environment variables and documentation
   - Add REDIS_URL, PUSH_WORKER_CONCURRENCY, PUSH_WORKER_HEALTH_PORT to .env.example
   - Add EXPO_PUBLIC_EAS_PROJECT_ID to .env.example
   - Add push-worker dev/start scripts to root turbo.json pipeline

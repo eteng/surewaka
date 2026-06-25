@@ -24,6 +24,7 @@ pnpm dev
 | `pnpm --filter @surewaka/landing dev` | Landing site (:3002) |
 | `pnpm --filter @surewaka/api dev` | API server (:4000) |
 | `pnpm --filter @surewaka/mobile-customer dev` | Mobile customer (Expo) |
+| `pnpm --filter @surewaka/worker-push dev` | Push worker (push notifications, :4001 health) |
 | `pnpm --filter @surewaka/db db:studio` | Drizzle Studio |
 
 ## Database (Schema Changes)

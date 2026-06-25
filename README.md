@@ -46,6 +46,7 @@ agents/         → AI agents
 workers/        → Background processors
   email-worker/     → Email notifications
   payment-worker/   → Paystack webhooks & payouts
+  push-worker/      → Push notifications (Expo + BullMQ)
   agent-worker/     → Async AI agent tasks
   cron/             → Scheduled jobs
 
@@ -65,6 +66,7 @@ infra/          → Infrastructure & DevOps
 | `pnpm test` | Run all tests |
 | `pnpm --filter @surewaka/web dev` | Start just the customer app |
 | `pnpm --filter @surewaka/api dev` | Start just the API |
+| `pnpm --filter @surewaka/worker-push dev` | Start push notification worker |
 | `pnpm --filter @surewaka/db db:push` | Push DB schema |
 | `pnpm --filter @surewaka/db db:studio` | Open Drizzle Studio |
 

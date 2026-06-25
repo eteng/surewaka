@@ -19,6 +19,7 @@ import webhookRoutes from './routes/webhook';
 import bookingPaymentRoutes from './routes/booking-payment';
 import payoutRoutes from './routes/payouts';
 import pushTokenRoutes from './routes/push-tokens';
+import adminBroadcastRoutes from './routes/admin/broadcast';
 
 const app = new Hono();
 
@@ -54,6 +55,7 @@ app.route('/api/v1/webhook', webhookRoutes);
 app.route('/api/v1', bookingPaymentRoutes);
 app.route('/api/v1/payouts', payoutRoutes);
 app.route('/api/v1/push-tokens', pushTokenRoutes);
+app.route('/api/v1/admin/broadcast', adminBroadcastRoutes);
 
 // Start server
 const port = Number(process.env.PORT) || 4000;

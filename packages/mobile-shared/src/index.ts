@@ -26,4 +26,5 @@ export type { WalletTransaction, WalletState } from './store/wallet-store';
 export { NotificationBanner } from './components/notification-banner';
 export { navigateToDeepLink } from './utils/deep-link-router';
 export type { PushNotificationData } from './utils/deep-link-router';
+export { storeDeferredDeepLink, consumeDeferredDeepLink, clearDeferredDeepLink } from './utils/deferred-deep-link';
 export { usePushNotifications, deactivatePushToken } from './hooks/use-push-notifications';

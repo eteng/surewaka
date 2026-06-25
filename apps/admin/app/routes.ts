@@ -18,6 +18,7 @@ export default [
     route('settings/profile', 'routes/settings/profile.tsx'),
     route('settings/name-changes', 'routes/settings/name-changes.tsx'),
     route('notifications', 'routes/notifications.tsx'),
+    route('notifications/broadcast', 'routes/notifications.broadcast.tsx'),
     route('disputes', 'routes/disputes.tsx'),
     route('verifications', 'routes/verifications.tsx'),
     route('waitlist', 'routes/waitlist.tsx'),

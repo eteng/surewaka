@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { Platform } from 'react-native';
 import { navigateToDeepLink } from '../utils/deep-link-router';
 import type { PushNotificationData } from '../utils/deep-link-router';
+import { storeDeferredDeepLink } from '../utils/deferred-deep-link';
 import { apiClient } from '../api/client';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -220,7 +221,7 @@ export function usePushNotifications(
     return () => subscription.remove();
   }, [showBanner]);
 
-  // ─── Notification response listener (tap → deep link) (Req 5.1, 5.2) ────
+  // ─── Notification response listener (tap → deep link) (Req 5.1, 5.2, 5.11) ─
 
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
@@ -229,12 +230,17 @@ export function usePushNotifications(
         | undefined;
 
       if (data) {
-        navigateToDeepLink(data, router);
+        if (isSignedIn) {
+          navigateToDeepLink(data, router);
+        } else {
+          // Session expired — store deep link for post-auth navigation (Req 5.11)
+          storeDeferredDeepLink(data).catch(() => {});
+        }
       }
     });
 
     return () => subscription.remove();
-  }, [router]);
+  }, [router, isSignedIn]);
 
   // ─── Cold-start notification handling (Req 5.11) ─────────────────────────
 
@@ -247,13 +253,18 @@ export function usePushNotifications(
           | undefined;
 
         if (data) {
-          navigateToDeepLink(data, router);
+          if (isSignedIn) {
+            navigateToDeepLink(data, router);
+          } else {
+            // Session expired on cold start — store for post-auth navigation (Req 5.11)
+            await storeDeferredDeepLink(data).catch(() => {});
+          }
         }
       }
     }
 
     handleColdStart();
-  }, [router]);
+  }, [router, isSignedIn]);
 
   // ─── Cleanup auto-dismiss timer on unmount ───────────────────────────────
 

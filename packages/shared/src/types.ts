@@ -80,6 +80,7 @@ export type AppMetadata = {
 export type ProfilePreferencesUpdate = {
   notificationEmail?: boolean;
   notificationSms?: boolean;
+  notificationPush?: boolean;
 };
 
 export type NameChangeRequest = {

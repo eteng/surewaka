@@ -197,6 +197,7 @@ export type CustomerProfileUpdate = z.infer<typeof customerProfileUpdateSchema>;
 export const profilePreferencesUpdateSchema = z.object({
   notificationEmail: z.boolean().optional(),
   notificationSms: z.boolean().optional(),
+  notificationPush: z.boolean().optional(),
 });
 
 export const avatarFileSchema = z.object({

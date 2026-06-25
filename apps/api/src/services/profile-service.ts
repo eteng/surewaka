@@ -25,6 +25,7 @@ export type ProfileResponse = {
   avatarUrl: string | null;
   notificationEmail: boolean;
   notificationSms: boolean;
+  notificationPush: boolean;
   verified: boolean;
   updatedAt: string;
   pendingNameChange: {
@@ -111,6 +112,7 @@ export async function getProfile(userId: string): Promise<ServiceResult<ProfileR
     avatarUrl: user.avatarUrl,
     notificationEmail: user.notificationEmail,
     notificationSms: user.notificationSms,
+    notificationPush: user.notificationPush,
     verified: user.verified,
     updatedAt: user.updatedAt.toISOString(),
     pendingNameChange: pendingRequest
@@ -139,6 +141,7 @@ export async function updatePreferences(
   const updateFields: Partial<{
     notificationEmail: boolean;
     notificationSms: boolean;
+    notificationPush: boolean;
     updatedAt: Date;
   }> = { updatedAt: new Date() };
 
@@ -147,6 +150,9 @@ export async function updatePreferences(
   }
   if (data.notificationSms !== undefined) {
     updateFields.notificationSms = data.notificationSms;
+  }
+  if (data.notificationPush !== undefined) {
+    updateFields.notificationPush = data.notificationPush;
   }
 
   const [updated] = await db

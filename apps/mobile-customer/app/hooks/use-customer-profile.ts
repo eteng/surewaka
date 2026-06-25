@@ -15,6 +15,7 @@ export type CustomerProfile = {
   gender: Gender | null;
   notificationEmail: boolean;
   notificationSms: boolean;
+  notificationPush: boolean;
   pendingEmail: string | null;
   avatarUrl: string | null;
 };
@@ -32,6 +33,7 @@ type UseCustomerProfile = {
   updateNotifications: (prefs: {
     notificationEmail?: boolean;
     notificationSms?: boolean;
+    notificationPush?: boolean;
   }) => Promise<MutationResult>;
   updateAvatar: (localUri: string) => Promise<MutationResult>;
   removeAvatar: () => Promise<MutationResult>;
@@ -61,6 +63,7 @@ export function useCustomerProfile(): UseCustomerProfile {
       avatarUrl: string | null;
       notificationEmail: boolean;
       notificationSms: boolean;
+      notificationPush: boolean;
       verified: boolean;
     }>('/api/v1/profile', token);
 
@@ -79,6 +82,7 @@ export function useCustomerProfile(): UseCustomerProfile {
       gender: null, // TODO: expose gender in profile API response
       notificationEmail: data.notificationEmail,
       notificationSms: data.notificationSms,
+      notificationPush: data.notificationPush,
       pendingEmail: null,
       avatarUrl: data.avatarUrl,
     });
@@ -135,6 +139,7 @@ export function useCustomerProfile(): UseCustomerProfile {
     async (prefs: {
       notificationEmail?: boolean;
       notificationSms?: boolean;
+      notificationPush?: boolean;
     }): Promise<MutationResult> => {
       const token = await getToken();
       if (!token) return { error: 'Not authenticated' };
@@ -151,6 +156,9 @@ export function useCustomerProfile(): UseCustomerProfile {
               }),
               ...(prefs.notificationSms !== undefined && {
                 notificationSms: prefs.notificationSms,
+              }),
+              ...(prefs.notificationPush !== undefined && {
+                notificationPush: prefs.notificationPush,
               }),
             }
           : prev,

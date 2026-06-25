@@ -1,12 +1,29 @@
-import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ClerkProvider } from '@clerk/expo';
-import { tokenCache, usePushNotifications, NotificationBanner } from '@surewaka/mobile-shared';
+import { ClerkProvider, useAuth } from '@clerk/expo';
+import { tokenCache, usePushNotifications, NotificationBanner, consumeDeferredDeepLink, navigateToDeepLink } from '@surewaka/mobile-shared';
 
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
 function InnerLayout() {
+  const router = useRouter();
+  const { isSignedIn, isLoaded } = useAuth();
   const { banner, dismissBanner, onBannerTap } = usePushNotifications({ app: 'driver' });
+
+  // Check for deferred deep link after successful re-authentication (Req 5.11)
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
+    async function checkDeferredDeepLink() {
+      const data = await consumeDeferredDeepLink();
+      if (data) {
+        navigateToDeepLink(data, router);
+      }
+    }
+
+    checkDeferredDeepLink();
+  }, [isLoaded, isSignedIn, router]);
 
   return (
     <>
