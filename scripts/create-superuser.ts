@@ -25,20 +25,26 @@ import { eq, and } from 'drizzle-orm';
 
 // ── Args ─────────────────────────────────────────────────────────────────────
 
-const args = Object.fromEntries(
-  process.argv
-    .slice(2)
-    .filter((a) => a.startsWith('--'))
-    .map((a) => {
-      const [k, ...rest] = a.replace(/^--/, '').split('=');
-      return [k, rest.join('=')];
-    }),
-);
+const argv = process.argv.slice(2);
+const args: Record<string, string> = {};
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  if (a.startsWith('--')) {
+    const eqIdx = a.indexOf('=');
+    if (eqIdx !== -1) {
+      args[a.slice(2, eqIdx)] = a.slice(eqIdx + 1);
+    } else if (i + 1 < argv.length && !argv[i + 1].startsWith('--')) {
+      args[a.slice(2)] = argv[++i];
+    } else {
+      args[a.slice(2)] = '';
+    }
+  }
+}
 
 // Also support positional: create-superuser.ts eteng@busyunit.com
-const email = args['email'] ?? process.argv[2];
+const email = args['email'] ?? (argv[0] && !argv[0].startsWith('--') ? argv[0] : undefined);
 
-if (!email || email.startsWith('--')) {
+if (!email) {
   console.error('Usage: npx tsx scripts/create-superuser.ts --email <email>');
   process.exit(1);
 }
