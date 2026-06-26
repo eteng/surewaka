@@ -11,7 +11,7 @@
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
-    "@clerk/react": "^5.54.0",
+    "@clerk/react": "^6.11.1",
     "@react-router/node": "^7.1.0",
     "@react-router/serve": "^7.1.0",
     "@surewaka/shared": "workspace:*",

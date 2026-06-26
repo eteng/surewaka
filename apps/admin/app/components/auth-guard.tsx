@@ -4,21 +4,15 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '~/hooks/use-auth';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading, mfaEnabled } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (loading) return;
-
     if (!user) {
       navigate('/login', { replace: true });
-      return;
     }
-
-    if (!mfaEnabled) {
-      navigate('/mfa/enroll', { replace: true });
-    }
-  }, [user, loading, mfaEnabled, navigate]);
+  }, [user, loading, navigate]);
 
   if (loading) {
     return (
@@ -28,7 +22,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user || !mfaEnabled) {
+  if (!user) {
     return null;
   }
 

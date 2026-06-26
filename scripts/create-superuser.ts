@@ -19,9 +19,7 @@
  */
 
 import { createClerkClient } from '@clerk/backend';
-import { drizzle } from 'drizzle-orm/neon-http';
 import { neon } from '@neondatabase/serverless';
-import { eq, and } from 'drizzle-orm';
 
 // ── Args ─────────────────────────────────────────────────────────────────────
 
@@ -67,7 +65,6 @@ if (!DATABASE_URL) {
 
 const clerk = createClerkClient({ secretKey: CLERK_SECRET_KEY });
 const sql = neon(DATABASE_URL);
-const db = drizzle(sql);
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -101,40 +98,51 @@ async function main() {
 
   // ── DB upsert (best-effort) ───────────────────────────────────────────────
 
-  const dbUser = await db.execute(
-    sql`SELECT id FROM users WHERE clerk_id = ${clerkUser.id} LIMIT 1`,
-  );
+  let dbUser = await sql`SELECT id FROM users WHERE clerk_id = ${clerkUser.id} LIMIT 1`;
 
-  if (dbUser.rows.length === 0) {
-    console.log('\nNo users table row found yet (user may not have logged in).');
-    console.log('Clerk metadata is set — the role will be active on their next login.');
-    return;
+  if (dbUser.length === 0) {
+    console.log('No users table row found. Creating one...');
+
+    const name =
+      [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || email.split('@')[0];
+    const phone =
+      (clerkUser.phoneNumbers as Array<{ phoneNumber: string }> | undefined)?.[0]?.phoneNumber ??
+      '+000000000000';
+
+    await sql`
+      INSERT INTO users (clerk_id, email, phone, name, role, verified)
+      VALUES (${clerkUser.id}, ${email}, ${phone}, ${name}, 'surewaka_admin', true)
+      ON CONFLICT (clerk_id) DO NOTHING
+    `;
+
+    dbUser = await sql`SELECT id FROM users WHERE clerk_id = ${clerkUser.id} LIMIT 1`;
+
+    if (dbUser.length === 0) {
+      console.error('Failed to insert users row.');
+      process.exit(1);
+    }
+
+    console.log('✓ users row created');
   }
 
-  const userId = dbUser.rows[0].id as string;
+  const userId = dbUser[0].id as string;
   console.log(`Found internal user: ${userId}`);
 
-  const existing = await db.execute(
-    sql`SELECT id FROM user_roles WHERE user_id = ${userId} AND role = 'surewaka_admin' AND is_active = true LIMIT 1`,
-  );
+  const existing = await sql`SELECT id FROM user_roles WHERE user_id = ${userId} AND role = 'surewaka_admin' AND is_active = true LIMIT 1`;
 
-  if (existing.rows.length > 0) {
+  if (existing.length > 0) {
     console.log('surewaka_admin already active in user_roles table. Nothing to do.');
   } else {
-    await db.execute(
-      sql`
-        INSERT INTO user_roles (user_id, role, assigned_by, is_active, assigned_at)
-        VALUES (${userId}, 'surewaka_admin', ${userId}, true, now())
-        ON CONFLICT DO NOTHING
-      `,
-    );
+    await sql`
+      INSERT INTO user_roles (user_id, role, assigned_by, is_active, assigned_at)
+      VALUES (${userId}, 'surewaka_admin', ${userId}, true, now())
+      ON CONFLICT DO NOTHING
+    `;
 
-    await db.execute(
-      sql`
-        INSERT INTO role_audit_log (user_id, action, role, performed_by, reason, created_at)
-        VALUES (${userId}, 'assigned', 'surewaka_admin', ${userId}, 'Bootstrap via create-superuser script', now())
-      `,
-    );
+    await sql`
+      INSERT INTO role_audit_log (user_id, action, role, performed_by, reason, created_at)
+      VALUES (${userId}, 'assigned', 'surewaka_admin', ${userId}, 'Bootstrap via create-superuser script', now())
+    `;
 
     console.log('✓ user_roles row inserted');
     console.log('✓ role_audit_log entry written');
