@@ -72,13 +72,37 @@ export function useProfile(): UseProfileResult {
         return;
       }
 
-      const response = await fetch(`${API_URL}/api/v1/profile`, {
+      let response = await fetch(`${API_URL}/api/v1/profile`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
         signal: controller.signal,
       });
+
+      // Invited staff have no DB row yet — provision it then retry
+      if (response.status === 401) {
+        const body = await response.json().catch(() => null);
+        if (body?.error?.code === 'PROFILE_REQUIRED') {
+          const reg = await fetch(`${API_URL}/api/v1/auth/register-employee`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            signal: controller.signal,
+          });
+          if (!reg.ok) {
+            const regBody = await reg.json().catch(() => null);
+            setError(regBody?.error?.message || 'Failed to complete account setup');
+            setProfile(null);
+            setIsLoading(false);
+            return;
+          }
+          // Retry profile fetch now that the row exists
+          response = await fetch(`${API_URL}/api/v1/profile`, {
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            signal: controller.signal,
+          });
+        }
+      }
 
       if (!response.ok) {
         const body = await response.json().catch(() => null);

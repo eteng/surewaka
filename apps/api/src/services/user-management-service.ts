@@ -7,7 +7,7 @@ import { db, users, userRoles, carriers, roleAuditLog } from '@surewaka/db';
 import { eq, ne, and, ilike, or, asc, desc, count, sql, type SQL } from 'drizzle-orm';
 import { getClerkClient } from '@surewaka/auth';
 import type { UserRole } from '@surewaka/shared';
-import { assignRole, syncRolesToAuth } from './role-service';
+import { syncRolesToAuth } from './role-service';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -97,10 +97,10 @@ export type ServiceResult<T> = {
  */
 export async function inviteEmployee(
   params: InviteEmployeeParams
-): Promise<ServiceResult<EmployeeDetail>> {
+): Promise<ServiceResult<null>> {
   const { email, fullName, role, scopeType, scopeId, invitedBy, invitedByRoles } = params;
 
-  // 1. Check email uniqueness in users table (Requirement 1.4)
+  // 1. Check email uniqueness against already-registered users (Requirement 1.4)
   const existingUser = await db
     .select({ id: users.id })
     .from(users)
@@ -115,13 +115,20 @@ export async function inviteEmployee(
     };
   }
 
-  // 2. Create invitation via Clerk (Requirement 1.1, 1.7)
-  // This is called BEFORE the DB transaction — fail-fast pattern
+  // 2. Send Clerk invitation — the DB row is provisioned on first login via
+  //    POST /api/v1/auth/register-employee, which reads role from publicMetadata.
+  //    This avoids a chicken-and-egg problem: we can't store clerk_id (NOT NULL)
+  //    until the user has accepted the invite and Clerk has created their account.
   const clerk = getClerkClient();
   try {
     await clerk.invitations.createInvitation({
       emailAddress: email,
-      publicMetadata: { name: fullName, role },
+      publicMetadata: {
+        name: fullName,
+        roles: [role],
+        ...(scopeType ? { invite_scope_type: scopeType } : {}),
+        ...(scopeId ? { invite_scope_id: scopeId } : {}),
+      },
     });
   } catch (err) {
     return {
@@ -134,86 +141,7 @@ export async function inviteEmployee(
     };
   }
 
-  // 3. Begin DB transaction: insert user + assign role (Requirement 1.2, 1.3, 1.8)
-  const result = await db.transaction(async (tx) => {
-    // Insert user record with verified=false
-    const [newUser] = await tx
-      .insert(users)
-      .values({
-        email,
-        name: fullName,
-        phone: '',
-        verified: false,
-      })
-      .returning();
-
-    // Assign role via RoleService (delegates to existing RBAC system)
-    const roleResult = await assignRole({
-      userId: newUser.id,
-      role,
-      assignedBy: invitedBy,
-      assignedByRoles: invitedByRoles,
-      scopeType: scopeType ?? null,
-      scopeId: scopeId ?? null,
-      reason: 'Invited by admin',
-    });
-
-    if (roleResult.error) {
-      throw new Error(`Role assignment failed: ${roleResult.error.message}`);
-    }
-
-    return newUser;
-  });
-
-  // 4. Build and return EmployeeDetail response
-  // Fetch the active roles for the newly created user
-  const activeRoles = await db
-    .select({
-      role: userRoles.role,
-      scopeType: userRoles.scopeType,
-      scopeId: userRoles.scopeId,
-    })
-    .from(userRoles)
-    .where(and(eq(userRoles.userId, result.id), eq(userRoles.isActive, true)));
-
-  // Resolve carrier names for org-scoped roles
-  const carrierDetails: { id: string; name: string; role: UserRole }[] = [];
-  for (const r of activeRoles) {
-    if ((r.role === 'carrier_admin' || r.role === 'carrier_driver') && r.scopeId) {
-      const [carrier] = await db
-        .select({ id: carriers.id, name: carriers.name })
-        .from(carriers)
-        .where(eq(carriers.id, r.scopeId))
-        .limit(1);
-
-      if (carrier) {
-        carrierDetails.push({
-          id: carrier.id,
-          name: carrier.name,
-          role: r.role as UserRole,
-        });
-      }
-    }
-  }
-
-  const employeeDetail: EmployeeDetail = {
-    id: result.id,
-    name: result.name,
-    email: result.email,
-    phone: result.phone || null,
-    verified: result.verified,
-    roles: activeRoles.map((r) => ({
-      role: r.role as UserRole,
-      scopeType: r.scopeType,
-      scopeId: r.scopeId,
-    })),
-    createdAt: result.createdAt,
-    updatedAt: result.updatedAt,
-    avatarUrl: result.avatarUrl ?? null,
-    carriers: carrierDetails,
-  };
-
-  return { data: employeeDetail, error: null, meta: null };
+  return { data: null, error: null, meta: null };
 }
 
 // ─── Column Mapping for Sorting ──────────────────────────────────────────────
