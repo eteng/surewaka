@@ -1,4 +1,4 @@
- # Implementation Plan: Push Notifications
+# Implementation Plan: Push Notifications
 
 ## Overview
 
