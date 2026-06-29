@@ -23,7 +23,13 @@ const app = new Hono();
 
 // Middleware
 app.use('*', requestLogger);
-app.use('*', cors());
+app.use('*', cors({
+  origin: '*',
+  allowHeaders: ['Authorization', 'Content-Type'],
+  allowMethods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  exposeHeaders: ['Content-Length'],
+  maxAge: 86400,
+}));
 
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok', service: 'surewaka-api' }));
