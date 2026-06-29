@@ -8,7 +8,7 @@ export default function Login() {
   return (
     <div className="flex min-h-svh items-center justify-center bg-background p-4">
       <SignIn
-        afterSignInUrl="/"
+        fallbackRedirectUrl="/"
         appearance={{
           variables: {
             colorPrimary: '#16a34a',

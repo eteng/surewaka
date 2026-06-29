@@ -45,7 +45,7 @@ type UseProfileResult = {
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 export function useProfile(): UseProfileResult {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -53,6 +53,11 @@ export function useProfile(): UseProfileResult {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchProfile = useCallback(async () => {
+    if (!isLoaded || !isSignedIn) {
+      setIsLoading(false);
+      return;
+    }
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -127,7 +132,7 @@ export function useProfile(): UseProfileResult {
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [isLoaded, isSignedIn, getToken]);
 
   useEffect(() => {
     fetchProfile();
@@ -175,7 +180,7 @@ export function useProfile(): UseProfileResult {
     } finally {
       setIsUpdating(false);
     }
-  }, []);
+  }, [getToken]);
 
   const uploadAvatar = useCallback(async (file: File) => {
     setIsUpdating(true);
@@ -215,7 +220,7 @@ export function useProfile(): UseProfileResult {
     } finally {
       setIsUpdating(false);
     }
-  }, []);
+  }, [getToken]);
 
   const removeAvatar = useCallback(async () => {
     setIsUpdating(true);
@@ -252,7 +257,7 @@ export function useProfile(): UseProfileResult {
     } finally {
       setIsUpdating(false);
     }
-  }, []);
+  }, [getToken]);
 
   const submitNameChangeRequest = useCallback(async (data: NameChangeRequestData) => {
     setIsUpdating(true);
@@ -290,7 +295,7 @@ export function useProfile(): UseProfileResult {
     } finally {
       setIsUpdating(false);
     }
-  }, [fetchProfile]);
+  }, [getToken, fetchProfile]);
 
   return {
     profile,

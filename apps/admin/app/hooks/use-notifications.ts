@@ -30,7 +30,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const POLL_INTERVAL = 30_000; // 30 seconds
 
 export function useNotifications(): UseNotificationsReturn {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,6 +41,7 @@ export function useNotifications(): UseNotificationsReturn {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const refetchUnreadCount = useCallback(async () => {
+    if (!isLoaded || !isSignedIn) return;
     try {
       const accessToken = await getToken();
       if (!accessToken) return;
@@ -59,9 +60,11 @@ export function useNotifications(): UseNotificationsReturn {
     } catch {
       // Silently fail for background polls — don't show error for polling failures
     }
-  }, []);
+  }, [isLoaded, isSignedIn, getToken]);
 
   const fetchNotifications = useCallback(async (options?: FetchOptions) => {
+    if (!isLoaded || !isSignedIn) return;
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -124,7 +127,7 @@ export function useNotifications(): UseNotificationsReturn {
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [isLoaded, isSignedIn, getToken]);
 
   const markAsRead = useCallback(async (id: string) => {
     // Optimistic update: decrement count and set isRead locally
@@ -166,7 +169,7 @@ export function useNotifications(): UseNotificationsReturn {
       setUnreadCount(previousCount);
       setNotifications(previousNotifications);
     }
-  }, [unreadCount, notifications]);
+  }, [getToken, unreadCount, notifications]);
 
   const markAllAsRead = useCallback(async () => {
     // Optimistic update: set count to 0 and mark all read locally
@@ -203,7 +206,7 @@ export function useNotifications(): UseNotificationsReturn {
       setUnreadCount(previousCount);
       setNotifications(previousNotifications);
     }
-  }, [unreadCount, notifications]);
+  }, [getToken, unreadCount, notifications]);
 
   // Polling with tab visibility awareness
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { createClerkClient, type ClerkClient } from '@clerk/backend';
+import { createClerkClient, verifyToken as clerkVerifyToken, type ClerkClient } from '@clerk/backend';
 
 let clerkClient: ClerkClient | null = null;
 
@@ -32,36 +32,22 @@ export type ClerkUserInfo = {
  * Verify a Clerk session token (from Authorization: Bearer <token>).
  * Returns Clerk user info or null if invalid.
  *
+ * Uses clerkVerifyToken (the correct approach for bearer tokens in pure APIs).
+ * authenticateRequest is for full web request objects with cookies and domain logic.
+ *
  * Note: This does NOT return an internal user ID. The auth middleware
  * must look up the clerk_id in the users table to resolve the UUID.
  */
 export async function verifyToken(token: string): Promise<ClerkUserInfo | null> {
   try {
-    const clerk = getClerkClient();
-
-    // Use authenticateRequest with a minimal Request object
-    const url = 'http://localhost/api';
-    const request = new Request(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const requestState = await clerk.authenticateRequest(request, {
+    const payload = await clerkVerifyToken(token, {
       secretKey: process.env.CLERK_SECRET_KEY!,
-      publishableKey: process.env.CLERK_PUBLISHABLE_KEY!,
     });
 
-    if (!requestState.isSignedIn) {
-      return null;
-    }
+    const userId = payload.sub;
+    if (!userId) return null;
 
-    const auth = requestState.toAuth();
-    const userId = auth.userId;
-
-    if (!userId) {
-      return null;
-    }
-
-    // Fetch full user details from Clerk
+    const clerk = getClerkClient();
     const user = await clerk.users.getUser(userId);
 
     return {
@@ -73,7 +59,8 @@ export async function verifyToken(token: string): Promise<ClerkUserInfo | null> 
       roles: ((user.publicMetadata as Record<string, unknown>)?.roles as string[]) ?? ['customer'],
       carrierId: (user.publicMetadata as Record<string, unknown>)?.carrier_id as string | undefined,
     };
-  } catch {
+  } catch (err) {
+    console.error('[verifyToken] Token verification failed:', err instanceof Error ? err.message : err);
     return null;
   }
 }
