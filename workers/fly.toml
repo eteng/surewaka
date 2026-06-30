@@ -1,0 +1,21 @@
+# Fly.io configuration for SureWaka Workers
+# Region: London (lhr) — co-located with API and Neon Postgres
+# All BullMQ workers run in a single machine for simplicity at current scale.
+
+app = "surewaka-workers"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "../../infra/docker/Dockerfile.workers"
+
+[env]
+  NODE_ENV = "production"
+
+# Workers don't serve HTTP — use a simple process health check
+[[services]]
+  # No HTTP service; Fly will monitor the process directly
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

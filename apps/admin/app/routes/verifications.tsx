@@ -1,3 +1,5 @@
+import { ShieldCheck } from 'lucide-react';
+import { EmptyState } from '~/components/empty-state';
 import type { Route } from './+types/verifications';
 
 export function meta({}: Route.MetaArgs) {
@@ -6,14 +8,16 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Verifications() {
   return (
-    <div className="pt-4">
+    <div className="p-8">
       <h1 className="text-2xl font-bold text-foreground">Verifications</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Review and approve driver/carrier KYC documents
-      </p>
+      <p className="mt-2 text-muted-foreground">Review and approve driver and carrier KYC documents</p>
 
-      <div className="mt-6 min-h-[60vh] rounded-xl border border-border bg-card p-6">
-        <p className="text-sm text-muted-foreground">Verification queue coming soon.</p>
+      <div className="mt-8">
+        <EmptyState
+          icon={<ShieldCheck className="h-6 w-6" />}
+          heading="Verification queue is empty"
+          body="KYC documents submitted by drivers and carriers will appear here for review and approval."
+        />
       </div>
     </div>
   );

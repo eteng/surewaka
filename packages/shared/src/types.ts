@@ -158,6 +158,79 @@ export type CarrierListItem = {
   applicationId: string | null;
   createdAt: string;
 };
+
+// ─── Driver Listing Types ─────────────────────────────────────────────────────
+
+export type DriverListItem = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  avatarUrl: string | null;
+  vehicleType: 'motorcycle' | 'car' | 'van' | 'truck';
+  licensePlate: string;
+  vehicleModel: string;
+  verified: boolean;
+  available: boolean;
+  rating: number;
+  totalDeliveries: number;
+  carrierName: string | null;
+  carrierId: string | null;
+  createdAt: string;
+};
+
+// ─── Driver Detail Types ──────────────────────────────────────────────────────
+
+export type DriverDetailDelivery = {
+  id: string;
+  status: string;
+  pickupAddress: string;
+  dropoffAddress: string;
+  date: string; // ISO string of deliveries.createdAt
+  price: number; // deliveries.price (0 if null)
+};
+
+export type DriverDetail = {
+  id: string; // drivers.id
+  name: string; // users.name
+  phone: string; // users.phone
+  email: string | null; // users.email
+  avatarUrl: string | null; // users.avatarUrl
+  vehicleType: 'motorcycle' | 'car' | 'van' | 'truck';
+  vehicleModel: string; // drivers.vehicleModel
+  licensePlate: string; // drivers.licensePlate
+  verified: boolean; // drivers.verified
+  available: boolean; // drivers.available
+  rating: number; // drivers.rating
+  totalDeliveries: number; // COUNT(deliveries) WHERE status='delivered'
+  createdAt: string; // drivers.createdAt (ISO string)
+  carrierName: string | null; // carriers.name via carrier_members
+  carrierId: string | null; // carrier_members.carrierId
+  carrierRole: string | null; // carrier_members.role
+  carrierJoinedAt: string | null; // carrier_members.joinedAt (ISO string)
+  recentDeliveries: DriverDetailDelivery[];
+};
+
+// ─── Customer Listing Types ──────────────────────────────────────────────────
+
+export type CustomerTier = 'power' | 'regular' | 'new' | 'dormant';
+
+export type CustomerListItem = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string;
+  avatarUrl: string | null;
+  verified: boolean;
+  tier: CustomerTier | null;
+  totalDeliveries: number;
+  totalSpent: number;
+  lastDeliveryAt: string | null;
+  primaryCity: string | null;
+  healthScore: number;
+  createdAt: string;
+};
+
 // ─── Push Notifications ──────────────────────────────────────────────────────
 
 export type PushNotificationType =

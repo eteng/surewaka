@@ -1,0 +1,30 @@
+name: Reset Staging DB
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "reset" to confirm staging database reset from production'
+        required: true
+        type: string
+
+jobs:
+  reset:
+    name: Reset Staging Branch from Production
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'reset'
+    steps:
+      - name: Reset Neon staging branch
+        uses: neondatabase/reset-branch-action@v2
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: staging
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Summary
+        run: |
+          echo "## ✅ Staging DB Reset" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The \`staging\` Neon branch has been reset to match \`production\` (parent)." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All staging data has been replaced with a fresh copy-on-write snapshot of production." >> $GITHUB_STEP_SUMMARY

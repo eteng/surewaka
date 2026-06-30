@@ -26,6 +26,9 @@ CLAUDE.md
 *-screenshot*.png
 *-screenshot*.jpg
 
+# Secrets setup scripts (never commit)
+infra/scripts/doppler-secrets.sh
+
 # OS
 .DS_Store
 Thumbs.db

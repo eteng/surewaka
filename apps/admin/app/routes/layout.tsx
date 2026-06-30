@@ -3,6 +3,7 @@ import { AppSidebar } from '~/components/app-sidebar';
 import { AuthGuard } from '~/components/auth-guard';
 import { HeaderUser } from '~/components/header-user';
 import { NotificationBell } from '~/components/notifications/notification-bell';
+import { ThemeToggle } from '~/components/theme-toggle';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -17,10 +18,11 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from '~/components/ui/s
 const routeTitles: Record<string, { title: string; parent?: string }> = {
   '/': { title: 'Dashboard', parent: 'Operations' },
   '/deliveries': { title: 'Deliveries', parent: 'Operations' },
-  '/drivers': { title: 'Drivers', parent: 'Fleet' },
-  '/carriers': { title: 'Carriers', parent: 'Fleet' },
-  '/verifications': { title: 'Verifications', parent: 'Fleet' },
-  '/disputes': { title: 'Disputes', parent: 'Support' },
+  '/customers': { title: 'Customers', parent: 'Operations' },
+  '/drivers': { title: 'Drivers', parent: 'Network' },
+  '/carriers': { title: 'Carriers', parent: 'Network' },
+  '/verifications': { title: 'Verifications', parent: 'Network' },
+  '/disputes': { title: 'Disputes', parent: 'Operations' },
   '/analytics': { title: 'Analytics', parent: 'Operations' },
   '/settings': { title: 'Settings' },
 };
@@ -55,6 +57,7 @@ export default function AdminLayout() {
               </Breadcrumb>
             </div>
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <NotificationBell />
               <HeaderUser />
             </div>

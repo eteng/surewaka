@@ -1,0 +1,69 @@
+FROM node:22-alpine AS base
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+
+FROM base AS builder
+WORKDIR /app
+
+# Copy workspace config and lockfile
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+
+# Copy package.json for all workers + internal packages
+COPY workers/email-worker/package.json ./workers/email-worker/
+COPY workers/payment-worker/package.json ./workers/payment-worker/
+COPY workers/agent-worker/package.json ./workers/agent-worker/
+COPY workers/cron/package.json ./workers/cron/
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/db/package.json ./packages/db/
+COPY packages/auth/package.json ./packages/auth/
+COPY packages/ai/package.json ./packages/ai/
+COPY packages/realtime/package.json ./packages/realtime/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY tsconfig.base.json ./
+COPY workers ./workers
+COPY packages/shared ./packages/shared
+COPY packages/db ./packages/db
+COPY packages/auth ./packages/auth
+COPY packages/ai ./packages/ai
+COPY packages/realtime ./packages/realtime
+
+# Build all workers (turborepo builds dependencies first)
+RUN pnpm --filter "@surewaka/worker-*" build
+
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Copy built output for each worker
+COPY --from=builder /app/workers/email-worker/dist ./workers/email-worker/dist
+COPY --from=builder /app/workers/email-worker/package.json ./workers/email-worker/
+COPY --from=builder /app/workers/payment-worker/dist ./workers/payment-worker/dist
+COPY --from=builder /app/workers/payment-worker/package.json ./workers/payment-worker/
+COPY --from=builder /app/workers/agent-worker/dist ./workers/agent-worker/dist
+COPY --from=builder /app/workers/agent-worker/package.json ./workers/agent-worker/
+COPY --from=builder /app/workers/cron/dist ./workers/cron/dist
+COPY --from=builder /app/workers/cron/package.json ./workers/cron/
+
+# Copy shared packages
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder /app/packages/db/dist ./packages/db/dist
+COPY --from=builder /app/packages/db/package.json ./packages/db/
+COPY --from=builder /app/packages/auth/dist ./packages/auth/dist
+COPY --from=builder /app/packages/auth/package.json ./packages/auth/
+COPY --from=builder /app/packages/ai/dist ./packages/ai/dist
+COPY --from=builder /app/packages/ai/package.json ./packages/ai/
+COPY --from=builder /app/packages/realtime/dist ./packages/realtime/dist
+COPY --from=builder /app/packages/realtime/package.json ./packages/realtime/
+
+# Copy node_modules for runtime dependencies
+COPY --from=builder /app/node_modules ./node_modules
+
+# Default: run all workers via a supervisor script
+COPY infra/docker/start-workers.sh ./start-workers.sh
+RUN chmod +x ./start-workers.sh
+
+CMD ["./start-workers.sh"]

@@ -88,4 +88,6 @@ export const vehicleType = pgEnum('vehicle_type', ['motorcycle', 'car', 'van', '
 
 export const waitlistUserType = pgEnum('waitlist_user_type', ['sender', 'business', 'driver']);
 
+export const customerTier = pgEnum('customer_tier', ['power', 'regular', 'new', 'dormant']);
+
 export const walletStatus = pgEnum('wallet_status', ['active', 'frozen', 'closed']);

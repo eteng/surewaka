@@ -1,3 +1,5 @@
+import { BarChart3 } from 'lucide-react';
+import { EmptyState } from '~/components/empty-state';
 import type { Route } from './+types/analytics';
 
 export function meta({}: Route.MetaArgs) {
@@ -6,17 +8,18 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Analytics() {
   return (
-    <div className="pt-4">
+    <div className="p-8">
       <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Platform metrics and business intelligence
-      </p>
+      <p className="mt-2 text-muted-foreground">Platform metrics and business intelligence</p>
 
-      <div className="mt-6 grid auto-rows-min gap-4 md:grid-cols-2">
-        <div className="aspect-video rounded-xl bg-muted/50" />
-        <div className="aspect-video rounded-xl bg-muted/50" />
+      <div className="mt-8">
+        <EmptyState
+          icon={<BarChart3 className="h-6 w-6" />}
+          heading="Analytics coming soon"
+          body="Revenue trends, delivery performance, and growth metrics will appear here. For now, check the Waitlist page for current growth data."
+          action={{ label: 'View waitlist', href: '/waitlist' }}
+        />
       </div>
-      <div className="mt-4 min-h-[40vh] rounded-xl bg-muted/50" />
     </div>
   );
 }

@@ -1,13 +1,7 @@
 import * as React from 'react';
 import {
-  BarChart3,
-  Building2,
-  ClipboardList,
   LayoutDashboard,
-  MessageSquare,
-  Package,
   Settings2,
-  ShieldCheck,
   Truck,
   Users,
 } from 'lucide-react';
@@ -15,7 +9,6 @@ import type { UserRole } from '@surewaka/shared';
 import { RoleGate } from '@surewaka/ui';
 
 import { NavMain } from '~/components/nav-main';
-import { NavProjects } from '~/components/nav-projects';
 import { TeamSwitcher } from '~/components/team-switcher';
 import { useProfile } from '~/hooks/use-profile';
 import {
@@ -42,11 +35,14 @@ const data = {
       items: [
         { title: 'Dashboard', url: '/' },
         { title: 'Deliveries', url: '/deliveries' },
+        { title: 'Customers', url: '/customers' },
+        { title: 'Disputes', url: '/disputes' },
         { title: 'Analytics', url: '/analytics' },
+        { title: 'Waitlist', url: '/waitlist' },
       ],
     },
     {
-      title: 'Fleet',
+      title: 'Network',
       url: '#',
       icon: Users,
       items: [
@@ -55,18 +51,6 @@ const data = {
         { title: 'Applications', url: '/carriers/applications' },
         { title: 'Verifications', url: '/verifications' },
       ],
-    },
-    {
-      title: 'Support',
-      url: '#',
-      icon: MessageSquare,
-      items: [{ title: 'Disputes', url: '/disputes' }],
-    },
-    {
-      title: 'Growth',
-      url: '#',
-      icon: ClipboardList,
-      items: [{ title: 'Waitlist', url: '/waitlist' }],
     },
     {
       title: 'Settings',
@@ -87,11 +71,6 @@ const data = {
       items: [{ title: 'Users', url: '/users' }],
     },
   ],
-  projects: [
-    { name: 'Lagos Operations', url: '#', icon: Package },
-    { name: 'Carrier Partners', url: '#', icon: Building2 },
-    { name: 'KYC Pipeline', url: '#', icon: ShieldCheck },
-  ],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -106,9 +85,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavMain items={data.navMain} />
         <RoleGate roles={['surewaka_admin']} userRoles={userRoles}>
-          <NavMain items={data.adminNav} />
+          <NavMain items={data.adminNav} label="Admin" />
         </RoleGate>
-        <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

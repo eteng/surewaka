@@ -386,6 +386,40 @@ export type RejectCarrierApplicationInput = z.infer<typeof rejectCarrierApplicat
 export type CarrierApplicationListQuery = z.infer<typeof carrierApplicationListQuerySchema>;
 export type CreateStrategicCarrierInput = z.infer<typeof createStrategicCarrierSchema>;
 export type CarrierListQuery = z.infer<typeof carrierListQuerySchema>;
+
+// ─── Driver Listing (Admin) ───────────────────────────────────────────────────
+
+export const driverListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().max(200).default(''),
+  vehicleType: z.enum(['motorcycle', 'car', 'van', 'truck']).optional(),
+  verified: z.enum(['true', 'false']).optional(),
+  available: z.enum(['true', 'false']).optional(),
+  carrierId: z.string().uuid().optional(),
+  affiliation: z.enum(['independent', 'carrier']).optional(),
+  sortBy: z.enum(['createdAt', 'rating', 'name', 'totalDeliveries']).default('createdAt'),
+  sortDir: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export type DriverListQuery = z.infer<typeof driverListQuerySchema>;
+
+// ─── Customer Listing (Admin) ────────────────────────────────────────────────
+
+export const customerListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().max(200).default(''),
+  tier: z.enum(['power', 'regular', 'new', 'dormant']).optional(),
+  verified: z.enum(['true', 'false']).optional(),
+  city: z.string().max(100).optional(),
+  joinedFrom: z.string().optional(), // ISO date string
+  joinedTo: z.string().optional(), // ISO date string
+  sortBy: z.enum(['createdAt', 'totalSpent', 'lastDeliveryAt', 'totalDeliveries', 'name']).default('createdAt'),
+  sortDir: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export type CustomerListQuery = z.infer<typeof customerListQuerySchema>;
 // ─── Push Notification Validators ────────────────────────────────────────────
 
 export const registerPushTokenSchema = z.object({

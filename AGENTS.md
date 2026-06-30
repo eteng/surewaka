@@ -27,6 +27,15 @@ pnpm dev
 | `pnpm --filter @surewaka/worker-push dev` | Push worker (push notifications, :4001 health) |
 | `pnpm --filter @surewaka/db db:studio` | Drizzle Studio |
 
+## Workers (Cron / Background)
+
+| Command | What it does |
+|---------|-------------|
+| `npx tsx workers/cron/compute-customer-segments.ts` | Run customer segmentation (nightly cron) |
+| `pnpm --filter @surewaka/cron dev` | Start cron worker (registered jobs) |
+
+See `docs/guides/workers.md` for full documentation.
+
 ## Database (Schema Changes)
 
 **Schema-first.** Drizzle schema files are the source of truth. Neon Postgres is the host.
@@ -54,6 +63,31 @@ pnpm --filter @surewaka/mobile-customer exec tsc --noEmit
 pnpm --filter @surewaka/mobile-shared exec tsc --noEmit
 pnpm --filter @surewaka/api exec tsc --noEmit
 ```
+
+## Deployment
+
+| Target | Platform | Region | Command |
+|--------|----------|--------|---------|
+| Web apps | Vercel | Auto (edge) | Auto-deploy on push to main |
+| API | Fly.io | London (lhr) | `flyctl deploy --config apps/api/fly.toml` |
+| Workers | Fly.io | London (lhr) | `flyctl deploy --config workers/fly.toml` |
+| Database | Neon Postgres | London (aws-eu-west-2) | Managed |
+
+```bash
+# Deploy API manually
+flyctl deploy --config apps/api/fly.toml
+
+# Set a secret on Fly
+flyctl secrets set DATABASE_URL="..." --app surewaka-api
+
+# Check API logs
+flyctl logs --app surewaka-api
+
+# SSH into running machine
+flyctl ssh console --app surewaka-api
+```
+
+Auto-deploy: Push to `main` triggers `.github/workflows/deploy-api.yml`
 
 ## Git — Two Remotes
 

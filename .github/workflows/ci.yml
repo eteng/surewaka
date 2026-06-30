@@ -6,30 +6,32 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
 jobs:
-  lint-and-test:
+  quality:
+    name: Lint, Test & Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'pnpm'
+          node-version: 22
+          cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm lint
-      - run: pnpm test
 
-  # Note: Web apps (landing, web, admin) are deployed by Vercel automatically.
-  # This CI pipeline handles linting, testing, and building packages/API/workers.
-  # Vercel deploys are triggered on push to main and on PRs (preview URLs).
+      - run: pnpm build
+
+      - run: pnpm lint
+
+      - run: pnpm test

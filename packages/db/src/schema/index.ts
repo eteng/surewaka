@@ -33,5 +33,8 @@ export * from './name-change-requests';
 export * from './notifications';
 export * from './push-tokens';
 
+// Customer analytics
+export * from './customer-segments';
+
 // Pre-launch
 export * from './waitlist';

@@ -1,0 +1,106 @@
+name: Preview Database
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - 'packages/db/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  create-branch:
+    name: Create Neon Branch
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    outputs:
+      db_url: ${{ steps.create.outputs.db_url }}
+      branch_id: ${{ steps.create.outputs.branch_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: create
+        uses: neondatabase/create-branch-action@v5
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: preview/pr-${{ github.event.number }}
+          parent: staging
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Comment DB URL on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `🗄️ **Preview database branch created**\n\nBranch: \`preview/pr-${{ github.event.number }}\`\n\nThis branch will be deleted when the PR is closed.`;
+            // Update or create comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes('Preview database branch created'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  schema-diff:
+    name: Schema Diff
+    if: github.event.action != 'closed'
+    needs: create-branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: neondatabase/schema-diff-action@v2
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          base_branch: staging
+          compare_branch: preview/pr-${{ github.event.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+  migrate-preview:
+    name: Apply Migrations to Preview
+    if: github.event.action != 'closed'
+    needs: create-branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @surewaka/db db:migrate
+        env:
+          DATABASE_URL: ${{ needs.create-branch.outputs.db_url }}
+
+  delete-branch:
+    name: Delete Neon Branch
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: preview/pr-${{ github.event.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
