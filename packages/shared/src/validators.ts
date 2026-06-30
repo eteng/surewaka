@@ -420,6 +420,15 @@ export const customerListQuerySchema = z.object({
 });
 
 export type CustomerListQuery = z.infer<typeof customerListQuerySchema>;
+
+// ─── Customer Detail (Admin) ─────────────────────────────────────────────────
+
+export const customerDetailDeliveryQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(50).default(10).optional(),
+});
+
+export type CustomerDetailDeliveryQuery = z.infer<typeof customerDetailDeliveryQuerySchema>;
 // ─── Push Notification Validators ────────────────────────────────────────────
 
 export const registerPushTokenSchema = z.object({

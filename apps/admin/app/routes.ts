@@ -15,6 +15,7 @@ export default [
     route('users', 'routes/users.tsx'),
     route('users/:userId', 'routes/users.$userId.tsx'),
     route('customers', 'routes/customers.tsx'),
+    route('customers/:customerId', 'routes/customers.$customerId.tsx'),
     route('analytics', 'routes/analytics.tsx'),
     route('settings', 'routes/settings.tsx'),
     route('settings/profile', 'routes/settings/profile.tsx'),

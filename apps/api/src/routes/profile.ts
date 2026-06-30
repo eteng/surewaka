@@ -42,7 +42,13 @@ profileRoutes.get('/', async (c) => {
 
     return c.json({ data: result.data, error: null, meta: null }, 200);
   } catch (error) {
-    console.error('[ProfileRoutes] GET /profile error:', error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : undefined;
+    console.error('[ProfileRoutes] GET /profile error:', {
+      message: errMsg,
+      stack: errStack,
+      userId: user.id,
+    });
     return c.json(
       { data: null, error: { code: 'INTERNAL_ERROR', message: 'Failed to retrieve profile' }, meta: null },
       500,

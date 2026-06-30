@@ -231,6 +231,44 @@ export type CustomerListItem = {
   createdAt: string;
 };
 
+// ─── Customer Detail Types ────────────────────────────────────────────────────
+
+export type CustomerDetail = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  avatarUrl: string | null;
+  gender: string | null;
+  verified: boolean;
+  createdAt: string;
+  notificationEmail: boolean;
+  notificationSms: boolean;
+  tier: CustomerTier | null;
+  totalDeliveries: number;
+  totalSpent: number;
+  lastDeliveryAt: string | null;
+  primaryCity: string | null;
+  healthScore: number;
+};
+
+export type CustomerDeliveryItem = {
+  id: string;
+  status: string;
+  pickupAddress: string;
+  pickupCity: string;
+  dropoffAddress: string;
+  dropoffCity: string;
+  packageDescription: string;
+  packageCategory: string;
+  price: number | null;
+  amountPaid: number | null;
+  paymentStatus: string;
+  recipientName: string;
+  recipientPhone: string;
+  createdAt: string;
+};
+
 // ─── Push Notifications ──────────────────────────────────────────────────────
 
 export type PushNotificationType =
