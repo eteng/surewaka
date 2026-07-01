@@ -147,9 +147,6 @@ export function DeliveriesPage() {
         onSearchChange={handleSearchChange}
         status={status}
         onStatusChange={handleStatusChange}
-        sortBy={sortBy}
-        sortDir={sortDir}
-        onSortChange={handleSortChange}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
       />
