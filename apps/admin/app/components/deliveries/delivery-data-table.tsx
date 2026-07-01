@@ -96,14 +96,33 @@ function formatDate(isoDate: string): string {
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 0) return 'Today';
+  if (diffDays === 0) {
+    return `Today, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+  }
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays} days ago`;
 
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function ElapsedTimeBadge({ createdAt }: { createdAt: string }) {
+  const elapsed = formatElapsedTime(createdAt);
+  const minutesAgo = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60));
+
+  return (
+    <span
+      className={cn(
+        'text-sm',
+        minutesAgo < 30
+          ? 'text-muted-foreground'
+          : minutesAgo < 60
+            ? 'font-medium text-amber-600'
+            : 'font-medium text-red-600',
+      )}
+    >
+      {elapsed}
+    </span>
+  );
 }
 
 function formatCategory(category: string): string {
@@ -165,6 +184,17 @@ function getColumns(activeTab?: DeliveryTab): ColumnDef<DeliveryListItem, unknow
       },
     },
     {
+      id: 'driver',
+      header: 'Driver',
+      enableSorting: false,
+      cell: ({ row }) =>
+        row.original.driverName ? (
+          <span className="text-sm">{row.original.driverName}</span>
+        ) : (
+          <span className="text-xs italic text-muted-foreground">Unassigned</span>
+        ),
+    },
+    {
       id: 'packageCategory',
       header: 'Category',
       enableSorting: false,
@@ -178,11 +208,7 @@ function getColumns(activeTab?: DeliveryTab): ColumnDef<DeliveryListItem, unknow
       id: 'elapsedTime',
       header: 'Elapsed',
       enableSorting: false,
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {formatElapsedTime(row.original.createdAt)}
-        </span>
-      ),
+      cell: ({ row }) => <ElapsedTimeBadge createdAt={row.original.createdAt} />,
     });
   } else {
     baseColumns.push({
@@ -308,7 +334,7 @@ export function DeliveryDataTable({
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="overflow-x-auto rounded-md border">
       <table className="w-full text-sm">
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (
