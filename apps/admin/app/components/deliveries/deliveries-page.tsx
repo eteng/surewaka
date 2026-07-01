@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DeliveryStatus } from '@surewaka/shared';
 import { cn } from '~/lib/utils';
 import { useDeliveries } from '~/hooks/use-deliveries';
@@ -9,6 +10,14 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '~/components/ui/breadcrumb';
+import { Button } from '~/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select';
 import { LifecycleTabBar } from './lifecycle-tab-bar';
 import { DeliveryToolbar } from './delivery-toolbar';
 import { DeliveryDataTable } from './delivery-data-table';
@@ -176,36 +185,43 @@ export function DeliveriesPage() {
                   Showing {data.length} of {meta.total} deliveries
                 </p>
                 <div className="flex items-center gap-2">
-                  <select
-                    value={pageSize}
-                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                    className="h-9 rounded-md border px-2 text-sm"
+                  <Select
+                    value={String(pageSize)}
+                    onValueChange={(v) => handlePageSizeChange(Number(v))}
                   >
-                    <option value={10}>10 / page</option>
-                    <option value={20}>20 / page</option>
-                    <option value={50}>50 / page</option>
-                    <option value={100}>100 / page</option>
-                  </select>
+                    <SelectTrigger className="h-9 w-[110px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[10, 20, 50, 100].map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n} / page
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      className="h-9 cursor-pointer rounded-md border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                    <Button
+                      variant="outline"
+                      size="sm"
                       disabled={page <= 1}
                       onClick={() => handlePageChange(page - 1)}
                     >
+                      <ChevronLeft className="h-4 w-4" />
                       Previous
-                    </button>
+                    </Button>
                     <span className="px-2 text-sm text-muted-foreground">
-                      Page {meta.page} of {meta.totalPages}
+                      {meta.page} / {meta.totalPages}
                     </span>
-                    <button
-                      type="button"
-                      className="h-9 cursor-pointer rounded-md border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                    <Button
+                      variant="outline"
+                      size="sm"
                       disabled={page >= meta.totalPages}
                       onClick={() => handlePageChange(page + 1)}
                     >
                       Next
-                    </button>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               </div>
