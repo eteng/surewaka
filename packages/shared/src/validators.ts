@@ -429,6 +429,22 @@ export const customerDetailDeliveryQuerySchema = z.object({
 });
 
 export type CustomerDetailDeliveryQuery = z.infer<typeof customerDetailDeliveryQuerySchema>;
+
+// ─── Delivery Listing (Admin) ────────────────────────────────────────────────
+
+const deliveryTabValues = ['all', 'requests', 'active', 'completed'] as const;
+
+export const adminDeliveryListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().max(200).optional(),
+  status: deliveryStatusSchema.optional(),
+  tab: z.enum(deliveryTabValues).default('all'),
+  sortBy: z.enum(['createdAt', 'status', 'customerName', 'price']).default('createdAt'),
+  sortDir: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export type AdminDeliveryListQuery = z.infer<typeof adminDeliveryListQuerySchema>;
 // ─── Push Notification Validators ────────────────────────────────────────────
 
 export const registerPushTokenSchema = z.object({
@@ -462,3 +478,51 @@ export const broadcastSchema = z.object({
 });
 
 export type BroadcastInput = z.infer<typeof broadcastSchema>;
+
+// ─── Delivery Model Validators ────────────────────────────────────────────────
+
+export const createDeliveryLegSchema = z.object({
+  deliveryId: z.string().uuid(),
+  legNumber: z.number().int().min(1).max(10),
+  legType: z.enum(['first_mile', 'intercity', 'last_mile']),
+  actorType: z.enum(['driver', 'carrier']),
+  actorId: z.string().uuid(),
+  pickupAddress: z.string().min(1).max(500),
+  pickupLat: z.number().min(-90).max(90),
+  pickupLng: z.number().min(-180).max(180),
+  dropoffAddress: z.string().min(1).max(500),
+  dropoffLat: z.number().min(-90).max(90),
+  dropoffLng: z.number().min(-180).max(180),
+  slaHours: z.number().positive().optional(),
+});
+
+export const updateDriverEtaSchema = z.object({
+  driverEtaAt: z.string().datetime(),
+});
+
+export const recordDriverLocationSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  deliveryId: z.string().uuid().optional(),
+});
+
+export const submitDeliveryRatingSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().max(500).optional(),
+});
+
+export const overrideFailureCauseSchema = z.object({
+  failureCause: z.enum(['driver', 'carrier', 'route_traffic', 'system']),
+  failureNote: z.string().max(500).optional(),
+});
+
+export const createCarrierSlaOverrideSchema = z.object({
+  carrierId: z.string().uuid(),
+  originZone: z.enum([
+    'Lekki', 'Victoria Island', 'Ikeja', 'Surulere', 'Mainland', 'Island', 'Other',
+  ]),
+  destinationZone: z.enum([
+    'Lekki', 'Victoria Island', 'Ikeja', 'Surulere', 'Mainland', 'Island', 'Other',
+  ]),
+  slaHours: z.number().positive().max(720),
+});
