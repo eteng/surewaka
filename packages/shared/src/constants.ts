@@ -78,6 +78,56 @@ export const MAX_PUSH_TOKENS_PER_USER_PER_APP = 10;
 export const PUSH_BATCH_SIZE = 100;
 export const PUSH_MAX_RETRIES = 3;
 export const PUSH_RETRY_BASE_MS = 1000;
-export const PUSH_QUEUE_NAME = 'push:notifications';
-export const PUSH_BROADCAST_QUEUE_NAME = 'push:broadcasts';
+export const PUSH_QUEUE_NAME = 'push-notifications';
+export const PUSH_BROADCAST_QUEUE_NAME = 'push-broadcasts';
 export const PUSH_BROADCAST_BATCH_SIZE = 500;
+
+// ─── Delivery Model ───────────────────────────────────────────────────────────
+
+export const LAGOS_ZONES = [
+  'Lekki',
+  'Victoria Island',
+  'Ikeja',
+  'Surulere',
+  'Mainland',
+  'Island',
+  'Other',
+] as const;
+
+export const LEG_TYPES = ['first_mile', 'intercity', 'last_mile'] as const;
+export const LEG_ACTOR_TYPES = ['driver', 'carrier'] as const;
+export const FAILURE_CAUSES = ['driver', 'carrier', 'route_traffic', 'system'] as const;
+
+export const DEFAULT_SLA_HOURS: Record<string, number> = {
+  first_mile: 1,
+  intercity: 24,
+  last_mile: 2,
+};
+
+// Statuses that trigger a customer-facing notification
+export const CUSTOMER_FACING_STATUSES = [
+  'accepted',
+  'picked_up',
+  'en_route_dropoff',
+  'arrived_dropoff',
+  'delivered',
+] as const;
+
+// ETA calculation: minutes per km by vehicle type (server-side use only)
+export const ETA_MINUTES_PER_KM: Record<string, number> = {
+  motorcycle: 3,
+  car: 4,
+  van: 5,
+  truck: 6,
+};
+export const ETA_BUFFER_MINUTES = 15;
+
+// Alert engine thresholds (minutes) — all configurable in /settings/alerts
+export const ALERT_DRIVER_SILENT_WARNING_MIN = 15;
+export const ALERT_DRIVER_SILENT_CRITICAL_MIN = 30;
+export const ALERT_LEG_OVERDUE_WARNING_MIN = 30;
+export const ALERT_LEG_OVERDUE_CRITICAL_MIN = 60;
+export const ALERT_CUSTOMER_UPDATE_GAP_WARNING_MIN = 45;
+export const ALERT_CUSTOMER_UPDATE_GAP_CRITICAL_MIN = 90;
+export const ALERT_ONTIME_RATE_WARNING_PCT = 80;
+export const ALERT_ONTIME_RATE_CRITICAL_PCT = 60;
