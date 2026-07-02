@@ -17,23 +17,19 @@ SureWaka connects senders with verified logistics providers and independent driv
 ## Absolute Rules
 
 1. **Never import directly between apps.** Share through `packages/*`. All cross-package types via `@surewaka/shared`.
-2. **Database-first schema workflow.** Supabase is the migration source of truth. The flow for any schema change is:
-   1. Create the migration file: `supabase migration new <name>`
-   2. Write the SQL in `supabase/migrations/<timestamp>_<name>.sql`
-   3. Stop — do not touch `packages/db/src/schema.ts`. That file is **generated**, not hand-edited.
-   4. After the migration is applied to the database, the schema is regenerated with `pnpm --filter @surewaka/db db:pull`
+2. **Database-first schema workflow.** NeonDB (Postgres, London — `aws-eu-west-2`) is the database. Drizzle ORM is the schema source of truth. The flow for any schema change is:
+   1. Edit the relevant file in `packages/db/src/schema/` (one file per table, e.g. `deliveries.ts`)
+   2. Generate a migration: `pnpm --filter @surewaka/db db:generate`
+   3. Apply it: `pnpm --filter @surewaka/db db:migrate`
+   4. For local dev iteration, `pnpm --filter @surewaka/db db:push` applies directly without creating a migration file
 
-   **Every migration that creates a new table must also include RLS setup in the same file:**
-   - `ALTER TABLE <table> ENABLE ROW LEVEL SECURITY;`
-   - A `service_role` bypass policy: `FOR ALL USING (auth.role() = 'service_role')`
-   - Access policies for `authenticated` scoped to what users actually need (own rows, read-only catalog, etc.)
-   - `GRANT` only the minimum privileges the `authenticated` role needs (`SELECT`, `INSERT`, etc.) — never grant INSERT/UPDATE/DELETE unless the client writes directly; API mutations go through service role
+   Schema files in `packages/db/src/schema/` are **hand-maintained** — this directory is the authoritative source. Generated migration files in `packages/db/drizzle/` are committed to git.
 
-   Reference pattern: `supabase/migrations/20260603045850_fix_rls_and_grants_all_tables.sql`
+   **No RLS policies** — all DB access goes through the Hono API using the service-level `DATABASE_URL`. Authorization is enforced at the API layer.
 
-   Never use `drizzle-kit push`, `drizzle-kit generate`, or `drizzle-kit migrate`. Never manually edit `packages/db/src/schema.ts`.
+   The `supabase/migrations/` directory contains historical SQL from before the NeonDB switch — do not add new files there.
 3. **Never read `.env`, `.env.local`, or `.env.*.local`.** Reference `.env.example` for structure only. (Kiro `block-env-reads` hook enforces this.)
-4. **Never expose `SUPABASE_SERVICE_ROLE_KEY` to the client.** Use `createServerClient` (user JWT) for user queries; `createServiceClient` only in workers/admin.
+4. **Supabase is auth-only.** The database is NeonDB — Supabase handles authentication (JWT) only. Never expose `SUPABASE_SERVICE_ROLE_KEY` to the client. Use `createServerClient` (user JWT) for auth operations; `createServiceClient` only in workers/admin. All data queries go through `packages/db` via `DATABASE_URL`.
 5. **Zod schemas are the single source of truth** for validation — keep in sync with DB schema.
 
 ---
@@ -132,8 +128,9 @@ Architecture patterns: `.kiro/steering/project-context.md`
 
 - **CI:** GitHub Actions on `main` — build → lint → test
 - **Web/Admin/Landing:** Vercel auto-deploy on push to `main`
-- **API + Workers:** Fly.io (Johannesburg region)
-- **Supabase project ref:** `royfgnaiiexvpxapmcdh` (EU Frankfurt)
+- **API + Workers:** Fly.io (London — `lhr` region)
+- **Database:** NeonDB `aws-eu-west-2` (London) — `DATABASE_URL` in env. See `docs/migration-neon-to-london.md`.
+- **Supabase** (auth only): project ref `royfgnaiiexvpxapmcdh` (EU Frankfurt)
 
 ---
 
