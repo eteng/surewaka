@@ -1,5 +1,10 @@
 // Core domain types for SureWaka
 import type { DeliveryStatus, PaymentStatus } from './validators';
+import type { LAGOS_ZONES, LEG_TYPES, LEG_ACTOR_TYPES, FAILURE_CAUSES } from './constants';
+
+export type { DeliveryStatus, PaymentStatus };
+
+export type PackageCategory = 'document' | 'parcel' | 'fragile' | 'heavy' | 'food';
 
 export type UserRole = 'customer' | 'driver' | 'surewaka_admin' | 'carrier_driver' | 'carrier_admin' | 'support_agent';
 
@@ -317,4 +322,159 @@ export type PushTokenRecord = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+// ─── Admin Delivery Types ─────────────────────────────────────────────────────
+
+export type DeliveryListItem = {
+  id: string;
+  status: DeliveryStatus;
+  pickupAddress: string;
+  pickupCity: string;
+  dropoffAddress: string;
+  dropoffCity: string;
+  packageCategory: PackageCategory;
+  price: number | null;
+  createdAt: string;
+  updatedAt: string;
+  customerName: string;
+  customerPhone: string;
+  driverName: string | null;
+  carrierName: string | null;
+  recipientName: string;
+  recipientPhone: string;
+};
+
+export type DeliveryDetail = {
+  id: string;
+  status: DeliveryStatus;
+  pickupAddress: string;
+  pickupCity: string;
+  pickupLat: number;
+  pickupLng: number;
+  dropoffAddress: string;
+  dropoffCity: string;
+  dropoffLat: number;
+  dropoffLng: number;
+  packageDescription: string;
+  packageWeight: number;
+  packageCategory: PackageCategory;
+  deliveryNotes: string | null;
+  price: number | null;
+  amountPaid: number | null;
+  paymentStatus: string;
+  createdAt: string;
+  updatedAt: string;
+  recipientName: string;
+  recipientPhone: string;
+  senderPhone: string | null;
+  customer: {
+    id: string;
+    name: string;
+    phone: string;
+  };
+  driver: {
+    id: string;
+    userId: string;
+    name: string;
+    vehicleType: string;
+    licensePlate: string;
+  } | null;
+  carrier: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+};
+
+export type TabCounts = {
+  all: number;
+  requests: number;
+  active: number;
+  completed: number;
+};
+
+export type StatusUpdatePayload = {
+  deliveryId: string;
+  previousStatus: DeliveryStatus;
+  newStatus: DeliveryStatus;
+  timestamp: string;
+};
+
+export type LocationUpdatePayload = {
+  driverId: string;
+  lat: number;
+  lng: number;
+  heading: number;
+  timestamp: string;
+};
+
+// ─── Multi-Leg Delivery Model Types ──────────────────────────────────────────
+
+export type LagosZone = (typeof LAGOS_ZONES)[number];
+export type LegType = (typeof LEG_TYPES)[number];
+export type LegActorType = (typeof LEG_ACTOR_TYPES)[number];
+export type FailureCause = (typeof FAILURE_CAUSES)[number];
+
+export type DeliveryLeg = {
+  id: string;
+  deliveryId: string;
+  legNumber: number;
+  legType: LegType;
+  actorType: LegActorType;
+  actorId: string;
+  pickupAddress: string;
+  pickupLat: number;
+  pickupLng: number;
+  pickupZone: LagosZone | null;
+  dropoffAddress: string;
+  dropoffLat: number;
+  dropoffLng: number;
+  dropoffZone: LagosZone | null;
+  status: DeliveryStatus;
+  systemEtaAt: string | null;   // ISO 8601
+  driverEtaAt: string | null;   // ISO 8601
+  slaHours: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+};
+
+export type DeliveryEvent = {
+  id: string;
+  deliveryId: string;
+  legId: string | null;
+  fromStatus: DeliveryStatus | null;
+  toStatus: DeliveryStatus;
+  triggeredBy: string | null;   // user id or null for system
+  failureCause: FailureCause | null;
+  failureNote: string | null;
+  createdAt: string;
+};
+
+export type DriverLocation = {
+  id: string;
+  driverId: string;
+  deliveryId: string | null;
+  lat: number;
+  lng: number;
+  recordedAt: string;
+};
+
+export type DeliveryRating = {
+  id: string;
+  deliveryId: string;
+  driverId: string | null;
+  customerId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+};
+
+export type CarrierSlaOverride = {
+  id: string;
+  carrierId: string;
+  originZone: LagosZone;
+  destinationZone: LagosZone;
+  slaHours: number;
 };
