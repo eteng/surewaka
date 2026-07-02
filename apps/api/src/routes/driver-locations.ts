@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { db, driverLocations, drivers } from '@surewaka/db';
-import { eq } from 'drizzle-orm';
+import { db, deliveries, driverLocations, drivers } from '@surewaka/db';
+import { and, eq } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth';
 import { recordDriverLocationSchema } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
@@ -34,6 +34,21 @@ driverLocationRoutes.post('/', async (c) => {
       { data: null, error: { code: 'NOT_FOUND', message: 'Driver profile not found' }, meta: null },
       404,
     );
+  }
+
+  if (parsed.data.deliveryId) {
+    const [delivery] = await db
+      .select({ id: deliveries.id })
+      .from(deliveries)
+      .where(and(eq(deliveries.id, parsed.data.deliveryId), eq(deliveries.driverId, driver.id)))
+      .limit(1);
+
+    if (!delivery) {
+      return c.json(
+        { data: null, error: { code: 'FORBIDDEN', message: 'Delivery not assigned to this driver' }, meta: null },
+        403,
+      );
+    }
   }
 
   const [location] = await db
