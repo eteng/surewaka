@@ -23,6 +23,11 @@ export * from './drivers';
 
 // Deliveries & payments
 export * from './deliveries';
+export * from './delivery-legs';
+export * from './delivery-events';
+export * from './delivery-ratings';
+export * from './driver-locations';
+export * from './carrier-sla-overrides';
 export * from './escrow-holds';
 export * from './wallets';
 export * from './payout-requests';

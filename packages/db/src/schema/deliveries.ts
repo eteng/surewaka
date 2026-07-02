@@ -51,6 +51,8 @@ export const deliveries = pgTable(
     paymentStatus: text('payment_status').default('unpaid').notNull(),
     escrowHoldId: uuid('escrow_hold_id'),
     amountPaid: bigint('amount_paid', { mode: 'number' }),
+    systemEtaAt: timestamp('system_eta_at', { withTimezone: true }),
+    driverEtaAt: timestamp('driver_eta_at', { withTimezone: true }),
   },
   (table) => [
     index('idx_deliveries_payment_status').using('btree', table.paymentStatus),
