@@ -434,17 +434,6 @@ export type CustomerDetailDeliveryQuery = z.infer<typeof customerDetailDeliveryQ
 
 const deliveryTabValues = ['all', 'requests', 'active', 'completed'] as const;
 
-export const adminDeliveryListQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().max(200).optional(),
-  status: deliveryStatusSchema.optional(),
-  tab: z.enum(deliveryTabValues).default('all'),
-  sortBy: z.enum(['createdAt', 'status', 'customerName', 'price']).default('createdAt'),
-  sortDir: z.enum(['asc', 'desc']).default('desc'),
-});
-
-export type AdminDeliveryListQuery = z.infer<typeof adminDeliveryListQuerySchema>;
 // ─── Push Notification Validators ────────────────────────────────────────────
 
 export const registerPushTokenSchema = z.object({
