@@ -4,6 +4,7 @@ import { db, deliveries, users } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { createDeliverySchema } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
+import { calculateSystemEta } from '../lib/eta-calculator';
 
 type DeliveriesEnv = {
   Variables: {
@@ -46,6 +47,14 @@ deliveryRoutes.post('/', async (c) => {
       .from(users)
       .where(eq(users.id, user.id));
 
+    const systemEtaAt = calculateSystemEta(
+      pickup.lat,
+      pickup.lng,
+      dropoff.lat,
+      dropoff.lng,
+      'motorcycle', // default — driver vehicle type applied when driver is assigned
+    );
+
     const [delivery] = await db
       .insert(deliveries)
       .values({
@@ -66,6 +75,7 @@ deliveryRoutes.post('/', async (c) => {
         recipientPhone:     recipientDetails.recipientPhone,
         deliveryNotes:      recipientDetails.deliveryNotes ?? null,
         senderPhone:        userRow?.phone ?? null,
+        systemEtaAt:        systemEtaAt,
       })
       .returning();
 
