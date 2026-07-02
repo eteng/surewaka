@@ -78,8 +78,8 @@ export const MAX_PUSH_TOKENS_PER_USER_PER_APP = 10;
 export const PUSH_BATCH_SIZE = 100;
 export const PUSH_MAX_RETRIES = 3;
 export const PUSH_RETRY_BASE_MS = 1000;
-export const PUSH_QUEUE_NAME = 'push-notifications';
-export const PUSH_BROADCAST_QUEUE_NAME = 'push-broadcasts';
+export const PUSH_QUEUE_NAME = 'push:notifications';
+export const PUSH_BROADCAST_QUEUE_NAME = 'push:broadcasts';
 export const PUSH_BROADCAST_BATCH_SIZE = 500;
 
 // ─── Delivery Model ───────────────────────────────────────────────────────────
