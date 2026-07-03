@@ -482,3 +482,87 @@ export type CarrierSlaOverride = {
 // ─── Ops Hub ──────────────────────────────────────────────────────────────────
 
 export type { OpsHubStats, AtRiskDelivery, AlertItem, AlertSeverity, RiskReason, EscalationAction } from './types/ops-hub';
+
+// ─── Analytics Suite Types ────────────────────────────────────────────────────
+
+export type SparkPoint = { date: string; value: number };
+
+export type OverviewKpis = {
+  onTimeRate: number;
+  onTimeRateSparkline: SparkPoint[];
+  fulfillmentRate: number;
+  fulfillmentRateSparkline: SparkPoint[];
+  avgDeliveryMinutes: number;
+  avgDeliveryMinutesSparkline: SparkPoint[];
+  disputeRate: number;
+  disputeRateSparkline: SparkPoint[];
+  customerUpdateFrequency: number;
+  customerUpdateFrequencySparkline: SparkPoint[];
+  driverCompletionRate: number;
+  driverCompletionRateSparkline: SparkPoint[];
+};
+
+export type DailyOnTimePoint = { date: string; rate: number; isAnomaly: boolean };
+export type OutcomeBar = { status: string; count: number };
+export type PhaseBar = { legType: string; avgMinutes: number; slaHours: number };
+export type LateDistBar = { bucket: string; count: number };
+
+export type DeliveryPerformanceData = {
+  dailyOnTimeRate: DailyOnTimePoint[];
+  volumeByOutcome: OutcomeBar[];
+  phaseBreakdown: PhaseBar[];
+  lateDistribution: LateDistBar[];
+};
+
+export type DriverPerformanceRow = {
+  driverId: string;
+  name: string;
+  totalLegs: number;
+  onTimePct: number;
+  completionPct: number;
+  ghostRate: number;
+  avgRating: number;
+  reliabilityScore: number;
+};
+
+export type CarrierSlaRow = {
+  carrierId: string;
+  name: string;
+  avgActualHours: number;
+  slaHours: number;
+  adherencePct: number;
+  fulfillmentPct: number;
+};
+
+export type CarrierPerformanceData = {
+  rows: CarrierSlaRow[];
+  overrideCoverage: { configured: number; total: number };
+};
+
+export type CustomerExperienceData = {
+  updateFrequencyTrend: SparkPoint[];
+  avgUpdateFrequency: number;
+  disputeRateTrend: SparkPoint[];
+  avgDisputeRate: number;
+  avgResolutionHours: number;
+  repeatRate30d: number;
+  repeatRate60d: number;
+};
+
+export type FailureShare = { cause: string; count: number; pct: number };
+export type TopContributor = {
+  actorType: 'driver' | 'carrier';
+  actorId: string;
+  name: string;
+  lateCount: number;
+  avgMinutesLate: number;
+  topZone: string;
+  topTimeOfDay: string;
+};
+export type HeatCell = { zone: string; timeOfDay: string; avgDelayMinutes: number };
+
+export type RootCauseData = {
+  failureDecomposition: FailureShare[];
+  topContributors: TopContributor[];
+  heatmap: HeatCell[];
+};
