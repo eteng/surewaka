@@ -24,6 +24,8 @@ import payoutRoutes from './routes/payouts';
 import pushTokenRoutes from './routes/push-tokens';
 import adminBroadcastRoutes from './routes/admin/broadcast';
 import driverLocationRoutes from './routes/driver-locations';
+import opsHubRoutes from './routes/admin/ops-hub';
+import alertRoutes from './routes/admin/alerts';
 
 const app = new Hono();
 
@@ -64,6 +66,8 @@ app.route('/api/v1/payouts', payoutRoutes);
 app.route('/api/v1/push-tokens', pushTokenRoutes);
 app.route('/api/v1/admin/broadcast', adminBroadcastRoutes);
 app.route('/api/v1/driver/location', driverLocationRoutes);
+app.route('/api/v1/admin/ops-hub', opsHubRoutes);
+app.route('/api/v1/admin/alerts', alertRoutes);
 
 // Start server
 const port = Number(process.env.PORT) || 4000;
