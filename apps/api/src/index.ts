@@ -23,7 +23,6 @@ import bookingPaymentRoutes from './routes/booking-payment';
 import payoutRoutes from './routes/payouts';
 import pushTokenRoutes from './routes/push-tokens';
 import adminBroadcastRoutes from './routes/admin/broadcast';
-import adminDeliveryRoutes from './routes/admin/deliveries';
 import driverLocationRoutes from './routes/driver-locations';
 
 const app = new Hono();
@@ -64,7 +63,6 @@ app.route('/api/v1', bookingPaymentRoutes);
 app.route('/api/v1/payouts', payoutRoutes);
 app.route('/api/v1/push-tokens', pushTokenRoutes);
 app.route('/api/v1/admin/broadcast', adminBroadcastRoutes);
-app.route('/api/v1/admin/deliveries', adminDeliveryRoutes);
 app.route('/api/v1/driver/location', driverLocationRoutes);
 
 // Start server
