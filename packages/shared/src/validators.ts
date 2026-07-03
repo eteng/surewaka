@@ -515,3 +515,24 @@ export const createCarrierSlaOverrideSchema = z.object({
   ]),
   slaHours: z.number().positive().max(720),
 });
+
+// ─── Admin Deliveries ────────────────────────────────────────────────────────
+
+export const adminDeliveryListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().max(200).optional(),
+  status: z.enum([
+    'draft', 'pending', 'accepted',
+    'en_route_pickup', 'arrived_pickup', 'picked_up',
+    'en_route_dropoff', 'arrived_dropoff',
+    'delivered', 'cancelled', 'failed', 'returned',
+  ]).optional(),
+  tab: z.enum(['all', 'requests', 'active', 'completed']).default('all'),
+  sortBy: z.enum(['createdAt', 'status', 'customerName', 'price']).default('createdAt'),
+  sortDir: z.enum(['asc', 'desc']).default('desc'),
+});
+
+// ─── Ops Hub ──────────────────────────────────────────────────────────────────
+
+export { escalationActionSchema } from './validators/ops-hub';

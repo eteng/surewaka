@@ -478,3 +478,7 @@ export type CarrierSlaOverride = {
   destinationZone: LagosZone;
   slaHours: number;
 };
+
+// ─── Ops Hub ──────────────────────────────────────────────────────────────────
+
+export type { OpsHubStats, AtRiskDelivery, AlertItem, AlertSeverity, RiskReason, EscalationAction } from './types/ops-hub';
