@@ -1,113 +1,70 @@
-import { ArrowUpRight, Building2, ClipboardList, Package, Users } from 'lucide-react';
-import { Skeleton } from '~/components/ui/skeleton';
-import { useDashboardStats } from '~/hooks/use-dashboard-stats';
+import { useState } from 'react';
+import { KpiBar } from '~/components/ops-hub/kpi-bar';
+import { AtRiskList } from '~/components/ops-hub/at-risk-list';
+import { AlertFeed } from '~/components/ops-hub/alert-feed';
+import { EscalationModal } from '~/components/ops-hub/escalation-modal';
+import { DeliveryMap } from '~/components/deliveries/delivery-map';
+import { useOpsHubStats, useAtRiskDeliveries } from '~/hooks/use-ops-hub';
+import { useDeliveries } from '~/hooks/use-deliveries';
 import type { Route } from './+types/dashboard';
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: 'SureWaka Admin - Dashboard' }];
+  return [{ title: 'SureWaka Admin - Ops Hub' }];
 }
 
-export default function Dashboard() {
-  const { stats, isLoading, error } = useDashboardStats();
+export default function OpsHub() {
+  const { stats, isLoading: statsLoading, error: statsError } = useOpsHubStats();
+  const { atRisk, isLoading: atRiskLoading } = useAtRiskDeliveries();
+  const { data: activeDeliveries, isLoading: mapLoading } = useDeliveries({ tab: 'active', pageSize: 100 });
+  const [escalatingId, setEscalatingId] = useState<string | null>(null);
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-      <p className="mt-2 text-muted-foreground">SureWaka operations overview</p>
-
-      {error && (
-        <p className="mt-4 text-sm text-destructive">Failed to load stats: {error}</p>
-      )}
-
-      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Pending Applications"
-          value={stats?.pendingApplications}
-          delta={stats?.pendingApplicationsDelta}
-          icon={<ClipboardList className="h-4 w-4" />}
-          isLoading={isLoading}
-          href="/carriers/applications"
-        />
-        <StatCard
-          label="Approved Carriers"
-          value={stats?.approvedCarriers}
-          delta={stats?.approvedCarriersDelta}
-          icon={<Building2 className="h-4 w-4" />}
-          isLoading={isLoading}
-          href="/carriers"
-        />
-        <StatCard
-          label="Total Deliveries"
-          value={stats?.totalDeliveries}
-          delta={stats?.deliveriesDelta}
-          icon={<Package className="h-4 w-4" />}
-          isLoading={isLoading}
-          href="/deliveries"
-        />
-        <StatCard
-          label="Waitlist Signups"
-          value={stats?.waitlistTotal}
-          delta={stats?.waitlistDelta}
-          icon={<Users className="h-4 w-4" />}
-          isLoading={isLoading}
-          href="/waitlist"
-        />
+    <div className="flex h-full flex-col gap-6 p-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Operations Hub</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Live delivery command centre — auto-refreshes every 30 s</p>
       </div>
-    </div>
-  );
-}
 
-type StatCardProps = {
-  label: string;
-  value: number | undefined;
-  delta: number | undefined;
-  icon: React.ReactNode;
-  isLoading: boolean;
-  href: string;
-};
+      <KpiBar stats={stats} isLoading={statsLoading} error={statsError} />
 
-function StatCard({ label, value, delta, icon, isLoading, href }: StatCardProps) {
-  if (isLoading) {
-    return (
-      <div className="rounded-lg border border-border p-6">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-4 w-4" />
-          <Skeleton className="h-4 w-28" />
+      <div className="flex min-h-0 flex-1 gap-6">
+        {/* Left column: map + at-risk list */}
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <div className="h-80 overflow-hidden rounded-lg border border-border">
+            <DeliveryMap data={activeDeliveries} isLoading={mapLoading} />
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold text-foreground">
+              At-Risk Deliveries
+              {atRisk.length > 0 && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  — {atRisk.length} need attention
+                </span>
+              )}
+            </h2>
+            <AtRiskList
+              deliveries={atRisk}
+              isLoading={atRiskLoading}
+              onEscalate={(id) => setEscalatingId(id)}
+            />
+          </div>
         </div>
-        <Skeleton className="mt-3 h-9 w-16" />
-        <Skeleton className="mt-2 h-4 w-24" />
+
+        {/* Right column: alert feed (hidden below xl breakpoint) */}
+        <div className="hidden w-80 shrink-0 xl:block">
+          <div className="sticky top-6 rounded-lg border border-border p-4">
+            <AlertFeed />
+          </div>
+        </div>
       </div>
-    );
-  }
 
-  return (
-    <a
-      href={href}
-      className="block rounded-lg border border-border p-6 transition-shadow hover:shadow-sm"
-    >
-      <div className="flex items-center gap-2 text-muted-foreground">
-        {icon}
-        <p className="text-sm font-medium">{label}</p>
-      </div>
-      <p className="mt-3 text-3xl font-bold text-foreground">
-        {value?.toLocaleString() ?? '—'}
-      </p>
-      <DeltaBadge delta={delta} />
-    </a>
-  );
-}
-
-function DeltaBadge({ delta }: { delta: number | undefined }) {
-  if (delta === undefined) return null;
-
-  if (delta === 0) {
-    return <p className="mt-2 text-xs text-muted-foreground">No change this week</p>;
-  }
-
-  return (
-    <p className="mt-2 flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400">
-      <ArrowUpRight className="h-3 w-3" />
-      +{delta.toLocaleString()} this week
-    </p>
+      {escalatingId && (
+        <EscalationModal
+          deliveryId={escalatingId}
+          onClose={() => setEscalatingId(null)}
+        />
+      )}
+    </div>
   );
 }
