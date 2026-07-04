@@ -34,7 +34,7 @@ opsHubRoutes.get('/stats', async (c) => {
       WITH active AS (
         SELECT id, driver_id, system_eta_at, driver_eta_at
         FROM deliveries
-        WHERE status = ANY(ARRAY[${sql.raw(ACTIVE_STATUSES.map((s) => `'${s}'`).join(','))}]::text[])
+        WHERE status::text = ANY(ARRAY[${sql.raw(ACTIVE_STATUSES.map((s) => `'${s}'`).join(','))}])
       ),
       driver_last_ping AS (
         SELECT DISTINCT ON (driver_id) driver_id, recorded_at
@@ -85,7 +85,7 @@ opsHubRoutes.get('/stats', async (c) => {
         )::text AS on_time_rate_today
     `);
 
-    const row = rows[0];
+    const row = rows.rows[0];
     const stats: OpsHubStats = {
       activeDeliveries: parseInt(row.active_deliveries, 10),
       driversOnDuty: parseInt(row.drivers_on_duty, 10),
@@ -132,7 +132,7 @@ opsHubRoutes.get('/at-risk', async (c) => {
         JOIN users u ON u.id = d.customer_id
         LEFT JOIN drivers dr ON dr.id = d.driver_id
         LEFT JOIN users du ON du.id = dr.user_id
-        WHERE d.status = ANY(ARRAY['en_route_pickup','arrived_pickup','picked_up','en_route_dropoff','arrived_dropoff']::text[])
+        WHERE d.status::text = ANY(ARRAY['en_route_pickup','arrived_pickup','picked_up','en_route_dropoff','arrived_dropoff'])
       ),
       driver_pings AS (
         SELECT DISTINCT ON (driver_id) driver_id, recorded_at
@@ -142,7 +142,7 @@ opsHubRoutes.get('/at-risk', async (c) => {
       last_customer_event AS (
         SELECT DISTINCT ON (delivery_id) delivery_id, created_at
         FROM delivery_events
-        WHERE to_status = ANY(ARRAY['accepted','picked_up','en_route_dropoff','arrived_dropoff','delivered']::text[])
+        WHERE to_status::text = ANY(ARRAY['accepted','picked_up','en_route_dropoff','arrived_dropoff','delivered'])
         ORDER BY delivery_id, created_at DESC
       )
       SELECT
@@ -174,7 +174,7 @@ opsHubRoutes.get('/at-risk', async (c) => {
       LIMIT 50
     `);
 
-    const atRisk: AtRiskDelivery[] = rows.map((r) => ({
+    const atRisk: AtRiskDelivery[] = rows.rows.map((r) => ({
       id: r.id,
       trackingId: r.id.slice(0, 8).toUpperCase(),
       customerName: r.customer_name,

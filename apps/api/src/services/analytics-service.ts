@@ -197,7 +197,7 @@ export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpi
     SELECT AVG(event_count) AS avg_updates FROM (
       SELECT delivery_id, COUNT(*) AS event_count
       FROM delivery_events
-      WHERE to_status = ANY(${CUSTOMER_FACING_STATUSES}::text[])
+      WHERE to_status::text = ANY(${CUSTOMER_FACING_STATUSES})
         AND created_at >= ${from.toISOString()}
         AND created_at <= ${to.toISOString()}
       GROUP BY delivery_id
@@ -243,7 +243,7 @@ export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpi
        WHERE DATE(de2.created_at) = DATE(deliveries.updated_at))::numeric AS dispute_rate,
       (SELECT AVG(cnt) FROM (
          SELECT delivery_id, COUNT(*) AS cnt FROM delivery_events
-         WHERE to_status = ANY(ARRAY['accepted','picked_up','en_route_dropoff','arrived_dropoff','delivered']::text[])
+         WHERE to_status::text = ANY(ARRAY['accepted','picked_up','en_route_dropoff','arrived_dropoff','delivered'])
            AND DATE(created_at) = DATE(deliveries.updated_at)
          GROUP BY delivery_id
        ) s)::numeric AS update_freq,
@@ -486,7 +486,7 @@ export async function getCustomerExperience(from: Date, to: Date): Promise<Custo
     FROM (
       SELECT delivery_id, DATE(created_at) AS day, COUNT(*) AS cnt
       FROM delivery_events
-      WHERE to_status = ANY(${CUSTOMER_FACING_STATUSES}::text[])
+      WHERE to_status::text = ANY(${CUSTOMER_FACING_STATUSES})
         AND created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
       GROUP BY delivery_id, DATE(created_at)
     ) counts
@@ -498,7 +498,7 @@ export async function getCustomerExperience(from: Date, to: Date): Promise<Custo
     SELECT AVG(cnt) AS avg FROM (
       SELECT delivery_id, COUNT(*) AS cnt
       FROM delivery_events
-      WHERE to_status = ANY(${CUSTOMER_FACING_STATUSES}::text[])
+      WHERE to_status::text = ANY(${CUSTOMER_FACING_STATUSES})
         AND created_at >= ${from.toISOString()}
         AND created_at <= ${to.toISOString()}
       GROUP BY delivery_id

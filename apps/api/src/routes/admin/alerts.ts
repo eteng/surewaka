@@ -56,7 +56,7 @@ alertRoutes.get('/', async (c) => {
       LIMIT 100
     `);
 
-    const items: AlertItem[] = rows.map((r) => ({
+    const items: AlertItem[] = rows.rows.map((r) => ({
       id: r.id,
       deliveryId: r.delivery_id,
       legId: r.leg_id,
@@ -74,8 +74,12 @@ alertRoutes.get('/', async (c) => {
 
     return c.json({ data: items, error: null, meta: null });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : '';
-    if (msg.includes('relation "alerts" does not exist') || msg.includes('"alerts"')) {
+    const causeMsg =
+      (err as { cause?: { message?: string } })?.cause?.message ?? '';
+    const topMsg = err instanceof Error ? err.message : '';
+    const isNoTable =
+      causeMsg.includes('"alerts"') || topMsg.includes('"alerts"');
+    if (isNoTable) {
       return c.json({ data: [] as AlertItem[], error: null, meta: null });
     }
     return c.json(
