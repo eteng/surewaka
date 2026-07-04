@@ -233,10 +233,24 @@ export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpi
         / NULLIF(COUNT(*) FILTER (WHERE status='delivered'), 0), 2) AS on_time_rate,
       ROUND(100.0 * COUNT(*) FILTER (WHERE status='delivered')
         / NULLIF(COUNT(*) FILTER (WHERE status NOT IN ('draft','pending')), 0), 2) AS fulfillment_rate,
-      0 AS avg_minutes,
-      0 AS dispute_rate,
-      0 AS update_freq,
-      0 AS completion_rate
+      (SELECT AVG(EXTRACT(EPOCH FROM (de_end.created_at - de_start.created_at)) / 60)
+       FROM delivery_events de_start
+       JOIN delivery_events de_end ON de_end.delivery_id = de_start.delivery_id
+       WHERE de_start.to_status = 'accepted' AND de_end.to_status = 'delivered'
+         AND DATE(de_end.created_at) = DATE(deliveries.updated_at))::numeric AS avg_minutes,
+      (SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE failure_cause IS NOT NULL) / NULLIF(COUNT(*), 0), 2)
+       FROM delivery_events de2
+       WHERE DATE(de2.created_at) = DATE(deliveries.updated_at))::numeric AS dispute_rate,
+      (SELECT AVG(cnt) FROM (
+         SELECT delivery_id, COUNT(*) AS cnt FROM delivery_events
+         WHERE to_status = ANY(ARRAY['accepted','picked_up','en_route_dropoff','arrived_dropoff','delivered']::text[])
+           AND DATE(created_at) = DATE(deliveries.updated_at)
+         GROUP BY delivery_id
+       ) s)::numeric AS update_freq,
+      (SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'delivered')
+                    / NULLIF(COUNT(*) FILTER (WHERE status != 'pending'), 0), 2)
+       FROM delivery_legs dl2
+       WHERE DATE(dl2.created_at) = DATE(deliveries.updated_at) AND dl2.actor_type = 'driver')::numeric AS completion_rate
     FROM deliveries
     WHERE updated_at >= ${sparkStart.toISOString()} AND updated_at <= ${to.toISOString()}
     GROUP BY DATE(updated_at)
@@ -342,50 +356,43 @@ export async function getDriverPerformance(from: Date, to: Date): Promise<Driver
     total_legs: number;
     on_time_pct: number;
     completion_pct: number;
-    ghost_rate: number;
     avg_rating: number;
   }>(sql`
+    WITH rated AS (
+      SELECT driver_id, AVG(rating)::numeric AS avg_rating
+      FROM delivery_ratings
+      WHERE created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
+      GROUP BY driver_id
+    )
     SELECT
-      dl.actor_id AS driver_id,
+      dr.id AS driver_id,
       u.name,
-      COUNT(dl.id)::int AS total_legs,
+      COUNT(DISTINCT dl.id)::int AS total_legs,
       ROUND(
-        100.0 * COUNT(dl.id) FILTER (WHERE dl.completed_at <= COALESCE(dl.driver_eta_at, dl.system_eta_at) AND dl.completed_at IS NOT NULL)
-        / NULLIF(COUNT(dl.id) FILTER (WHERE dl.completed_at IS NOT NULL), 0),
-      2) AS on_time_pct,
+        100.0 * COUNT(DISTINCT dl.id) FILTER (
+          WHERE dl.completed_at IS NOT NULL
+            AND dl.completed_at <= COALESCE(dl.driver_eta_at, dl.system_eta_at)
+        ) / NULLIF(COUNT(DISTINCT dl.id) FILTER (WHERE dl.completed_at IS NOT NULL), 0),
+      2)::numeric AS on_time_pct,
       ROUND(
-        100.0 * COUNT(dl.id) FILTER (WHERE dl.status = 'delivered')
-        / NULLIF(COUNT(dl.id) FILTER (WHERE dl.status != 'pending'), 0),
-      2) AS completion_pct,
-      ROUND(
-        100.0 * COUNT(de.id) FILTER (
-          WHERE de.to_status IN ('cancelled', 'failed')
-            AND de.triggered_by = dr.user_id
-            AND NOT EXISTS (
-              SELECT 1 FROM delivery_events prev
-              WHERE prev.delivery_id = de.delivery_id AND prev.to_status = 'picked_up'
-                AND prev.created_at < de.created_at
-            )
-        )
-        / NULLIF(COUNT(dl.id) FILTER (WHERE dl.status != 'pending'), 0),
-      2) AS ghost_rate,
-      COALESCE(AVG(dr2.rating), 0) AS avg_rating
+        100.0 * COUNT(DISTINCT dl.id) FILTER (WHERE dl.status = 'delivered')
+        / NULLIF(COUNT(DISTINCT dl.id) FILTER (WHERE dl.status != 'pending'), 0),
+      2)::numeric AS completion_pct,
+      COALESCE(rated.avg_rating, 0) AS avg_rating
     FROM delivery_legs dl
     JOIN drivers dr ON dr.id = dl.actor_id
     JOIN users u ON u.id = dr.user_id
-    LEFT JOIN delivery_events de ON de.leg_id = dl.id
-    LEFT JOIN delivery_ratings dr2 ON dr2.driver_id = dl.actor_id
-      AND dr2.created_at >= ${from.toISOString()} AND dr2.created_at <= ${to.toISOString()}
+    LEFT JOIN rated ON rated.driver_id = dr.id
     WHERE dl.actor_type = 'driver'
       AND dl.created_at >= ${from.toISOString()} AND dl.created_at <= ${to.toISOString()}
-    GROUP BY dl.actor_id, u.name, dr.user_id
+    GROUP BY dr.id, u.name, rated.avg_rating
     ORDER BY total_legs DESC
   `);
 
   return rows.map((r) => {
     const completion = (r.completion_pct as number) ?? 0;
     const onTime = (r.on_time_pct as number) ?? 0;
-    const ghost = (r.ghost_rate as number) ?? 0;
+    const ghost = 0; // ghost_rate removed: the delivery_events join caused a Cartesian product
     const reliabilityScore = Math.round(
       (completion * 0.4 + onTime * 0.35 + (100 - ghost) * 0.25) * 10,
     ) / 10;
