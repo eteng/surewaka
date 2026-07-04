@@ -112,7 +112,8 @@ export function AlertFeed() {
           <Bell className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <h2 className="text-sm font-semibold text-foreground">Alert Feed</h2>
           {criticalCount > 0 && (
-            <span className="rounded-full bg-destructive px-1.5 py-0.5 text-xs font-bold text-destructive-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full bg-destructive px-1.5 py-0.5 text-xs font-bold text-destructive-foreground">
+              <AlertTriangle className="h-3 w-3" aria-hidden="true" />
               {criticalCount} critical
             </span>
           )}

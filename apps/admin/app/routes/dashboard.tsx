@@ -1,11 +1,10 @@
 import { useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { KpiBar } from '~/components/ops-hub/kpi-bar';
 import { AtRiskList } from '~/components/ops-hub/at-risk-list';
 import { AlertFeed } from '~/components/ops-hub/alert-feed';
 import { EscalationModal } from '~/components/ops-hub/escalation-modal';
-import { DeliveryMap } from '~/components/deliveries/delivery-map';
 import { useOpsHubStats, useAtRiskDeliveries } from '~/hooks/use-ops-hub';
-import { useDeliveries } from '~/hooks/use-deliveries';
 import type { Route } from './+types/dashboard';
 
 export function meta({}: Route.MetaArgs) {
@@ -14,8 +13,7 @@ export function meta({}: Route.MetaArgs) {
 
 export default function OpsHub() {
   const { stats, isLoading: statsLoading, error: statsError } = useOpsHubStats();
-  const { atRisk, isLoading: atRiskLoading } = useAtRiskDeliveries();
-  const { data: activeDeliveries, isLoading: mapLoading } = useDeliveries({ tab: 'active', pageSize: 100 });
+  const { atRisk, isLoading: atRiskLoading, error: atRiskError } = useAtRiskDeliveries();
   const [escalatingId, setEscalatingId] = useState<string | null>(null);
 
   return (
@@ -28,12 +26,8 @@ export default function OpsHub() {
       <KpiBar stats={stats} isLoading={statsLoading} error={statsError} />
 
       <div className="flex min-h-0 flex-1 gap-6">
-        {/* Left column: map + at-risk list */}
+        {/* Left column: at-risk list */}
         <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <div className="h-80 overflow-hidden rounded-lg border border-border">
-            <DeliveryMap data={activeDeliveries} isLoading={mapLoading} />
-          </div>
-
           <div className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold text-foreground">
               At-Risk Deliveries
@@ -43,6 +37,12 @@ export default function OpsHub() {
                 </span>
               )}
             </h2>
+            {atRiskError && (
+              <p className="text-sm text-destructive">
+                <AlertTriangle className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
+                Failed to load at-risk deliveries: {atRiskError}
+              </p>
+            )}
             <AtRiskList
               deliveries={atRisk}
               isLoading={atRiskLoading}
