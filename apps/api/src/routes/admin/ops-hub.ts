@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
-import { sql } from 'drizzle-orm';
-import { eq } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
 import { db, deliveries } from '@surewaka/db';
 import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
@@ -70,11 +69,7 @@ opsHubRoutes.get('/stats', async (c) => {
             AND NOT EXISTS (SELECT 1 FROM active a WHERE a.driver_id = dr.id)
         )::text AS drivers_available,
         (SELECT COUNT(*) FROM at_risk)::text AS at_risk_deliveries,
-        (
-          SELECT COUNT(*) FROM deliveries
-          WHERE status = 'delivered'
-            AND updated_at >= CURRENT_DATE
-        )::text AS open_disputes,
+        0::bigint AS open_disputes, /* disputes table pending Spec 3 */
         (
           SELECT
             CASE WHEN COUNT(*) = 0 THEN NULL
