@@ -29,7 +29,7 @@ SureWaka connects senders with verified logistics providers and independent driv
 
    The `supabase/migrations/` directory contains historical SQL from before the NeonDB switch — do not add new files there.
 3. **Never read `.env`, `.env.local`, or `.env.*.local`.** Reference `.env.example` for structure only. (Kiro `block-env-reads` hook enforces this.)
-4. **Supabase is auth-only.** The database is NeonDB — Supabase handles authentication (JWT) only. Never expose `SUPABASE_SERVICE_ROLE_KEY` to the client. Use `createServerClient` (user JWT) for auth operations; `createServiceClient` only in workers/admin. All data queries go through `packages/db` via `DATABASE_URL`.
+4. **Auth is Clerk.** Session tokens are verified by `requireAuth` middleware in the API layer. Roles stored in Clerk `publicMetadata.roles` (synced from `user_roles` DB table). Mobile: `@clerk/expo`. Web: `@clerk/react-router`. Never expose `CLERK_SECRET_KEY` to the client. `packages/auth` provides `verifyToken()`, `getClerkClient()`, `AuthUser` type.
 5. **Zod schemas are the single source of truth** for validation — keep in sync with DB schema.
 
 ---
@@ -96,8 +96,9 @@ design.md         # Architecture decisions, data models, component structure
 | `apps/mobile-driver` | Driver mobile (Expo/RN) | — |
 | `packages/shared` | Domain types, Zod validators, constants | — |
 | `packages/ui` | shadcn/ui components + Tailwind | — |
-| `packages/db` | Drizzle ORM schema + client | — |
-| `packages/supabase` | Supabase client (auth, realtime — storage is Cloudinary/R2 via `apps/api/src/lib/storage/`) | — |
+| `packages/db` | Drizzle ORM schema + Neon client | — |
+| `packages/auth` | Clerk auth verification + user types | — |
+| `packages/realtime` | Realtime pub/sub abstraction (Ably) | — |
 | `packages/ai` | LLM client (Vercel AI SDK) | — |
 | `packages/mobile-shared` | Shared RN components/hooks | — |
 | `agents/*` | AI agents (customer-support, onboarding, internal-ops) | — |
@@ -115,7 +116,7 @@ Commands, setup, and DB workflow: see `AGENTS.md`.
 - **Prettier:** single quotes, semicolons, trailing commas, 100 char width
 - **Frontend:** `cn()` for class names; Tailwind v4 `@theme` directive; path alias `~/*` → `./app/*`
 - **API:** routes under `/api/v1/`, response shape `{ data, error, meta }`, Zod validation
-- **Auth:** Supabase JWT via `requireAuth` middleware
+- **Auth:** Clerk JWT via `requireAuth` middleware (from `packages/auth`)
 - **Brand:** green `#16a34a`, icons via `lucide-react`
 
 Full standards: `.kiro/steering/coding-standards.md`  
@@ -129,8 +130,8 @@ Architecture patterns: `.kiro/steering/project-context.md`
 - **CI:** GitHub Actions on `main` — build → lint → test
 - **Web/Admin/Landing:** Vercel auto-deploy on push to `main`
 - **API + Workers:** Fly.io (London — `lhr` region)
-- **Database:** NeonDB `aws-eu-west-2` (London) — `DATABASE_URL` in env. See `docs/migration-neon-to-london.md`.
-- **Supabase** (auth only): project ref `royfgnaiiexvpxapmcdh` (EU Frankfurt)
+- **Database:** NeonDB `aws-eu-west-2` (London) — `DATABASE_URL` in env
+- **Auth:** Clerk (EU region) — `CLERK_SECRET_KEY` + `CLERK_PUBLISHABLE_KEY` in env
 
 ---
 
@@ -163,10 +164,13 @@ Check before writing — never duplicate existing entries.
 [x] Admin dashboard (user management, RBAC)
 [x] API — carrier aggregation endpoints
 [x] Landing page (waitlist, campaign pages)
-[x] Storage decoupled from Supabase (avatars → Cloudinary, private docs → Cloudflare R2)
+[x] Storage (avatars → Cloudinary, private docs → Cloudflare R2)
+[x] Auth migrated to Clerk (from Supabase Auth)
+[x] Database migrated to NeonDB (from Supabase Postgres)
+[x] Realtime via Ably (from Supabase Realtime)
 [ ] Payment integration (Paystack flow)
 [ ] Push notifications
-[ ] Real-time tracking (Supabase Realtime, replacing 30s polling)
+[ ] Alert system (ops monitoring engine)
 [ ] Production launch in Lagos
 [ ] Seed funding closed
 ```
@@ -196,7 +200,7 @@ logs/api/
 ```
 41.200.x.x - <userId|-> [07/Jun/2026:14:22:11 +0000] "POST /api/v1/wallet/topup HTTP/1.1" 200 842 "-" "okhttp/4.12.0" 45ms
 ```
-User field is the Supabase user UUID, or `-` for unauthenticated requests.
+User field is the Clerk user ID, or `-` for unauthenticated requests.
 
 **Error log format** (one JSON object per line):
 ```json
