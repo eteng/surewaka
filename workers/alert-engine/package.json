@@ -1,0 +1,27 @@
+{
+  "name": "@surewaka/alert-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --external @surewaka/db --external @surewaka/shared --external bullmq --external ioredis --external drizzle-orm --external @neondatabase/serverless",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@surewaka/db": "workspace:*",
+    "@surewaka/shared": "workspace:*",
+    "bullmq": "^5.34.8",
+    "dotenv": "^16.0.0",
+    "ioredis": "^5.4.0"
+  },
+  "devDependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "drizzle-orm": "^0.45.2",
+    "tsx": "^4.19.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.0.0"
+  }
+}
