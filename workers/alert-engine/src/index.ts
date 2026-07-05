@@ -17,6 +17,8 @@ import { evaluate as evalCustomerUpdateGap } from './rules/customer-update-gap';
 
 const POLL_INTERVAL_MS = 60_000;
 
+let tickRunning = false;
+
 async function getAdminUserIds(): Promise<string[]> {
   const rows = await db
     .select({ userId: userRoles.userId })
@@ -111,20 +113,28 @@ async function routeCritical(
   }
 }
 
+const evaluators = [
+  evalDriverSilent,
+  evalLegOverdue,
+  evalDriverGhost,
+  evalDisputeFiled,
+  evalDeliveryFailed,
+  evalOntimeRate,
+  evalCustomerUpdateGap,
+];
+
 async function runTick(): Promise<void> {
   const [settings, adminUserIds] = await Promise.all([loadSettings(), getAdminUserIds()]);
 
-  const allResults: EvaluationResult[] = (
-    await Promise.allSettled([
-      evalDriverSilent(settings),
-      evalLegOverdue(settings),
-      evalDriverGhost(settings),
-      evalDisputeFiled(settings),
-      evalDeliveryFailed(settings),
-      evalOntimeRate(settings),
-      evalCustomerUpdateGap(settings),
-    ])
-  ).flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
+  const settled = await Promise.allSettled(evaluators.map((fn) => fn(settings)));
+  const allResults: EvaluationResult[] = [];
+  for (const [i, result] of settled.entries()) {
+    if (result.status === 'fulfilled') {
+      allResults.push(...result.value);
+    } else {
+      console.error(`[alert-engine] rule evaluator ${i} rejected:`, result.reason);
+    }
+  }
 
   for (const result of allResults) {
     try {
@@ -144,8 +154,13 @@ async function runTick(): Promise<void> {
 console.log('[alert-engine] starting — poll interval: 60s');
 
 // Run immediately on start, then every 60s
-runTick().catch(console.error);
-const timer = setInterval(() => runTick().catch(console.error), POLL_INTERVAL_MS);
+tickRunning = true;
+runTick().finally(() => { tickRunning = false; });
+const timer = setInterval(() => {
+  if (tickRunning) return;
+  tickRunning = true;
+  runTick().finally(() => { tickRunning = false; });
+}, POLL_INTERVAL_MS);
 
 process.on('SIGTERM', () => {
   clearInterval(timer);

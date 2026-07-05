@@ -44,7 +44,7 @@ export const PUSH_NOTIFICATION_TYPES = [
   'broadcast',
 ] as const;
 
-export const PUSH_TARGET_APPS = ['customer', 'driver'] as const;
+export const PUSH_TARGET_APPS = ['customer', 'driver', 'admin'] as const;
 
 export const HIGH_PRIORITY_PUSH_TYPES: PushNotificationType[] = [
   'delivery_status_change',

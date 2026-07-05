@@ -38,6 +38,10 @@ export async function resolveTokens(
   userId: string,
   targetApp: PushTargetApp | 'all',
 ): Promise<ResolvedToken[]> {
+  // Admin push tokens from a web SPA don't exist yet — return empty to avoid
+  // misrouting 'admin' jobs to the all-tokens path.
+  if (targetApp === 'admin') return [];
+
   // Build conditions: active tokens for this user, joined with user preference
   const conditions = [
     eq(pushTokens.userId, userId),

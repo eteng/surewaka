@@ -1,16 +1,16 @@
 import IORedis from 'ioredis';
 import { Queue } from 'bullmq';
 import { PUSH_QUEUE_NAME } from '@surewaka/shared';
-import type { AlertRule } from '@surewaka/shared';
+import type { AlertRule, PushJobData } from '@surewaka/shared';
 
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://localhost:6379';
 
-let _queue: Queue | null = null;
+let _queue: Queue<PushJobData> | null = null;
 
-function getQueue(): Queue {
+function getQueue(): Queue<PushJobData> {
   if (!_queue) {
     const connection = new IORedis(REDIS_URL, { maxRetriesPerRequest: null });
-    _queue = new Queue(PUSH_QUEUE_NAME, { connection });
+    _queue = new Queue<PushJobData>(PUSH_QUEUE_NAME, { connection });
   }
   return _queue;
 }

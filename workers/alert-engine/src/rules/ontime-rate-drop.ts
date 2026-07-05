@@ -12,9 +12,10 @@ import type { EvaluationResult } from '../types';
 export async function evaluate(settings: AlertSettings): Promise<EvaluationResult[]> {
   const result = await db.execute(sql`
     SELECT
-      COUNT(*) FILTER (WHERE status = 'delivered') AS delivered,
+      COUNT(*) FILTER (WHERE status = 'delivered' AND system_eta_at IS NOT NULL) AS delivered,
       COUNT(*) FILTER (
         WHERE status = 'delivered'
+          AND system_eta_at IS NOT NULL
           AND updated_at <= system_eta_at
       ) AS on_time
     FROM deliveries

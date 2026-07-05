@@ -287,7 +287,7 @@ export type PushNotificationType =
   | 'carrier_verified'
   | 'broadcast';
 
-export type PushTargetApp = 'customer' | 'driver';
+export type PushTargetApp = 'customer' | 'driver' | 'admin';
 
 export type PushNotificationPayload = {
   title: string;
