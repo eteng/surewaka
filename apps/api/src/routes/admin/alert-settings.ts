@@ -38,6 +38,13 @@ alertSettingsRoutes.put('/', async (c) => {
     .set({ ...parsed.data, updatedAt: new Date() })
     .returning();
 
+  if (!updated) {
+    return c.json(
+      { data: null, error: { code: 'NOT_FOUND', message: 'Settings not initialised' }, meta: null },
+      404,
+    );
+  }
+
   return c.json({ data: updated, error: null, meta: null });
 });
 
@@ -57,7 +64,7 @@ alertSettingsRoutes.post('/test', async (c) => {
       body: JSON.stringify({
         text: `🔴 CRITICAL — Test Alert\nThis is a test from SureWaka admin alert system.\n→ View: ${process.env.ADMIN_URL ?? 'https://admin.surewaka.ng'}`,
       }),
-    }).catch(() => {}); // non-blocking — ignore errors
+    }).catch((err) => console.error('[alert-settings] Pumble test webhook failed:', err));
   }
 
   return c.json({ data: { sent: true, pumble: row.pumbleEnabled, push: row.pushEnabled }, error: null, meta: null });
