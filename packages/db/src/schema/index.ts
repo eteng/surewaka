@@ -43,3 +43,7 @@ export * from './customer-segments';
 
 // Pre-launch
 export * from './waitlist';
+
+// Alert system
+export * from './alerts';
+export * from './alert-settings';

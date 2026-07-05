@@ -1,8 +1,25 @@
+import { Link } from 'react-router';
+import { Bell, User } from 'lucide-react';
 import type { Route } from './+types/settings';
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: 'SureWaka Admin - Settings' }];
 }
+
+const SETTINGS_CARDS = [
+  {
+    to: '/settings/alerts',
+    icon: Bell,
+    title: 'Alert Settings',
+    description: 'Thresholds, Pumble webhook, push routing',
+  },
+  {
+    to: '/settings/profile',
+    icon: User,
+    title: 'Profile',
+    description: 'Avatar, name, notification preferences',
+  },
+];
 
 export default function Settings() {
   return (
@@ -12,8 +29,20 @@ export default function Settings() {
         Platform configuration and admin preferences
       </p>
 
-      <div className="mt-6 min-h-[60vh] rounded-xl border border-border bg-card p-6">
-        <p className="text-sm text-muted-foreground">Settings panel coming soon.</p>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {SETTINGS_CARDS.map(({ to, icon: Icon, title, description }) => (
+          <Link
+            key={to}
+            to={to}
+            className="flex items-start gap-4 rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-sm"
+          >
+            <Icon className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-medium text-foreground">{title}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+            </div>
+          </Link>
+        ))}
       </div>
     </div>
   );

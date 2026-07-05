@@ -1,6 +1,7 @@
 // Core domain types for SureWaka
 import type { DeliveryStatus, PaymentStatus } from './validators';
-import type { LAGOS_ZONES, LEG_TYPES, LEG_ACTOR_TYPES, FAILURE_CAUSES } from './constants';
+import type { LAGOS_ZONES, LEG_TYPES, LEG_ACTOR_TYPES, FAILURE_CAUSES, ALERT_RULES } from './constants';
+import type { AlertSeverity } from './types/ops-hub';
 
 export type { DeliveryStatus, PaymentStatus };
 
@@ -286,7 +287,7 @@ export type PushNotificationType =
   | 'carrier_verified'
   | 'broadcast';
 
-export type PushTargetApp = 'customer' | 'driver';
+export type PushTargetApp = 'customer' | 'driver' | 'admin';
 
 export type PushNotificationPayload = {
   title: string;
@@ -565,4 +566,36 @@ export type RootCauseData = {
   failureDecomposition: FailureShare[];
   topContributors: TopContributor[];
   heatmap: HeatCell[];
+};
+
+// ─── Alert System Types ───────────────────────────────────────────────────────
+
+export type AlertRule = (typeof ALERT_RULES)[number];
+
+export type Alert = {
+  id: string;
+  deliveryId: string | null;
+  legId: string | null;
+  rule: AlertRule;
+  severity: AlertSeverity;
+  originalSeverity: AlertSeverity | null;
+  context: Record<string, unknown>;
+  firedAt: string;
+  escalatedAt: string | null;
+  resolvedAt: string | null;
+  ackBy: string | null;
+};
+
+export type AlertSettings = {
+  driverSilentWarningMin: number;
+  driverSilentCriticalMin: number;
+  legOverdueWarningMin: number;
+  legOverdueCriticalMin: number;
+  customerUpdateGapWarningMin: number;
+  customerUpdateGapCriticalMin: number;
+  ontimeRateWarningPct: number;
+  ontimeRateCriticalPct: number;
+  pumbleWebhookUrl: string | null;
+  pushEnabled: boolean;
+  pumbleEnabled: boolean;
 };
