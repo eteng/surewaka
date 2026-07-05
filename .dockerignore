@@ -1,0 +1,23 @@
+node_modules
+.git
+.github
+.kiro
+.agents
+docs
+logs
+*.md
+!pnpm-workspace.yaml
+
+# App-specific (not needed for API build)
+apps/web
+apps/admin
+apps/landing
+apps/mobile-customer
+apps/mobile-driver
+
+# Dev artifacts
+.turbo
+coverage
+.env
+.env.*
+*.log
