@@ -26,6 +26,7 @@ import adminBroadcastRoutes from './routes/admin/broadcast';
 import driverLocationRoutes from './routes/driver-locations';
 import opsHubRoutes from './routes/admin/ops-hub';
 import alertRoutes from './routes/admin/alerts';
+import alertSettingsRoutes from './routes/admin/alert-settings';
 import adminAnalyticsRoutes from './routes/admin/analytics';
 
 const app = new Hono();
@@ -69,6 +70,7 @@ app.route('/api/v1/admin/broadcast', adminBroadcastRoutes);
 app.route('/api/v1/driver/location', driverLocationRoutes);
 app.route('/api/v1/admin/ops-hub', opsHubRoutes);
 app.route('/api/v1/admin/alerts', alertRoutes);
+app.route('/api/v1/admin/alert-settings', alertSettingsRoutes);
 app.route('/api/v1/admin/analytics', adminAnalyticsRoutes);
 
 // Start server
