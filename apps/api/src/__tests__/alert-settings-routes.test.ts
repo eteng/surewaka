@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, type MockInstance } from 'vitest';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 
@@ -69,6 +69,22 @@ describe('PUT /api/v1/admin/alert-settings', () => {
     expect(res.status).toBe(400);
     const body = await res.json() as { data: unknown; error: { code: string } };
     expect(body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 404 when settings row does not exist', async () => {
+    const { db } = await import('@surewaka/db');
+    (db.update as unknown as MockInstance).mockReturnValueOnce({
+      set: vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([]) }),
+    });
+    const app = await createTestApp();
+    const res = await app.request('/api/v1/admin/alert-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer tok' },
+      body: JSON.stringify({ driverSilentWarningMin: 20 }),
+    });
+    expect(res.status).toBe(404);
+    const body = await res.json() as { error: { code: string } };
+    expect(body.error.code).toBe('NOT_FOUND');
   });
 
   it('returns updated settings for valid body', async () => {
