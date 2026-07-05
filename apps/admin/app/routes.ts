@@ -18,6 +18,7 @@ export default [
     route('customers/:customerId', 'routes/customers.$customerId.tsx'),
     route('analytics', 'routes/analytics.tsx'),
     route('settings', 'routes/settings.tsx'),
+    route('settings/alerts', 'routes/settings/alerts.tsx'),
     route('settings/profile', 'routes/settings/profile.tsx'),
     route('settings/name-changes', 'routes/settings/name-changes.tsx'),
     route('notifications', 'routes/notifications.tsx'),
