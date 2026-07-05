@@ -12,6 +12,8 @@ COPY workers/email-worker/package.json ./workers/email-worker/
 COPY workers/payment-worker/package.json ./workers/payment-worker/
 COPY workers/agent-worker/package.json ./workers/agent-worker/
 COPY workers/cron/package.json ./workers/cron/
+COPY workers/push-worker/package.json ./workers/push-worker/
+COPY workers/alert-engine/package.json ./workers/alert-engine/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/db/package.json ./packages/db/
 COPY packages/auth/package.json ./packages/auth/
@@ -31,7 +33,7 @@ COPY packages/ai ./packages/ai
 COPY packages/realtime ./packages/realtime
 
 # Build all workers (turborepo builds dependencies first)
-RUN pnpm --filter "@surewaka/worker-*" build
+RUN pnpm --filter "@surewaka/worker-*" --filter "@surewaka/alert-engine" build
 
 FROM base AS runner
 WORKDIR /app
@@ -46,6 +48,10 @@ COPY --from=builder /app/workers/agent-worker/dist ./workers/agent-worker/dist
 COPY --from=builder /app/workers/agent-worker/package.json ./workers/agent-worker/
 COPY --from=builder /app/workers/cron/dist ./workers/cron/dist
 COPY --from=builder /app/workers/cron/package.json ./workers/cron/
+COPY --from=builder /app/workers/push-worker/dist ./workers/push-worker/dist
+COPY --from=builder /app/workers/push-worker/package.json ./workers/push-worker/
+COPY --from=builder /app/workers/alert-engine/dist ./workers/alert-engine/dist
+COPY --from=builder /app/workers/alert-engine/package.json ./workers/alert-engine/
 
 # Copy shared packages
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
