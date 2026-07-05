@@ -131,3 +131,17 @@ export const ALERT_CUSTOMER_UPDATE_GAP_WARNING_MIN = 45;
 export const ALERT_CUSTOMER_UPDATE_GAP_CRITICAL_MIN = 90;
 export const ALERT_ONTIME_RATE_WARNING_PCT = 80;
 export const ALERT_ONTIME_RATE_CRITICAL_PCT = 60;
+
+// ─── Alert System ─────────────────────────────────────────────────────────────
+
+export const ALERT_RULES = [
+  'driver_silent',
+  'leg_overdue',
+  'driver_ghost',
+  'dispute_filed',
+  'delivery_failed',
+  'ontime_rate_drop',
+  'customer_update_gap',
+] as const;
+
+export const ALERT_SEVERITIES = ['info', 'warning', 'critical'] as const;
