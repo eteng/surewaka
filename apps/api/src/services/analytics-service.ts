@@ -146,7 +146,7 @@ function timeOfDayFilter(col: string, slot: string): string {
 // ─── Overview KPIs ────────────────────────────────────────────────────────────
 
 export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpis> {
-  const [onTimeResult] = await db.execute<{ rate: number }>(sql`
+  const [onTimeResult] = (await db.execute<{ rate: number }>(sql`
     SELECT
       ROUND(
         100.0 * COUNT(*) FILTER (WHERE updated_at <= COALESCE(driver_eta_at, system_eta_at))
@@ -155,9 +155,9 @@ export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpi
     FROM deliveries
     WHERE status = 'delivered'
       AND updated_at >= ${from.toISOString()} AND updated_at <= ${to.toISOString()}
-  `);
+  `)).rows;
 
-  const [fulfillResult] = await db.execute<{ rate: number }>(sql`
+  const [fulfillResult] = (await db.execute<{ rate: number }>(sql`
     SELECT
       ROUND(
         100.0 * COUNT(*) FILTER (WHERE status = 'delivered')
@@ -165,9 +165,9 @@ export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpi
       2) AS rate
     FROM deliveries
     WHERE created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
-  `);
+  `)).rows;
 
-  const [avgTimeResult] = await db.execute<{ avg_minutes: number }>(sql`
+  const [avgTimeResult] = (await db.execute<{ avg_minutes: number }>(sql`
     SELECT
       AVG(
         EXTRACT(EPOCH FROM (de_end.created_at - de_start.created_at)) / 60
@@ -178,9 +178,9 @@ export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpi
       AND de_end.to_status = 'delivered'
       AND de_start.created_at >= ${from.toISOString()}
       AND de_start.created_at <= ${to.toISOString()}
-  `);
+  `)).rows;
 
-  const [disputeResult] = await db.execute<{ rate: number }>(sql`
+  const [disputeResult] = (await db.execute<{ rate: number }>(sql`
     SELECT
       ROUND(
         100.0 * COUNT(*) FILTER (WHERE status IN ('failed') AND EXISTS (
@@ -191,9 +191,9 @@ export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpi
       2) AS rate
     FROM deliveries
     WHERE created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
-  `);
+  `)).rows;
 
-  const [updateFreqResult] = await db.execute<{ avg_updates: number }>(sql`
+  const [updateFreqResult] = (await db.execute<{ avg_updates: number }>(sql`
     SELECT AVG(event_count) AS avg_updates FROM (
       SELECT delivery_id, COUNT(*) AS event_count
       FROM delivery_events
@@ -202,9 +202,9 @@ export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpi
         AND created_at <= ${to.toISOString()}
       GROUP BY delivery_id
     ) sub
-  `);
+  `)).rows;
 
-  const [completionResult] = await db.execute<{ rate: number }>(sql`
+  const [completionResult] = (await db.execute<{ rate: number }>(sql`
     SELECT
       ROUND(
         100.0 * COUNT(*) FILTER (WHERE status = 'delivered')
@@ -213,12 +213,12 @@ export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpi
     FROM delivery_legs
     WHERE created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
       AND actor_type = 'driver'
-  `);
+  `)).rows;
 
   const sparkStart = new Date(to);
   sparkStart.setUTCDate(sparkStart.getUTCDate() - 6);
 
-  const sparkRows = await db.execute<{
+  const sparkRows = (await db.execute<{
     date: string;
     on_time_rate: number;
     fulfillment_rate: number;
@@ -255,7 +255,7 @@ export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpi
     WHERE updated_at >= ${sparkStart.toISOString()} AND updated_at <= ${to.toISOString()}
     GROUP BY DATE(updated_at)
     ORDER BY date
-  `);
+  `)).rows;
 
   const toSparkline = (field: keyof typeof sparkRows[0]) =>
     sparkRows.map((r) => ({ date: r.date, value: (r[field] as number) ?? 0 }));
@@ -279,7 +279,7 @@ export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpi
 // ─── Delivery Performance ─────────────────────────────────────────────────────
 
 export async function getDeliveryPerformance(from: Date, to: Date): Promise<DeliveryPerformanceData> {
-  const dailyRows = await db.execute<{ date: string; rate: number }>(sql`
+  const dailyRows = (await db.execute<{ date: string; rate: number }>(sql`
     SELECT
       DATE(updated_at)::text AS date,
       ROUND(
@@ -290,7 +290,7 @@ export async function getDeliveryPerformance(from: Date, to: Date): Promise<Deli
     WHERE updated_at >= ${from.toISOString()} AND updated_at <= ${to.toISOString()}
     GROUP BY DATE(updated_at)
     ORDER BY date
-  `);
+  `)).rows;
 
   const dailyOnTimeRate: DailyOnTimePoint[] = dailyRows.map((r, i) => ({
     date: r.date,
@@ -298,16 +298,16 @@ export async function getDeliveryPerformance(from: Date, to: Date): Promise<Deli
     isAnomaly: i > 0 ? (((dailyRows[i - 1].rate as number) ?? 0) - ((r.rate as number) ?? 0)) > 10 : false,
   }));
 
-  const volumeRows = await db.execute<{ status: string; count: number }>(sql`
+  const volumeRows = (await db.execute<{ status: string; count: number }>(sql`
     SELECT status, COUNT(*)::int AS count
     FROM deliveries
     WHERE created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
       AND status IN ('delivered', 'failed', 'cancelled', 'returned')
     GROUP BY status
     ORDER BY count DESC
-  `);
+  `)).rows;
 
-  const phaseRows = await db.execute<{ leg_type: string; avg_minutes: number; sla_hours: number }>(sql`
+  const phaseRows = (await db.execute<{ leg_type: string; avg_minutes: number; sla_hours: number }>(sql`
     SELECT
       leg_type,
       AVG(EXTRACT(EPOCH FROM (completed_at - started_at)) / 60)::int AS avg_minutes,
@@ -316,9 +316,9 @@ export async function getDeliveryPerformance(from: Date, to: Date): Promise<Deli
     WHERE completed_at IS NOT NULL AND started_at IS NOT NULL
       AND created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
     GROUP BY leg_type
-  `);
+  `)).rows;
 
-  const lateRows = await db.execute<{ bucket: string; count: number }>(sql`
+  const lateRows = (await db.execute<{ bucket: string; count: number }>(sql`
     SELECT
       CASE
         WHEN EXTRACT(EPOCH FROM (updated_at - COALESCE(driver_eta_at, system_eta_at))) / 60 BETWEEN 0 AND 15 THEN '0-15 min'
@@ -333,7 +333,7 @@ export async function getDeliveryPerformance(from: Date, to: Date): Promise<Deli
       AND updated_at >= ${from.toISOString()} AND updated_at <= ${to.toISOString()}
     GROUP BY bucket
     ORDER BY MIN(EXTRACT(EPOCH FROM (updated_at - COALESCE(driver_eta_at, system_eta_at))))
-  `);
+  `)).rows;
 
   return {
     dailyOnTimeRate,
@@ -350,7 +350,7 @@ export async function getDeliveryPerformance(from: Date, to: Date): Promise<Deli
 // ─── Driver Performance ───────────────────────────────────────────────────────
 
 export async function getDriverPerformance(from: Date, to: Date): Promise<DriverPerformanceRow[]> {
-  const rows = await db.execute<{
+  const rows = (await db.execute<{
     driver_id: string;
     name: string;
     total_legs: number;
@@ -387,7 +387,7 @@ export async function getDriverPerformance(from: Date, to: Date): Promise<Driver
       AND dl.created_at >= ${from.toISOString()} AND dl.created_at <= ${to.toISOString()}
     GROUP BY dr.id, u.name, rated.avg_rating
     ORDER BY total_legs DESC
-  `);
+  `)).rows;
 
   return rows.map((r) => {
     const completion = (r.completion_pct as number) ?? 0;
@@ -412,7 +412,7 @@ export async function getDriverPerformance(from: Date, to: Date): Promise<Driver
 // ─── Carrier Performance ──────────────────────────────────────────────────────
 
 export async function getCarrierPerformance(from: Date, to: Date): Promise<CarrierPerformanceData> {
-  const rows = await db.execute<{
+  const rows = (await db.execute<{
     carrier_id: string;
     name: string;
     avg_actual_hours: number;
@@ -438,9 +438,9 @@ export async function getCarrierPerformance(from: Date, to: Date): Promise<Carri
       AND dl.created_at >= ${from.toISOString()} AND dl.created_at <= ${to.toISOString()}
     GROUP BY dl.actor_id, c.name
     ORDER BY avg_actual_hours ASC
-  `);
+  `)).rows;
 
-  const [overrideResult] = await db.execute<{ configured: number; total: number }>(sql`
+  const [overrideResult] = (await db.execute<{ configured: number; total: number }>(sql`
     SELECT
       COUNT(DISTINCT (dl.actor_id, dl.pickup_zone, dl.dropoff_zone)) FILTER (
         WHERE EXISTS (
@@ -454,7 +454,7 @@ export async function getCarrierPerformance(from: Date, to: Date): Promise<Carri
     FROM delivery_legs dl
     WHERE dl.actor_type = 'carrier'
       AND dl.created_at >= ${from.toISOString()} AND dl.created_at <= ${to.toISOString()}
-  `);
+  `)).rows;
 
   return {
     rows: rows.map((r) => {
@@ -479,7 +479,7 @@ export async function getCarrierPerformance(from: Date, to: Date): Promise<Carri
 // ─── Customer Experience ──────────────────────────────────────────────────────
 
 export async function getCustomerExperience(from: Date, to: Date): Promise<CustomerExperienceData> {
-  const freqTrend = await db.execute<{ date: string; avg_updates: number }>(sql`
+  const freqTrend = (await db.execute<{ date: string; avg_updates: number }>(sql`
     SELECT
       counts.day::text AS date,
       AVG(counts.cnt) AS avg_updates
@@ -492,9 +492,9 @@ export async function getCustomerExperience(from: Date, to: Date): Promise<Custo
     ) counts
     GROUP BY counts.day
     ORDER BY date
-  `);
+  `)).rows;
 
-  const [avgFreqResult] = await db.execute<{ avg: number }>(sql`
+  const [avgFreqResult] = (await db.execute<{ avg: number }>(sql`
     SELECT AVG(cnt) AS avg FROM (
       SELECT delivery_id, COUNT(*) AS cnt
       FROM delivery_events
@@ -503,9 +503,9 @@ export async function getCustomerExperience(from: Date, to: Date): Promise<Custo
         AND created_at <= ${to.toISOString()}
       GROUP BY delivery_id
     ) s
-  `);
+  `)).rows;
 
-  const disputeTrend = await db.execute<{ date: string; rate: number }>(sql`
+  const disputeTrend = (await db.execute<{ date: string; rate: number }>(sql`
     SELECT
       DATE(created_at)::text AS date,
       ROUND(
@@ -516,15 +516,15 @@ export async function getCustomerExperience(from: Date, to: Date): Promise<Custo
     WHERE created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
     GROUP BY DATE(created_at)
     ORDER BY date
-  `);
+  `)).rows;
 
-  const [avgDisputeResult] = await db.execute<{ rate: number }>(sql`
+  const [avgDisputeResult] = (await db.execute<{ rate: number }>(sql`
     SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE failure_cause IS NOT NULL) / NULLIF(COUNT(*), 0), 2) AS rate
     FROM delivery_events
     WHERE created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
-  `);
+  `)).rows;
 
-  const [resolutionResult] = await db.execute<{ avg_hours: number }>(sql`
+  const [resolutionResult] = (await db.execute<{ avg_hours: number }>(sql`
     SELECT AVG(
       EXTRACT(EPOCH FROM (de_resolve.created_at - de_open.created_at)) / 3600
     ) AS avg_hours
@@ -534,7 +534,7 @@ export async function getCustomerExperience(from: Date, to: Date): Promise<Custo
       AND de_resolve.created_at > de_open.created_at
     WHERE de_open.failure_cause IS NOT NULL
       AND de_open.created_at >= ${from.toISOString()} AND de_open.created_at <= ${to.toISOString()}
-  `);
+  `)).rows;
 
   const now = to;
   const cutoff30 = new Date(now);
@@ -542,7 +542,7 @@ export async function getCustomerExperience(from: Date, to: Date): Promise<Custo
   const cutoff60 = new Date(now);
   cutoff60.setUTCDate(cutoff60.getUTCDate() - 60);
 
-  const [repeat30] = await db.execute<{ rate: number }>(sql`
+  const [repeat30] = (await db.execute<{ rate: number }>(sql`
     SELECT ROUND(
       100.0 * COUNT(DISTINCT repeat.customer_id) / NULLIF(COUNT(DISTINCT first.customer_id), 0),
     2) AS rate
@@ -552,9 +552,9 @@ export async function getCustomerExperience(from: Date, to: Date): Promise<Custo
       AND repeat.id != first.id
       AND repeat.created_at BETWEEN ${cutoff30.toISOString()} AND ${now.toISOString()}
     WHERE first.created_at >= ${from.toISOString()} AND first.created_at <= ${to.toISOString()}
-  `);
+  `)).rows;
 
-  const [repeat60] = await db.execute<{ rate: number }>(sql`
+  const [repeat60] = (await db.execute<{ rate: number }>(sql`
     SELECT ROUND(
       100.0 * COUNT(DISTINCT repeat.customer_id) / NULLIF(COUNT(DISTINCT first.customer_id), 0),
     2) AS rate
@@ -564,7 +564,7 @@ export async function getCustomerExperience(from: Date, to: Date): Promise<Custo
       AND repeat.id != first.id
       AND repeat.created_at BETWEEN ${cutoff60.toISOString()} AND ${now.toISOString()}
     WHERE first.created_at >= ${from.toISOString()} AND first.created_at <= ${to.toISOString()}
-  `);
+  `)).rows;
 
   return {
     updateFrequencyTrend: freqTrend.map((r) => ({ date: r.date, value: (r.avg_updates as number) ?? 0 })),
@@ -588,7 +588,7 @@ export async function getRootCause(params: RootCauseParams): Promise<RootCauseDa
   const legTypeClause = legType ? sql`AND dl.leg_type = ${legType}` : sql``;
   const todClause = timeOfDay ? sql.raw(timeOfDayFilter('de.created_at', timeOfDay)) : sql.raw('TRUE');
 
-  const decomp = await db.execute<{ cause: string; count: number }>(sql`
+  const decomp = (await db.execute<{ cause: string; count: number }>(sql`
     SELECT
       COALESCE(de.failure_cause, 'unknown') AS cause,
       COUNT(*)::int AS count
@@ -603,7 +603,7 @@ export async function getRootCause(params: RootCauseParams): Promise<RootCauseDa
       ${legTypeClause}
     GROUP BY cause
     ORDER BY count DESC
-  `);
+  `)).rows;
 
   const total = decomp.reduce((s, r) => s + (r.count as number), 0);
   const failureDecomposition: FailureShare[] = decomp.map((r) => ({
@@ -612,7 +612,7 @@ export async function getRootCause(params: RootCauseParams): Promise<RootCauseDa
     pct: total > 0 ? Math.round(((r.count as number) / total) * 100 * 10) / 10 : 0,
   }));
 
-  const topRows = await db.execute<{
+  const topRows = (await db.execute<{
     actor_type: string;
     actor_id: string;
     name: string;
@@ -650,9 +650,9 @@ export async function getRootCause(params: RootCauseParams): Promise<RootCauseDa
     GROUP BY dl.actor_type, dl.actor_id, COALESCE(u.name, c.name, 'Unknown')
     ORDER BY late_count DESC
     LIMIT 5
-  `);
+  `)).rows;
 
-  const heatRows = await db.execute<{ zone: string; time_of_day: string; avg_delay: number }>(sql`
+  const heatRows = (await db.execute<{ zone: string; time_of_day: string; avg_delay: number }>(sql`
     SELECT
       COALESCE(dl.dropoff_zone, 'Other') AS zone,
       CASE
@@ -669,7 +669,7 @@ export async function getRootCause(params: RootCauseParams): Promise<RootCauseDa
       AND dl.completed_at IS NOT NULL
       AND dl.created_at >= ${start.toISOString()} AND dl.created_at <= ${end.toISOString()}
     GROUP BY zone, time_of_day
-  `);
+  `)).rows;
 
   return {
     failureDecomposition,
