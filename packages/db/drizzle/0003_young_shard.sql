@@ -38,3 +38,5 @@ ALTER TABLE "alerts" ADD CONSTRAINT "alerts_ack_by_users_id_fk" FOREIGN KEY ("ac
 CREATE INDEX "idx_alerts_unresolved" ON "alerts" USING btree ("fired_at" DESC NULLS LAST) WHERE resolved_at IS NULL;--> statement-breakpoint
 CREATE INDEX "idx_alerts_delivery_id" ON "alerts" USING btree ("delivery_id") WHERE delivery_id IS NOT NULL;--> statement-breakpoint
 ALTER TABLE "push_tokens" ADD CONSTRAINT "push_tokens_app_check" CHECK (app IN ('customer', 'driver', 'admin'));
+--> statement-breakpoint
+INSERT INTO "alert_settings" DEFAULT VALUES;
