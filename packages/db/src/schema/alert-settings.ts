@@ -3,8 +3,8 @@ import { pgTable, uuid, text, timestamp, integer, boolean } from 'drizzle-orm/pg
 /**
  * alert_settings — singleton row pattern.
  * Exactly one row should exist (id is kept for ORM compatibility).
- * The API layer ensures only one row is ever created; if absent, column defaults apply.
- * The default row is seeded separately — no INSERT is included in the migration.
+ * The migration seeds the default row with INSERT DEFAULT VALUES.
+ * The API layer ensures only one row is ever created.
  */
 export const alertSettings = pgTable('alert_settings', {
   id: uuid().defaultRandom().primaryKey().notNull(),
