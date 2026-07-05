@@ -19,12 +19,12 @@ export async function evaluate(settings: AlertSettings): Promise<EvaluationResul
       SELECT
         d.id              AS delivery_id,
         d.recipient_name  AS customer_name,
-        EXTRACT(EPOCH FROM (now() - MAX(de.created_at))) / 60 AS minutes_since_update
+        EXTRACT(EPOCH FROM (now() - COALESCE(MAX(de.created_at), d.created_at))) / 60 AS minutes_since_update
       FROM deliveries d
-      JOIN delivery_events de ON de.delivery_id = d.id
+      LEFT JOIN delivery_events de ON de.delivery_id = d.id
         AND de.to_status IN (${statusList})
       WHERE d.status NOT IN ('delivered', 'cancelled', 'failed', 'returned', 'draft')
-      GROUP BY d.id, d.recipient_name
+      GROUP BY d.id, d.recipient_name, d.created_at
     `),
   );
 

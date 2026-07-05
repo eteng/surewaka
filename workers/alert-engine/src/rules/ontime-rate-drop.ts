@@ -19,7 +19,7 @@ export async function evaluate(settings: AlertSettings): Promise<EvaluationResul
           AND updated_at <= system_eta_at
       ) AS on_time
     FROM deliveries
-    WHERE DATE(created_at) = CURRENT_DATE
+    WHERE (created_at AT TIME ZONE 'Africa/Lagos')::date = (now() AT TIME ZONE 'Africa/Lagos')::date
       AND status IN ('delivered', 'failed', 'cancelled')
   `);
 

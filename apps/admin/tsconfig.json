@@ -11,6 +11,7 @@
     "paths": {
       "~/*": ["./app/*"],
       "@surewaka/shared": ["../../packages/shared/src"],
+      "@surewaka/realtime": ["../../packages/realtime/src"],
       "@surewaka/ui": ["../../packages/ui/src"]
     }
   },

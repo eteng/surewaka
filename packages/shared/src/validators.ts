@@ -539,16 +539,40 @@ export { escalationActionSchema } from './validators/ops-hub';
 
 // ─── Alert Settings ───────────────────────────────────────────────────────────
 
-export const updateAlertSettingsSchema = z.object({
-  driverSilentWarningMin: z.number().int().min(5).max(60).optional(),
-  driverSilentCriticalMin: z.number().int().min(10).max(120).optional(),
-  legOverdueWarningMin: z.number().int().min(10).max(120).optional(),
-  legOverdueCriticalMin: z.number().int().min(20).max(240).optional(),
-  customerUpdateGapWarningMin: z.number().int().min(15).max(120).optional(),
-  customerUpdateGapCriticalMin: z.number().int().min(30).max(240).optional(),
-  ontimeRateWarningPct: z.number().int().min(50).max(100).optional(),
-  ontimeRateCriticalPct: z.number().int().min(30).max(90).optional(),
-  pumbleWebhookUrl: z.string().url().nullable().optional(),
-  pushEnabled: z.boolean().optional(),
-  pumbleEnabled: z.boolean().optional(),
-});
+export const updateAlertSettingsSchema = z
+  .object({
+    driverSilentWarningMin: z.number().int().min(5).max(60).optional(),
+    driverSilentCriticalMin: z.number().int().min(10).max(120).optional(),
+    legOverdueWarningMin: z.number().int().min(10).max(120).optional(),
+    legOverdueCriticalMin: z.number().int().min(20).max(240).optional(),
+    customerUpdateGapWarningMin: z.number().int().min(15).max(120).optional(),
+    customerUpdateGapCriticalMin: z.number().int().min(30).max(240).optional(),
+    ontimeRateWarningPct: z.number().int().min(50).max(100).optional(),
+    ontimeRateCriticalPct: z.number().int().min(30).max(90).optional(),
+    pumbleWebhookUrl: z.string().url().nullable().optional(),
+    pushEnabled: z.boolean().optional(),
+    pumbleEnabled: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    // Minutes: warning must be < critical (stricter condition = higher value)
+    const minutePairs: [keyof typeof data, keyof typeof data, string][] = [
+      ['driverSilentWarningMin', 'driverSilentCriticalMin', 'driverSilent'],
+      ['legOverdueWarningMin', 'legOverdueCriticalMin', 'legOverdue'],
+      ['customerUpdateGapWarningMin', 'customerUpdateGapCriticalMin', 'customerUpdateGap'],
+    ];
+    for (const [warnKey, critKey, label] of minutePairs) {
+      const warn = data[warnKey] as number | undefined;
+      const crit = data[critKey] as number | undefined;
+      if (warn !== undefined && crit !== undefined && warn >= crit) {
+        ctx.addIssue({ code: 'custom', path: [warnKey], message: `${label} warning must be less than critical` });
+      }
+    }
+    // Pct: critical must be < warning (lower rate = worse)
+    if (
+      data.ontimeRateCriticalPct !== undefined &&
+      data.ontimeRateWarningPct !== undefined &&
+      data.ontimeRateCriticalPct >= data.ontimeRateWarningPct
+    ) {
+      ctx.addIssue({ code: 'custom', path: ['ontimeRateCriticalPct'], message: 'ontimeRate critical must be less than warning' });
+    }
+  });

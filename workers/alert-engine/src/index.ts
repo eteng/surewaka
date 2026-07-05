@@ -65,6 +65,10 @@ async function upsertAlert(
   if (existing) {
     // Escalate in place if severity increased
     const severityOrder: AlertSeverity[] = ['info', 'warning', 'critical'];
+    if (!severityOrder.includes(existing.severity as AlertSeverity)) {
+      console.error(`[alert-engine] unexpected severity '${existing.severity}' on alert ${existing.id} — skipping escalation`);
+      return;
+    }
     const existingIdx = severityOrder.indexOf(existing.severity as AlertSeverity);
     const newIdx = severityOrder.indexOf(result.severity);
 

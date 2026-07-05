@@ -9,14 +9,14 @@ import type { EvaluationResult } from '../types';
  */
 export async function evaluate(_settings: AlertSettings): Promise<EvaluationResult[]> {
   const result = await db.execute(sql`
-    SELECT d.id AS delivery_id, d.customer_id, d.driver_id
+    SELECT d.id AS delivery_id
     FROM deliveries d
     JOIN escrow_holds eh ON eh.delivery_id = d.id AND eh.status = 'disputed'
     WHERE NOT EXISTS (
       SELECT 1 FROM alerts a
       WHERE a.delivery_id = d.id
         AND a.rule = 'dispute_filed'
-        AND a.resolved_at IS NULL
+        AND (a.resolved_at IS NULL OR a.resolved_at > now() - interval '15 minutes')
     )
   `);
 

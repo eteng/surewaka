@@ -4,7 +4,7 @@ import type { AlertSettings } from '@surewaka/shared';
 
 export async function loadSettings(): Promise<AlertSettings> {
   const [row] = await db.select().from(alertSettings).limit(1);
-  if (!row) throw new Error('alert_settings row missing — run migration 20260703000002');
+  if (!row) throw new Error('alert_settings row missing — run migration 0003_young_shard (pnpm --filter @surewaka/db db:migrate)');
 
   return {
     driverSilentWarningMin: row.driverSilentWarningMin,

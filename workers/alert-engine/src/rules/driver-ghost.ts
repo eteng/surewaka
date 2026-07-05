@@ -35,6 +35,13 @@ export async function evaluate(_settings: AlertSettings): Promise<EvaluationResu
           SELECT d2.customer_id FROM deliveries d2 WHERE d2.id = de.delivery_id
         )
       )
+      AND NOT EXISTS (
+        SELECT 1 FROM alerts a
+        WHERE a.delivery_id = de.delivery_id
+          AND a.leg_id = dl.id
+          AND a.rule = 'driver_ghost'
+          AND (a.resolved_at IS NULL OR a.resolved_at > now() - interval '10 minutes')
+      )
     GROUP BY de.delivery_id, dl.id, u.name, de.triggered_by, de.created_at
   `);
 
