@@ -25,6 +25,6 @@ export const pushTokens = pgTable(
       .on(table.userId, table.app, table.isActive)
       .where(sql`is_active = true`),
     check('push_tokens_platform_check', sql`platform IN ('ios', 'android')`),
-    check('push_tokens_app_check', sql`app IN ('customer', 'driver')`),
+    check('push_tokens_app_check', sql`app IN ('customer', 'driver', 'admin')`),
   ],
 );
