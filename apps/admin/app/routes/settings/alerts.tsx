@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AlertTriangle, Bell, Smartphone, TestTube, Webhook } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
@@ -6,11 +6,10 @@ import { Label } from '~/components/ui/label';
 import { Skeleton } from '~/components/ui/skeleton';
 import { cn } from '~/lib/utils';
 import { useAlertSettings } from '~/hooks/use-alert-settings';
+import type { MetaFunction } from 'react-router';
 import type { AlertSettings } from '@surewaka/shared';
 
-export function meta() {
-  return [{ title: 'SureWaka Admin - Alert Settings' }];
-}
+export const meta: MetaFunction = () => [{ title: 'SureWaka Admin - Alert Settings' }];
 
 type ThresholdField = keyof Pick<
   AlertSettings,
@@ -61,6 +60,22 @@ export default function AlertSettingsPage() {
   const { settings, isLoading, isSaving, error, saveSettings, sendTestAlert } = useAlertSettings();
   const [testSent, setTestSent] = useState(false);
   const [pendingUrl, setPendingUrl] = useState<string>('');
+  const [localThresholds, setLocalThresholds] = useState<Record<ThresholdField, string>>(
+    {} as Record<ThresholdField, string>,
+  );
+  const initializedRef = useRef(false);
+
+  useEffect(() => {
+    if (settings && !initializedRef.current) {
+      initializedRef.current = true;
+      setLocalThresholds(
+        Object.fromEntries(
+          THRESHOLD_CONFIGS.map(({ field }) => [field, String(settings[field])]),
+        ) as Record<ThresholdField, string>,
+      );
+      setPendingUrl(settings.pumbleWebhookUrl ?? '');
+    }
+  }, [settings]);
 
   const handleTestAlert = async () => {
     const ok = await sendTestAlert();
@@ -118,7 +133,8 @@ export default function AlertSettingsPage() {
 
           <div className="mt-6 grid gap-5 sm:grid-cols-2">
             {THRESHOLD_CONFIGS.map(({ label, field, min, max, unit }) => {
-              const value = settings[field];
+              const committedValue = settings[field];
+              const localValue = localThresholds[field] ?? String(committedValue);
               return (
                 <div key={field} className="space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -126,7 +142,7 @@ export default function AlertSettingsPage() {
                       {label}
                     </Label>
                     <span className="text-xs tabular-nums text-muted-foreground">
-                      {unit === '%' ? `${value}${unit}` : `${value} ${unit}`}
+                      {unit === '%' ? `${committedValue}${unit}` : `${committedValue} ${unit}`}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -136,12 +152,20 @@ export default function AlertSettingsPage() {
                       min={min}
                       max={max}
                       step={1}
-                      value={value}
+                      value={localValue}
                       disabled={isSaving}
-                      onChange={(e) => {
+                      onChange={(e) =>
+                        setLocalThresholds((prev) => ({ ...prev, [field]: e.target.value }))
+                      }
+                      onBlur={(e) => {
                         const parsed = parseInt(e.target.value, 10);
                         if (!isNaN(parsed) && parsed >= min && parsed <= max) {
                           saveSettings({ [field]: parsed });
+                        } else {
+                          setLocalThresholds((prev) => ({
+                            ...prev,
+                            [field]: String(committedValue),
+                          }));
                         }
                       }}
                       className="w-24 tabular-nums"
@@ -215,7 +239,7 @@ export default function AlertSettingsPage() {
                   id="pumble-url"
                   type="url"
                   placeholder="https://api.pumble.com/workspaces/.../incoming-webhooks/..."
-                  defaultValue={settings.pumbleWebhookUrl ?? ''}
+                  value={pendingUrl}
                   onChange={(e) => setPendingUrl(e.target.value)}
                   className="font-mono text-xs"
                   disabled={isSaving || !settings.pumbleEnabled}
@@ -225,7 +249,7 @@ export default function AlertSettingsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => saveSettings({ pumbleWebhookUrl: pendingUrl || null })}
-                  disabled={isSaving || !pendingUrl || !settings.pumbleEnabled}
+                  disabled={isSaving || !settings.pumbleEnabled}
                 >
                   Save
                 </Button>
