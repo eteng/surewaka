@@ -46,7 +46,12 @@ export async function enqueueAdminPush(
         payload: {
           title: RULE_PUSH_TITLES[rule],
           body,
-          data: { alertRule: rule, deliveryId: context.deliveryId ?? null },
+          data: {
+            type: 'system_alert' as const,
+            resourceId: String(context.deliveryId ?? ''),
+            deepLink: context.deliveryId ? `/deliveries/${context.deliveryId}` : '/alerts',
+            metadata: { alertRule: rule },
+          },
         },
         priority: 'high' as const,
       },
