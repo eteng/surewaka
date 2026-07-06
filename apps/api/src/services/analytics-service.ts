@@ -2,6 +2,9 @@ import { sql } from 'drizzle-orm';
 import { db } from '@surewaka/db';
 import { CUSTOMER_FACING_STATUSES } from '@surewaka/shared';
 
+// Postgres array literal for use in raw SQL (e.g. ANY(ARRAY['a','b']))
+const CUSTOMER_STATUSES_PG = `ARRAY[${CUSTOMER_FACING_STATUSES.map((s) => `'${s}'`).join(',')}]`;
+
 // ─── Period helper ────────────────────────────────────────────────────────────
 
 export function periodToDates(
@@ -197,7 +200,7 @@ export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpi
     SELECT AVG(event_count) AS avg_updates FROM (
       SELECT delivery_id, COUNT(*) AS event_count
       FROM delivery_events
-      WHERE to_status::text = ANY(${CUSTOMER_FACING_STATUSES})
+      WHERE to_status::text = ANY(${sql.raw(CUSTOMER_STATUSES_PG)})
         AND created_at >= ${from.toISOString()}
         AND created_at <= ${to.toISOString()}
       GROUP BY delivery_id
@@ -227,34 +230,72 @@ export async function getOverviewKpis(from: Date, to: Date): Promise<OverviewKpi
     update_freq: number;
     completion_rate: number;
   }>(sql`
+    WITH delivery_daily AS (
+      SELECT
+        DATE(updated_at)::text AS date,
+        ROUND(100.0 * COUNT(*) FILTER (WHERE status='delivered' AND updated_at <= COALESCE(driver_eta_at, system_eta_at))
+          / NULLIF(COUNT(*) FILTER (WHERE status='delivered'), 0), 2) AS on_time_rate,
+        ROUND(100.0 * COUNT(*) FILTER (WHERE status='delivered')
+          / NULLIF(COUNT(*) FILTER (WHERE status NOT IN ('draft','pending')), 0), 2) AS fulfillment_rate
+      FROM deliveries
+      WHERE updated_at >= ${sparkStart.toISOString()} AND updated_at <= ${to.toISOString()}
+      GROUP BY DATE(updated_at)
+    ),
+    avg_time_daily AS (
+      SELECT
+        DATE(de_end.created_at)::text AS date,
+        AVG(EXTRACT(EPOCH FROM (de_end.created_at - de_start.created_at)) / 60)::numeric AS avg_minutes
+      FROM delivery_events de_start
+      JOIN delivery_events de_end ON de_end.delivery_id = de_start.delivery_id
+      WHERE de_start.to_status = 'accepted' AND de_end.to_status = 'delivered'
+        AND de_end.created_at >= ${sparkStart.toISOString()} AND de_end.created_at <= ${to.toISOString()}
+      GROUP BY DATE(de_end.created_at)
+    ),
+    dispute_daily AS (
+      SELECT
+        DATE(created_at)::text AS date,
+        ROUND(100.0 * COUNT(*) FILTER (WHERE failure_cause IS NOT NULL) / NULLIF(COUNT(*), 0), 2)::numeric AS dispute_rate
+      FROM delivery_events
+      WHERE created_at >= ${sparkStart.toISOString()} AND created_at <= ${to.toISOString()}
+      GROUP BY DATE(created_at)
+    ),
+    update_freq_daily AS (
+      SELECT
+        day::text AS date,
+        AVG(cnt)::numeric AS update_freq
+      FROM (
+        SELECT delivery_id, DATE(created_at) AS day, COUNT(*) AS cnt
+        FROM delivery_events
+        WHERE to_status::text = ANY(${sql.raw(CUSTOMER_STATUSES_PG)})
+          AND created_at >= ${sparkStart.toISOString()} AND created_at <= ${to.toISOString()}
+        GROUP BY delivery_id, DATE(created_at)
+      ) sub
+      GROUP BY day
+    ),
+    completion_daily AS (
+      SELECT
+        DATE(created_at)::text AS date,
+        ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'delivered')
+          / NULLIF(COUNT(*) FILTER (WHERE status != 'pending'), 0), 2)::numeric AS completion_rate
+      FROM delivery_legs
+      WHERE actor_type = 'driver'
+        AND created_at >= ${sparkStart.toISOString()} AND created_at <= ${to.toISOString()}
+      GROUP BY DATE(created_at)
+    )
     SELECT
-      DATE(updated_at)::text AS date,
-      ROUND(100.0 * COUNT(*) FILTER (WHERE status='delivered' AND updated_at <= COALESCE(driver_eta_at, system_eta_at))
-        / NULLIF(COUNT(*) FILTER (WHERE status='delivered'), 0), 2) AS on_time_rate,
-      ROUND(100.0 * COUNT(*) FILTER (WHERE status='delivered')
-        / NULLIF(COUNT(*) FILTER (WHERE status NOT IN ('draft','pending')), 0), 2) AS fulfillment_rate,
-      (SELECT AVG(EXTRACT(EPOCH FROM (de_end.created_at - de_start.created_at)) / 60)
-       FROM delivery_events de_start
-       JOIN delivery_events de_end ON de_end.delivery_id = de_start.delivery_id
-       WHERE de_start.to_status = 'accepted' AND de_end.to_status = 'delivered'
-         AND DATE(de_end.created_at) = DATE(deliveries.updated_at))::numeric AS avg_minutes,
-      (SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE failure_cause IS NOT NULL) / NULLIF(COUNT(*), 0), 2)
-       FROM delivery_events de2
-       WHERE DATE(de2.created_at) = DATE(deliveries.updated_at))::numeric AS dispute_rate,
-      (SELECT AVG(cnt) FROM (
-         SELECT delivery_id, COUNT(*) AS cnt FROM delivery_events
-         WHERE to_status::text = ANY(ARRAY['accepted','picked_up','en_route_dropoff','arrived_dropoff','delivered'])
-           AND DATE(created_at) = DATE(deliveries.updated_at)
-         GROUP BY delivery_id
-       ) s)::numeric AS update_freq,
-      (SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'delivered')
-                    / NULLIF(COUNT(*) FILTER (WHERE status != 'pending'), 0), 2)
-       FROM delivery_legs dl2
-       WHERE DATE(dl2.created_at) = DATE(deliveries.updated_at) AND dl2.actor_type = 'driver')::numeric AS completion_rate
-    FROM deliveries
-    WHERE updated_at >= ${sparkStart.toISOString()} AND updated_at <= ${to.toISOString()}
-    GROUP BY DATE(updated_at)
-    ORDER BY date
+      dd.date,
+      dd.on_time_rate,
+      dd.fulfillment_rate,
+      COALESCE(atd.avg_minutes, 0) AS avg_minutes,
+      COALESCE(disp.dispute_rate, 0) AS dispute_rate,
+      COALESCE(uf.update_freq, 0) AS update_freq,
+      COALESCE(cd.completion_rate, 0) AS completion_rate
+    FROM delivery_daily dd
+    LEFT JOIN avg_time_daily atd ON atd.date = dd.date
+    LEFT JOIN dispute_daily disp ON disp.date = dd.date
+    LEFT JOIN update_freq_daily uf ON uf.date = dd.date
+    LEFT JOIN completion_daily cd ON cd.date = dd.date
+    ORDER BY dd.date
   `)).rows;
 
   const toSparkline = (field: keyof typeof sparkRows[0]) =>
@@ -486,7 +527,7 @@ export async function getCustomerExperience(from: Date, to: Date): Promise<Custo
     FROM (
       SELECT delivery_id, DATE(created_at) AS day, COUNT(*) AS cnt
       FROM delivery_events
-      WHERE to_status::text = ANY(${CUSTOMER_FACING_STATUSES})
+      WHERE to_status::text = ANY(${sql.raw(CUSTOMER_STATUSES_PG)})
         AND created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
       GROUP BY delivery_id, DATE(created_at)
     ) counts
@@ -498,7 +539,7 @@ export async function getCustomerExperience(from: Date, to: Date): Promise<Custo
     SELECT AVG(cnt) AS avg FROM (
       SELECT delivery_id, COUNT(*) AS cnt
       FROM delivery_events
-      WHERE to_status::text = ANY(${CUSTOMER_FACING_STATUSES})
+      WHERE to_status::text = ANY(${sql.raw(CUSTOMER_STATUSES_PG)})
         AND created_at >= ${from.toISOString()}
         AND created_at <= ${to.toISOString()}
       GROUP BY delivery_id
