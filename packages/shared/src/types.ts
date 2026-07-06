@@ -50,9 +50,13 @@ export interface PackageDetails {
 export interface Carrier {
   id: string;
   name: string;
+  slug: string;
   verified: boolean;
-  rating: number;
-  deliveryCount: number;
+  isVerified: boolean;
+  rating: number | null;
+  deliveryCount: number | null;
+  logoUrl: string | null;
+  basePrice: number | null;
 }
 
 export interface Driver {

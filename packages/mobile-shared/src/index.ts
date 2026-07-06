@@ -16,6 +16,7 @@ export { useLocation } from './hooks/use-location';
 export { apiClient, createAuthClient } from './api/client';
 export type { ApiResponse } from './api/client';
 export { createAddressesClient } from './api/addresses';
+export { carriersApi } from './api/carriers';
 export { searchAddress, reverseGeocode } from './maps/locationiq';
 export type { LocationSuggestion } from './maps/locationiq';
 export { useAuthStore } from './store/auth-store';

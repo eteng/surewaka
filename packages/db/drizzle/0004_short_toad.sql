@@ -1,0 +1,1 @@
+ALTER TABLE "carriers" ADD COLUMN "base_price" integer;

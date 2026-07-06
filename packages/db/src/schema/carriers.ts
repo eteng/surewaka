@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean, real, unique, foreignKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, real, integer, unique, foreignKey } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { carrierMemberRole } from './enums';
 
@@ -21,6 +21,7 @@ export const carriers = pgTable(
     driverVettingEnabled: boolean('driver_vetting_enabled').notNull().default(false),
     // FK to carrier_applications(id) — enforced in DB; omitted here to avoid circular import
     applicationId: uuid('application_id'),
+    basePrice: integer('base_price'),
   },
   (table) => [
     foreignKey({

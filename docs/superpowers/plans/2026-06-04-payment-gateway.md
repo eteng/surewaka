@@ -1,6 +1,6 @@
 # Payment Gateway Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Implement a wallet-first payment system backed by Paystack — customers top up a wallet (card or bank transfer / DVA), bookings deduct via escrow, drivers earn into a wallet and request manual payouts.
 
@@ -63,7 +63,7 @@
 **Files:**
 - Create: `supabase/migrations/<timestamp>_add_wallet_tables.sql`
 
-- [ ] **Step 1: Create the migration file**
+- [x] **Step 1: Create the migration file**
 
 ```bash
 cd /path/to/project
@@ -72,7 +72,7 @@ supabase migration new add_wallet_tables
 
 Expected: creates `supabase/migrations/YYYYMMDDXXXXXX_add_wallet_tables.sql`
 
-- [ ] **Step 2: Write the migration SQL**
+- [x] **Step 2: Write the migration SQL**
 
 ```sql
 -- ENUMS
@@ -245,7 +245,7 @@ GRANT SELECT ON public.escrow_holds TO authenticated;
 GRANT SELECT ON public.payout_requests TO authenticated;
 ```
 
-- [ ] **Step 3: Commit the migration file**
+- [x] **Step 3: Commit the migration file**
 
 ```bash
 git add supabase/migrations/
@@ -259,13 +259,13 @@ git commit -m "feat(db): add wallet, wallet_transactions, escrow_holds, payout_r
 **Files:**
 - Create: `supabase/migrations/<timestamp>_refactor_delivery_status.sql`
 
-- [ ] **Step 1: Create the migration file**
+- [x] **Step 1: Create the migration file**
 
 ```bash
 supabase migration new refactor_delivery_status
 ```
 
-- [ ] **Step 2: Write the migration SQL**
+- [x] **Step 2: Write the migration SQL**
 
 ```sql
 -- Replace delivery_status enum (Postgres cannot remove enum values, so swap the type)
@@ -304,7 +304,7 @@ ALTER TABLE public.deliveries
 CREATE INDEX idx_deliveries_payment_status ON public.deliveries(payment_status);
 ```
 
-- [ ] **Step 3: Commit the migration**
+- [x] **Step 3: Commit the migration**
 
 ```bash
 git add supabase/migrations/
@@ -315,7 +315,7 @@ git commit -m "feat(db): refactor delivery_status enum + add payment columns"
 
 ### Task 3: Apply migrations and regenerate schema
 
-- [ ] **Step 1: Apply migrations to the local Supabase instance**
+- [x] **Step 1: Apply migrations to the local Supabase instance**
 
 ```bash
 supabase db push
@@ -323,7 +323,7 @@ supabase db push
 
 Expected: both migrations apply without error.
 
-- [ ] **Step 2: Regenerate Drizzle schema**
+- [x] **Step 2: Regenerate Drizzle schema**
 
 ```bash
 pnpm --filter @surewaka/db db:pull
@@ -331,7 +331,7 @@ pnpm --filter @surewaka/db db:pull
 
 Expected: `packages/db/src/schema.ts` regenerated. Verify it contains `wallets`, `walletTransactions`, `escrowHolds`, `payoutRequests` table exports and `deliveryStatus` enum has the 12 new values.
 
-- [ ] **Step 3: Commit the regenerated schema**
+- [x] **Step 3: Commit the regenerated schema**
 
 ```bash
 git add packages/db/
@@ -347,7 +347,7 @@ git commit -m "chore(db): regenerate schema after wallet + delivery status migra
 **Files:**
 - Modify: `packages/shared/src/validators.ts`
 
-- [ ] **Step 1: Append payment validators**
+- [x] **Step 1: Append payment validators**
 
 Add to the bottom of `packages/shared/src/validators.ts`:
 
@@ -399,7 +399,7 @@ export const cancelDeliverySchema = z.object({
 export type CancelDelivery = z.infer<typeof cancelDeliverySchema>;
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add packages/shared/src/validators.ts
@@ -416,7 +416,7 @@ git commit -m "feat(shared): add payment Zod validators"
 - Create: `apps/api/src/lib/paystack.ts`
 - Create: `apps/api/src/__tests__/paystack-client.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // apps/api/src/__tests__/paystack-client.test.ts
@@ -467,7 +467,7 @@ describe('Paystack client', () => {
 });
 ```
 
-- [ ] **Step 2: Run test — expect FAIL**
+- [x] **Step 2: Run test — expect FAIL**
 
 ```bash
 pnpm --filter @surewaka/api test --reporter=verbose paystack-client
@@ -475,7 +475,7 @@ pnpm --filter @surewaka/api test --reporter=verbose paystack-client
 
 Expected: `Cannot find module '../lib/paystack'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```typescript
 // apps/api/src/lib/paystack.ts
@@ -563,7 +563,7 @@ export function verifyWebhookSignature(rawBody: string, signature: string): bool
 }
 ```
 
-- [ ] **Step 4: Run test — expect PASS**
+- [x] **Step 4: Run test — expect PASS**
 
 ```bash
 pnpm --filter @surewaka/api test --reporter=verbose paystack-client
@@ -571,7 +571,7 @@ pnpm --filter @surewaka/api test --reporter=verbose paystack-client
 
 Expected: 3 passing tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/lib/paystack.ts apps/api/src/__tests__/paystack-client.test.ts
@@ -586,7 +586,7 @@ git commit -m "feat(api): add Paystack client with HMAC signature verification"
 - Create: `apps/api/src/lib/wallet-service.ts`
 - Create: `apps/api/src/__tests__/wallet-service.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```typescript
 // apps/api/src/__tests__/wallet-service.test.ts
@@ -661,7 +661,7 @@ describe('wallet-service: creditWallet', () => {
 });
 ```
 
-- [ ] **Step 2: Run test — expect FAIL**
+- [x] **Step 2: Run test — expect FAIL**
 
 ```bash
 pnpm --filter @surewaka/api test --reporter=verbose wallet-service
@@ -669,7 +669,7 @@ pnpm --filter @surewaka/api test --reporter=verbose wallet-service
 
 Expected: `Cannot find module '../lib/wallet-service'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```typescript
 // apps/api/src/lib/wallet-service.ts
@@ -764,13 +764,13 @@ export async function checkBalance(walletId: string, amount: number) {
 }
 ```
 
-- [ ] **Step 4: Run tests — expect PASS**
+- [x] **Step 4: Run tests — expect PASS**
 
 ```bash
 pnpm --filter @surewaka/api test --reporter=verbose wallet-service
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/lib/wallet-service.ts apps/api/src/__tests__/wallet-service.test.ts
@@ -787,7 +787,7 @@ git commit -m "feat(api): add wallet service with atomic credit/debit operations
 - Create: `apps/api/src/routes/wallet.ts`
 - Create: `apps/api/src/__tests__/wallet-routes.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```typescript
 // apps/api/src/__tests__/wallet-routes.test.ts
@@ -903,7 +903,7 @@ describe('Wallet routes', () => {
 });
 ```
 
-- [ ] **Step 2: Run test — expect FAIL**
+- [x] **Step 2: Run test — expect FAIL**
 
 ```bash
 pnpm --filter @surewaka/api test --reporter=verbose wallet-routes
@@ -911,7 +911,7 @@ pnpm --filter @surewaka/api test --reporter=verbose wallet-routes
 
 Expected: `Cannot find module '../routes/wallet'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```typescript
 // apps/api/src/routes/wallet.ts
@@ -1029,13 +1029,13 @@ walletRoutes.post('/check', async (c) => {
 export default walletRoutes;
 ```
 
-- [ ] **Step 4: Run tests — expect PASS**
+- [x] **Step 4: Run tests — expect PASS**
 
 ```bash
 pnpm --filter @surewaka/api test --reporter=verbose wallet-routes
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/routes/wallet.ts apps/api/src/__tests__/wallet-routes.test.ts
@@ -1050,7 +1050,7 @@ git commit -m "feat(api): add wallet routes (balance, transactions, dva, fund, c
 - Create: `apps/api/src/routes/webhook.ts`
 - Create: `apps/api/src/__tests__/webhook-routes.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```typescript
 // apps/api/src/__tests__/webhook-routes.test.ts
@@ -1171,13 +1171,13 @@ describe('Webhook — Paystack', () => {
 });
 ```
 
-- [ ] **Step 2: Run test — expect FAIL**
+- [x] **Step 2: Run test — expect FAIL**
 
 ```bash
 pnpm --filter @surewaka/api test --reporter=verbose webhook-routes
 ```
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```typescript
 // apps/api/src/routes/webhook.ts
@@ -1252,13 +1252,13 @@ webhookRoutes.post('/paystack', async (c) => {
 export default webhookRoutes;
 ```
 
-- [ ] **Step 4: Run tests — expect PASS**
+- [x] **Step 4: Run tests — expect PASS**
 
 ```bash
 pnpm --filter @surewaka/api test --reporter=verbose webhook-routes
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/routes/webhook.ts apps/api/src/__tests__/webhook-routes.test.ts
@@ -1274,7 +1274,7 @@ git commit -m "feat(api): add Paystack webhook handler with HMAC verification + 
 - Create: `apps/api/src/__tests__/booking-payment-routes.test.ts`
 - Modify: `apps/api/src/routes/deliveries.ts` (set `draft` as default status on create)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```typescript
 // apps/api/src/__tests__/booking-payment-routes.test.ts
@@ -1365,13 +1365,13 @@ describe('Booking payment routes', () => {
 });
 ```
 
-- [ ] **Step 2: Run test — expect FAIL**
+- [x] **Step 2: Run test — expect FAIL**
 
 ```bash
 pnpm --filter @surewaka/api test --reporter=verbose booking-payment-routes
 ```
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```typescript
 // apps/api/src/routes/booking-payment.ts
@@ -1513,17 +1513,17 @@ bookingPaymentRoutes.post('/deliveries/:id/cancel', async (c) => {
 export default bookingPaymentRoutes;
 ```
 
-- [ ] **Step 4: In `apps/api/src/routes/deliveries.ts`, change the default status on delivery creation**
+- [x] **Step 4: In `apps/api/src/routes/deliveries.ts`, change the default status on delivery creation**
 
 Find the `db.insert(deliveries).values({...})` call in `deliveryRoutes.post('/')` and add `status: 'draft'` to the values object.
 
-- [ ] **Step 5: Run tests — expect PASS**
+- [x] **Step 5: Run tests — expect PASS**
 
 ```bash
 pnpm --filter @surewaka/api test --reporter=verbose booking-payment-routes
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/api/src/routes/booking-payment.ts apps/api/src/routes/deliveries.ts apps/api/src/__tests__/booking-payment-routes.test.ts
@@ -1538,7 +1538,7 @@ git commit -m "feat(api): add booking confirm (escrow) + delivery cancel (tiered
 - Create: `apps/api/src/routes/payouts.ts`
 - Create: `apps/api/src/__tests__/payouts-routes.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```typescript
 // apps/api/src/__tests__/payouts-routes.test.ts
@@ -1623,13 +1623,13 @@ describe('Payouts routes', () => {
 });
 ```
 
-- [ ] **Step 2: Run test — expect FAIL**
+- [x] **Step 2: Run test — expect FAIL**
 
 ```bash
 pnpm --filter @surewaka/api test --reporter=verbose payouts-routes
 ```
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```typescript
 // apps/api/src/routes/payouts.ts
@@ -1709,13 +1709,13 @@ payoutRoutes.get('/', async (c) => {
 export default payoutRoutes;
 ```
 
-- [ ] **Step 4: Run tests — expect PASS**
+- [x] **Step 4: Run tests — expect PASS**
 
 ```bash
 pnpm --filter @surewaka/api test --reporter=verbose payouts-routes
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/routes/payouts.ts apps/api/src/__tests__/payouts-routes.test.ts
@@ -1729,7 +1729,7 @@ git commit -m "feat(api): add payout request + history routes"
 **Files:**
 - Modify: `apps/api/src/index.ts`
 
-- [ ] **Step 1: Add imports and route registrations**
+- [x] **Step 1: Add imports and route registrations**
 
 In `apps/api/src/index.ts`, add after the existing imports:
 
@@ -1749,7 +1749,7 @@ app.route('/api/v1', bookingPaymentRoutes);       // handles /booking/confirm + 
 app.route('/api/v1/payouts', payoutRoutes);
 ```
 
-- [ ] **Step 2: Run the full test suite**
+- [x] **Step 2: Run the full test suite**
 
 ```bash
 pnpm --filter @surewaka/api test
@@ -1757,7 +1757,7 @@ pnpm --filter @surewaka/api test
 
 Expected: all tests pass.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/api/src/index.ts
@@ -1776,7 +1776,7 @@ git commit -m "feat(api): wire wallet, webhook, booking-payment, and payout rout
 - Create: `workers/payment-worker/src/queue.ts`
 - Modify: `workers/payment-worker/src/index.ts`
 
-- [ ] **Step 1: Add vitest and types to payment worker**
+- [x] **Step 1: Add vitest and types to payment worker**
 
 In `workers/payment-worker/package.json`, add:
 
@@ -1795,7 +1795,7 @@ In `workers/payment-worker/package.json`, add:
 }
 ```
 
-- [ ] **Step 2: Create vitest config**
+- [x] **Step 2: Create vitest config**
 
 ```typescript
 // workers/payment-worker/vitest.config.ts
@@ -1809,7 +1809,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 3: Create queue module**
+- [x] **Step 3: Create queue module**
 
 ```typescript
 // workers/payment-worker/src/queue.ts
@@ -1863,7 +1863,7 @@ export type NotifyTopupJobData = {
 };
 ```
 
-- [ ] **Step 4: Rewrite worker entry point**
+- [x] **Step 4: Rewrite worker entry point**
 
 ```typescript
 // workers/payment-worker/src/index.ts
@@ -1898,7 +1898,7 @@ worker.on('failed', (job, err) => console.error(`❌ Job ${job?.id} (${job?.name
 console.log('💰 Payment worker started');
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add workers/payment-worker/
@@ -1917,7 +1917,7 @@ git commit -m "feat(worker): set up BullMQ payment worker with vitest"
 - Create: `workers/payment-worker/src/jobs/notify-topup.ts`
 - Create: `workers/payment-worker/src/__tests__/jobs.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```typescript
 // workers/payment-worker/src/__tests__/jobs.test.ts
@@ -1965,13 +1965,13 @@ describe('Refund job — amount calculation', () => {
 });
 ```
 
-- [ ] **Step 2: Run test — expect PASS (pure logic, no deps)**
+- [x] **Step 2: Run test — expect PASS (pure logic, no deps)**
 
 ```bash
 pnpm --filter @surewaka/worker-payment test
 ```
 
-- [ ] **Step 3: Write escrow-hold job**
+- [x] **Step 3: Write escrow-hold job**
 
 ```typescript
 // workers/payment-worker/src/jobs/escrow-hold.ts
@@ -2000,7 +2000,7 @@ export async function handleEscrowHold(data: EscrowHoldJobData) {
 }
 ```
 
-- [ ] **Step 4: Write escrow-release job**
+- [x] **Step 4: Write escrow-release job**
 
 ```typescript
 // workers/payment-worker/src/jobs/escrow-release.ts
@@ -2045,7 +2045,7 @@ export async function handleEscrowRelease(data: EscrowReleaseJobData) {
 }
 ```
 
-- [ ] **Step 5: Write refund job**
+- [x] **Step 5: Write refund job**
 
 ```typescript
 // workers/payment-worker/src/jobs/refund.ts
@@ -2068,7 +2068,7 @@ export async function handleRefund(data: RefundJobData) {
 }
 ```
 
-- [ ] **Step 6: Write provision-dva and notify-topup jobs**
+- [x] **Step 6: Write provision-dva and notify-topup jobs**
 
 ```typescript
 // workers/payment-worker/src/jobs/provision-dva.ts
@@ -2135,7 +2135,7 @@ export async function handleNotifyTopup(data: NotifyTopupJobData) {
 }
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add workers/payment-worker/src/
@@ -2152,7 +2152,7 @@ git commit -m "feat(worker): add escrow-hold, escrow-release, refund, provision-
 - Create: `packages/mobile-shared/src/store/wallet-store.ts`
 - Modify: `packages/mobile-shared/src/index.ts`
 
-- [ ] **Step 1: Create the wallet store**
+- [x] **Step 1: Create the wallet store**
 
 ```typescript
 // packages/mobile-shared/src/store/wallet-store.ts
@@ -2230,7 +2230,7 @@ export const useWalletStore = create<WalletState>((set) => ({
 }));
 ```
 
-- [ ] **Step 2: Export from mobile-shared index**
+- [x] **Step 2: Export from mobile-shared index**
 
 Add to the bottom of `packages/mobile-shared/src/index.ts`:
 
@@ -2239,7 +2239,7 @@ export { useWalletStore } from './store/wallet-store';
 export type { WalletTransaction, WalletState } from './store/wallet-store';
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add packages/mobile-shared/src/store/wallet-store.ts packages/mobile-shared/src/index.ts
@@ -2253,7 +2253,7 @@ git commit -m "feat(mobile-shared): add wallet store with balance, transactions,
 **Files:**
 - Modify: `apps/mobile-customer/app/profile/payments.tsx`
 
-- [ ] **Step 1: Replace the placeholder screen**
+- [x] **Step 1: Replace the placeholder screen**
 
 ```typescript
 // apps/mobile-customer/app/profile/payments.tsx
@@ -2341,7 +2341,7 @@ export default function PaymentsScreen() {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add apps/mobile-customer/app/profile/payments.tsx
@@ -2358,7 +2358,7 @@ git commit -m "feat(mobile): upgrade wallet home screen with balance, DVA, trans
 - Create: `apps/mobile-customer/app/wallet/topup-success.tsx`
 - Create: `apps/mobile-customer/app/wallet/transactions.tsx`
 
-- [ ] **Step 1: Create the wallet route layout**
+- [x] **Step 1: Create the wallet route layout**
 
 ```typescript
 // apps/mobile-customer/app/wallet/_layout.tsx
@@ -2371,7 +2371,7 @@ export default function WalletLayout() {
 }
 ```
 
-- [ ] **Step 2: Create the top-up screen**
+- [x] **Step 2: Create the top-up screen**
 
 ```typescript
 // apps/mobile-customer/app/wallet/topup.tsx
@@ -2496,7 +2496,7 @@ export default function TopupScreen() {
 }
 ```
 
-- [ ] **Step 3: Create the success screen**
+- [x] **Step 3: Create the success screen**
 
 ```typescript
 // apps/mobile-customer/app/wallet/topup-success.tsx
@@ -2529,7 +2529,7 @@ export default function TopupSuccessScreen() {
 }
 ```
 
-- [ ] **Step 4: Create the transaction history screen**
+- [x] **Step 4: Create the transaction history screen**
 
 ```typescript
 // apps/mobile-customer/app/wallet/transactions.tsx
@@ -2619,7 +2619,7 @@ export default function TransactionsScreen() {
 }
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/mobile-customer/app/wallet/
@@ -2634,7 +2634,7 @@ git commit -m "feat(mobile): add top-up, success, and transaction history screen
 - Modify: `apps/mobile-customer/app/booking/review.tsx`
 - Create: `apps/mobile-customer/app/booking/payment-shortfall.tsx`
 
-- [ ] **Step 1: Create the payment shortfall sheet**
+- [x] **Step 1: Create the payment shortfall sheet**
 
 ```typescript
 // apps/mobile-customer/app/booking/payment-shortfall.tsx
@@ -2739,7 +2739,7 @@ export default function PaymentShortfallSheet({ shortfall, deliveryId, totalAmou
 }
 ```
 
-- [ ] **Step 2: Modify review.tsx to add wallet check**
+- [x] **Step 2: Modify review.tsx to add wallet check**
 
 In `apps/mobile-customer/app/booking/review.tsx`:
 
@@ -2848,7 +2848,7 @@ const confirmBooking = async (deliveryId: string, amount: number) => {
 </Modal>
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/mobile-customer/app/booking/review.tsx apps/mobile-customer/app/booking/payment-shortfall.tsx

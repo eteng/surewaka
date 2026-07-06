@@ -10,7 +10,7 @@ import { onboardCarrierDriverSchema } from '@surewaka/shared';
 import type { UserRole } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
 import { db, users, userRoles, carrierMembers, carriers, roleAuditLog } from '@surewaka/db';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { syncRolesToAuth } from '../services/role-service';
 
 type CarrierRoutesEnv = {
@@ -32,7 +32,7 @@ const carrierRoutes = new Hono<CarrierRoutesEnv>();
  *
  * Requirements: 5.4, 8.4
  */
-carrierRoutes.get('/carriers', async (c) => {
+carrierRoutes.get('/', async (c) => {
   const carrierList = await db
     .select({
       id: carriers.id,
@@ -42,10 +42,11 @@ carrierRoutes.get('/carriers', async (c) => {
       deliveryCount: carriers.deliveryCount,
       isVerified: carriers.isVerified,
       logoUrl: carriers.logoUrl,
+      basePrice: carriers.basePrice,
     })
     .from(carriers)
     .where(eq(carriers.isActive, true))
-    .orderBy(carriers.rating);
+    .orderBy(desc(carriers.rating));
 
   return c.json({ data: carrierList, error: null, meta: null }, 200);
 });
