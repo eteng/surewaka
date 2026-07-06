@@ -285,7 +285,8 @@ export type PushNotificationType =
   | 'dispute_opened'
   | 'delivery_assigned'
   | 'carrier_verified'
-  | 'broadcast';
+  | 'broadcast'
+  | 'system_alert';
 
 export type PushTargetApp = 'customer' | 'driver' | 'admin';
 

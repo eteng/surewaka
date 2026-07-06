@@ -1,8 +1,8 @@
 import { db } from './db';
-import { loadSettings } from './settings';
+import { loadSettings, getAdminUserIds } from './settings';
 import { sendPumbleAlert } from './pumble';
 import { enqueueAdminPush } from './push';
-import { alerts, userRoles } from '@surewaka/db';
+import { alerts } from '@surewaka/db';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { EvaluationResult } from './types';
 import type { AlertSeverity } from '@surewaka/shared';
@@ -18,14 +18,6 @@ import { evaluate as evalCustomerUpdateGap } from './rules/customer-update-gap';
 const POLL_INTERVAL_MS = 60_000;
 
 let tickRunning = false;
-
-async function getAdminUserIds(): Promise<string[]> {
-  const rows = await db
-    .select({ userId: userRoles.userId })
-    .from(userRoles)
-    .where(and(eq(userRoles.role, 'surewaka_admin'), eq(userRoles.isActive, true)));
-  return rows.map((r) => r.userId);
-}
 
 async function upsertAlert(
   result: EvaluationResult,

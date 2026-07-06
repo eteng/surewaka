@@ -42,6 +42,7 @@ export const PUSH_NOTIFICATION_TYPES = [
   'delivery_assigned',
   'carrier_verified',
   'broadcast',
+  'system_alert',
 ] as const;
 
 export const PUSH_TARGET_APPS = ['customer', 'driver', 'admin'] as const;
@@ -50,6 +51,7 @@ export const HIGH_PRIORITY_PUSH_TYPES: PushNotificationType[] = [
   'delivery_status_change',
   'delivery_cancelled',
   'driver_arrived',
+  'system_alert',
 ];
 
 export const PUSH_DEEP_LINK_MAP: Record<PushNotificationType, string> = {
@@ -61,6 +63,7 @@ export const PUSH_DEEP_LINK_MAP: Record<PushNotificationType, string> = {
   delivery_assigned: '/delivery/:resourceId',
   carrier_verified: '/',
   broadcast: '/:deepLink',
+  system_alert: '/alerts',
 };
 
 export const PUSH_APP_ROUTING: Record<PushNotificationType, PushTargetApp | 'all'> = {
@@ -72,6 +75,7 @@ export const PUSH_APP_ROUTING: Record<PushNotificationType, PushTargetApp | 'all
   delivery_assigned: 'driver',
   carrier_verified: 'driver',
   broadcast: 'all',
+  system_alert: 'admin',
 };
 
 export const MAX_PUSH_TOKENS_PER_USER_PER_APP = 10;

@@ -549,12 +549,18 @@ export const updateAlertSettingsSchema = z
     customerUpdateGapCriticalMin: z.number().int().min(30).max(240).optional(),
     ontimeRateWarningPct: z.number().int().min(50).max(100).optional(),
     ontimeRateCriticalPct: z.number().int().min(30).max(90).optional(),
-    pumbleWebhookUrl: z.string().url().nullable().optional(),
+    pumbleWebhookUrl: z
+      .string()
+      .max(2048, 'Webhook URL must be at most 2048 characters')
+      .startsWith('https://', 'Webhook URL must start with https://')
+      .url('Webhook URL must be a valid URL')
+      .nullable()
+      .optional(),
     pushEnabled: z.boolean().optional(),
     pumbleEnabled: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
-    // Minutes: warning must be < critical (stricter condition = higher value)
+    // Time-based pairs: warning must be strictly less than critical
     const minutePairs: [keyof typeof data, keyof typeof data, string][] = [
       ['driverSilentWarningMin', 'driverSilentCriticalMin', 'driverSilent'],
       ['legOverdueWarningMin', 'legOverdueCriticalMin', 'legOverdue'],
@@ -576,3 +582,5 @@ export const updateAlertSettingsSchema = z
       ctx.addIssue({ code: 'custom', path: ['ontimeRateCriticalPct'], message: 'ontimeRate critical must be less than warning' });
     }
   });
+
+export type UpdateAlertSettings = z.infer<typeof updateAlertSettingsSchema>;

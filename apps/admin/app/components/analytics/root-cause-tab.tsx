@@ -23,7 +23,7 @@ export function RootCauseTab({ params }: Props) {
   const { data, isLoading, error } = useAnalyticsRootCause({ ...params, ...filters });
 
   const setFilter = (key: keyof RootCauseFilters, value: string | undefined) =>
-    setFilters((f) => ({ ...f, [key]: value || undefined }));
+    setFilters((f) => ({ ...f, [key]: value === 'all' ? undefined : value || undefined }));
 
   const heatCells = data?.heatmap ?? [];
   const maxDelay = Math.max(...heatCells.map((c) => c.avgDelayMinutes), 1);
@@ -35,12 +35,12 @@ export function RootCauseTab({ params }: Props) {
       <aside className="w-52 shrink-0 space-y-4">
         <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">Lagos Zone</label>
-          <Select value={filters.zone ?? ''} onValueChange={(v) => setFilter('zone', v)}>
+          <Select value={filters.zone ?? 'all'} onValueChange={(v) => setFilter('zone', v)}>
             <SelectTrigger className="h-8 text-xs" aria-label="Filter by Lagos zone">
               <SelectValue placeholder="All zones" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All zones</SelectItem>
+              <SelectItem value="all">All zones</SelectItem>
               {LAGOS_ZONES.map((z) => (
                 <SelectItem key={z} value={z}>
                   {z}
@@ -51,12 +51,12 @@ export function RootCauseTab({ params }: Props) {
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">Leg Type</label>
-          <Select value={filters.legType ?? ''} onValueChange={(v) => setFilter('legType', v)}>
+          <Select value={filters.legType ?? 'all'} onValueChange={(v) => setFilter('legType', v)}>
             <SelectTrigger className="h-8 text-xs" aria-label="Filter by leg type">
               <SelectValue placeholder="All leg types" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All leg types</SelectItem>
+              <SelectItem value="all">All leg types</SelectItem>
               <SelectItem value="first_mile">First Mile</SelectItem>
               <SelectItem value="intercity">Intercity</SelectItem>
               <SelectItem value="last_mile">Last Mile</SelectItem>
@@ -65,12 +65,12 @@ export function RootCauseTab({ params }: Props) {
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">Time of Day</label>
-          <Select value={filters.timeOfDay ?? ''} onValueChange={(v) => setFilter('timeOfDay', v)}>
+          <Select value={filters.timeOfDay ?? 'all'} onValueChange={(v) => setFilter('timeOfDay', v)}>
             <SelectTrigger className="h-8 text-xs" aria-label="Filter by time of day">
               <SelectValue placeholder="All hours" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All hours</SelectItem>
+              <SelectItem value="all">All hours</SelectItem>
               <SelectItem value="morning">Morning (6–10am)</SelectItem>
               <SelectItem value="midday">Midday (10am–3pm)</SelectItem>
               <SelectItem value="evening">Evening rush (3–7pm)</SelectItem>

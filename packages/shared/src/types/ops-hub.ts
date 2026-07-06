@@ -1,3 +1,5 @@
+import type { ALERT_SEVERITIES } from '../constants';
+
 export type OpsHubStats = {
   activeDeliveries: number;
   driversOnDuty: number;
@@ -21,7 +23,7 @@ export type AtRiskDelivery = {
   dropoffAddress: string;
 };
 
-export type AlertSeverity = 'info' | 'warning' | 'critical';
+export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
 
 export type AlertItem = {
   id: string;
