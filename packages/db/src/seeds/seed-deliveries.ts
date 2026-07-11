@@ -300,7 +300,7 @@ async function main() {
       const createdAt = generatePastTimestamp(30);
       const updatedAt = new Date(createdAt.getTime() + randomBetween(0, 48) * 60 * 60 * 1000);
 
-      const price = Math.round(randomBetween(100, 50000) * 100) / 100;
+      const priceKobo = Math.round(randomBetween(10000, 5000000)); // 100 to 50,000 naira in kobo
       const packageWeight = Math.round(randomBetween(0.1, 500) * 10) / 10;
 
       await db.insert(deliveries).values({
@@ -318,7 +318,7 @@ async function main() {
         packageDescription: generatePackageDescription(),
         packageWeight,
         packageCategory: category,
-        price,
+        priceKobo,
         recipientName: generateRecipientName(),
         recipientPhone: generateNigerianPhone(),
         deliveryNotes: `${SEED_MARKER} ${['Handle with care', 'Call before delivery', 'Leave at gate', 'Ring bell twice', 'Fragile contents'][randomInt(0, 4)]}`,

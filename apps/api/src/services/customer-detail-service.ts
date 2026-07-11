@@ -79,7 +79,7 @@ export async function getCustomerDeliveries(
       dropoffCity: deliveries.dropoffCity,
       packageDescription: deliveries.packageDescription,
       packageCategory: deliveries.packageCategory,
-      price: deliveries.price,
+      price: deliveries.priceKobo,
       amountPaid: deliveries.amountPaid,
       paymentStatus: deliveries.paymentStatus,
       recipientName: deliveries.recipientName,

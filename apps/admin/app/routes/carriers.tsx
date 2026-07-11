@@ -61,7 +61,11 @@ export default function Carriers() {
           </thead>
           <tbody>
             {data.map((carrier) => (
-              <tr key={carrier.id} className="border-b hover:bg-muted/50">
+              <tr
+                key={carrier.id}
+                className="border-b hover:bg-muted/50 cursor-pointer"
+                onClick={() => navigate(`/carriers/${carrier.id}`)}
+              >
                 <td className="py-3 font-medium">{carrier.name}</td>
                 <td className="py-3 text-muted-foreground">{carrier.slug}</td>
                 <td className="py-3">

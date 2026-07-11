@@ -49,7 +49,7 @@ export async function getDriverDetail(id: string): Promise<DriverDetail | null> 
       pickupAddress: deliveries.pickupAddress,
       dropoffAddress: deliveries.dropoffAddress,
       date: deliveries.createdAt,
-      price: deliveries.price,
+      price: deliveries.priceKobo,
     })
     .from(deliveries)
     .where(eq(deliveries.driverId, id))

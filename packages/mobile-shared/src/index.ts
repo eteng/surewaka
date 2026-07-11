@@ -13,6 +13,7 @@ export type { Theme, ThemeColors, ThemeSpacing, ThemeTypography, ThemeGradients 
 export { tokenCache } from './clerk';
 export { useAuth } from './hooks/use-auth';
 export { useLocation } from './hooks/use-location';
+export { useQuoteExpiry } from './hooks/use-quote-expiry';
 export { apiClient, createAuthClient } from './api/client';
 export type { ApiResponse } from './api/client';
 export { createAddressesClient } from './api/addresses';

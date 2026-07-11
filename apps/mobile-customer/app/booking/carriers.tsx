@@ -1,17 +1,46 @@
-import { useEffect, useState } from 'react';
+import { useAuth } from '@clerk/expo';
+import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useBookingStore, carriersApi } from '@surewaka/mobile-shared';
-import type { Carrier } from '@surewaka/shared';
+import { useBookingStore, carriersApi, apiClient } from '@surewaka/mobile-shared';
+import type { Carrier, LineItem } from '@surewaka/shared';
+
+type LegQuoteResult = {
+  legType: string;
+  lineItems: LineItem[];
+  totalKobo: number;
+};
+
+type QuoteResponse = {
+  legs: LegQuoteResult[];
+  compositeTotalKobo: number;
+};
+
+type CarrierQuoteState = {
+  loading: boolean;
+  quote: QuoteResponse | null;
+  error: string | null;
+};
 
 export default function CarriersScreen() {
   const router = useRouter();
+  const { getToken } = useAuth();
   const setStep = useBookingStore((s) => s.setStep);
   const setSelectedCarrier = useBookingStore((s) => s.setSelectedCarrier);
+  const pickup = useBookingStore((s) => s.pickup);
+  const dropoff = useBookingStore((s) => s.dropoff);
+  const packageDetails = useBookingStore((s) => s.packageDetails);
 
   const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Quotes state: keyed by carrier id (or 'instant' for on-demand)
+  const [quotes, setQuotes] = useState<Record<string, CarrierQuoteState>>({});
+
+  const vehicleType = useBookingStore((s) => s.vehicleType);
+
+  const packageWeight = packageDetails?.weight ?? 1;
 
   async function loadCarriers() {
     setLoading(true);
@@ -29,10 +58,210 @@ export default function CarriersScreen() {
     loadCarriers();
   }, []);
 
+  // Build the quote request legs for a given carrier
+  const buildQuoteLegs = useCallback(
+    (carrierId: string) => {
+      const legs: unknown[] = [];
+
+      // First-mile on-demand leg (pickup to some hub — use pickup/dropoff as estimate)
+      if (pickup?.lat != null && pickup?.lng != null && dropoff?.lat != null && dropoff?.lng != null) {
+        if (carrierId !== 'instant') {
+          // For carrier comparison: first_mile + intercity + last_mile
+          legs.push({
+            legType: 'first_mile',
+            vehicleType,
+            pickup: { lat: pickup.lat, lng: pickup.lng },
+            dropoff: { lat: pickup.lat, lng: pickup.lng }, // same point estimate for first-mile
+          });
+          legs.push({
+            legType: 'intercity',
+            carrierId,
+          });
+          legs.push({
+            legType: 'last_mile',
+            vehicleType,
+            pickup: { lat: dropoff.lat, lng: dropoff.lng },
+            dropoff: { lat: dropoff.lat, lng: dropoff.lng }, // same point estimate for last-mile
+          });
+        } else {
+          // Instant match: single on-demand leg from pickup to dropoff
+          legs.push({
+            legType: 'first_mile',
+            vehicleType,
+            pickup: { lat: pickup.lat, lng: pickup.lng },
+            dropoff: { lat: dropoff.lat, lng: dropoff.lng },
+          });
+        }
+      }
+
+      return legs;
+    },
+    [pickup, dropoff, vehicleType],
+  );
+
+  // Fetch speculative quote for a specific carrier
+  const fetchQuote = useCallback(
+    async (carrierId: string) => {
+      const token = await getToken();
+      if (!token) return;
+
+      const legs = buildQuoteLegs(carrierId);
+      if (legs.length === 0) return;
+
+      setQuotes((prev) => ({
+        ...prev,
+        [carrierId]: { loading: true, quote: null, error: null },
+      }));
+
+      const res = await apiClient.post<QuoteResponse>(
+        '/api/v1/booking/quote',
+        { legs, packageWeight },
+        token,
+      );
+
+      if (res.error || !res.data) {
+        setQuotes((prev) => ({
+          ...prev,
+          [carrierId]: {
+            loading: false,
+            quote: null,
+            error: res.error?.message ?? 'Could not get quote',
+          },
+        }));
+      } else {
+        setQuotes((prev) => ({
+          ...prev,
+          [carrierId]: { loading: false, quote: res.data, error: null },
+        }));
+      }
+    },
+    [getToken, buildQuoteLegs, packageWeight],
+  );
+
+  // Fetch quotes for all carriers + instant once carriers are loaded and locations are available
+  useEffect(() => {
+    if (loading || error || carriers.length === 0) return;
+    if (!pickup?.lat || !dropoff?.lat) return;
+
+    // Fetch instant quote
+    fetchQuote('instant');
+
+    // Fetch quote for each carrier
+    for (const carrier of carriers) {
+      fetchQuote(carrier.id);
+    }
+  }, [loading, error, carriers, pickup, dropoff, packageWeight, vehicleType]);
+
   function selectCarrier(id: string) {
     setSelectedCarrier(id);
     setStep(4);
     router.push('/booking/review');
+  }
+
+  function formatKobo(kobo: number): string {
+    return `₦${(kobo / 100).toLocaleString()}`;
+  }
+
+  // Render line items for a carrier's quote
+  function renderQuoteDetails(carrierId: string) {
+    const quoteState = quotes[carrierId];
+
+    if (!quoteState || quoteState.loading) {
+      return (
+        <View className="mt-2">
+          <View className="h-3 w-24 bg-gray-200 rounded animate-pulse" />
+        </View>
+      );
+    }
+
+    if (quoteState.error) {
+      return (
+        <Text className="text-xs text-red-500 mt-1">Price unavailable</Text>
+      );
+    }
+
+    if (!quoteState.quote) return null;
+
+    // For carrier comparison, show the intercity leg's line items
+    const intercityLeg = quoteState.quote.legs.find((l) => l.legType === 'intercity');
+    const onDemandLegs = quoteState.quote.legs.filter(
+      (l) => l.legType === 'first_mile' || l.legType === 'last_mile',
+    );
+
+    return (
+      <View className="mt-2">
+        {intercityLeg && (
+          <View>
+            {intercityLeg.lineItems.map((item, idx) => (
+              <View key={idx} className="flex-row justify-between items-center mt-0.5">
+                <Text className="text-xs text-gray-500">{item.label}</Text>
+                <Text className="text-xs text-gray-600">{formatKobo(item.amountKobo)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+        {onDemandLegs.length > 0 && (
+          <View className="mt-1 pt-1 border-t border-gray-100">
+            {onDemandLegs.map((leg, legIdx) => (
+              <View key={legIdx} className="mb-1">
+                <Text className="text-xs font-medium text-gray-600 mb-0.5">
+                  {leg.legType === 'first_mile' ? 'Pickup leg' : 'Delivery leg'}
+                </Text>
+                {leg.lineItems
+                  .filter((i) => i.label.startsWith('Vehicle type'))
+                  .map((item, idx) => (
+                    <View key={idx} className="flex-row justify-between items-center">
+                      <Text className="text-xs text-gray-500">{item.label}</Text>
+                      <Text className="text-xs text-gray-600">{formatKobo(item.amountKobo)}</Text>
+                    </View>
+                  ))}
+                <View className="flex-row justify-between items-center">
+                  <Text className="text-xs text-gray-500">Leg total</Text>
+                  <Text className="text-xs text-gray-600">{formatKobo(leg.totalKobo)}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+        <View className="flex-row justify-between items-center mt-1.5 pt-1 border-t border-gray-200">
+          <Text className="text-xs font-semibold text-gray-700">Total</Text>
+          <Text className="text-sm font-bold text-gray-900">
+            {formatKobo(quoteState.quote.compositeTotalKobo)}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Render the total price badge for a carrier
+  function renderPriceBadge(carrierId: string, fallbackPrice: number | null) {
+    const quoteState = quotes[carrierId];
+
+    if (!quoteState || quoteState.loading) {
+      return (
+        <View className="items-end">
+          <View className="h-5 w-20 bg-gray-200 rounded animate-pulse" />
+        </View>
+      );
+    }
+
+    if (quoteState.error || !quoteState.quote) {
+      // Fallback to static basePrice if quote fails
+      if (fallbackPrice != null) {
+        return (
+          <Text className="text-lg font-bold text-gray-900 shrink-0">
+            From {formatKobo(fallbackPrice)}
+          </Text>
+        );
+      }
+      return null;
+    }
+
+    return (
+      <Text className="text-lg font-bold text-gray-900 shrink-0">
+        {formatKobo(quoteState.quote.compositeTotalKobo)}
+      </Text>
+    );
   }
 
   return (
@@ -45,12 +274,13 @@ export default function CarriersScreen() {
         className="bg-primary-light rounded-xl p-4 mb-4 border-2 border-primary"
       >
         <View className="flex-row items-center justify-between">
-          <View>
+          <View className="flex-1 mr-4">
             <Text className="text-lg font-bold text-primary">Instant Match</Text>
             <Text className="text-sm text-gray-500 mt-1">Get a driver in ~15 minutes</Text>
           </View>
-          <Text className="text-xl font-bold text-primary">₦3,000</Text>
+          {renderPriceBadge('instant', 300000)}
         </View>
+        {renderQuoteDetails('instant')}
       </Pressable>
 
       <Text className="text-base font-semibold text-gray-900 mb-3 mt-2">Registered Carriers</Text>
@@ -99,12 +329,9 @@ export default function CarriersScreen() {
                     : ''}
                 </Text>
               </View>
-              {carrier.basePrice != null && (
-                <Text className="text-lg font-bold text-gray-900 shrink-0">
-                  From ₦{(carrier.basePrice / 100).toLocaleString()}
-                </Text>
-              )}
+              {renderPriceBadge(carrier.id, carrier.basePrice)}
             </View>
+            {renderQuoteDetails(carrier.id)}
           </Pressable>
         ))}
 
