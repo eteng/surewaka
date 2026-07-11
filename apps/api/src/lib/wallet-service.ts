@@ -8,7 +8,8 @@ export type TransactionType =
   | 'refund'
   | 'payout'
   | 'commission'
-  | 'adjustment';
+  | 'adjustment'
+  | 'payout_reversal';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TxOrDb = any;
