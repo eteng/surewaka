@@ -309,12 +309,16 @@ export type BookingConfirm = z.infer<typeof bookingConfirmSchema>;
 export const paystackWebhookSchema = z.object({
   event: z.string(),
   data: z.object({
-    reference: z.string(),
-    amount: z.number(),
-    status: z.string(),
-    customer: z.object({ email: z.string() }),
+    reference: z.string().optional(),
+    amount: z.number().optional(),
+    status: z.string().optional(),
+    customer: z.object({ email: z.string() }).optional(),
     metadata: z.record(z.unknown()).optional().default({}),
-  }),
+    transfer_code: z.string().optional(),
+    recipient: z.object({ recipient_code: z.string() }).optional(),
+    reason: z.string().optional(),
+    complete_message: z.string().optional(),
+  }).passthrough(),
 });
 export type PaystackWebhook = z.infer<typeof paystackWebhookSchema>;
 

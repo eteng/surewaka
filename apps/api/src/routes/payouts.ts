@@ -4,6 +4,7 @@ import { db, payoutRequests } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { getWalletByUserId, debitWallet } from '../lib/wallet-service';
 import { payoutRequestSchema } from '@surewaka/shared';
+import { enqueuePaymentJob } from '../lib/queue-client';
 import type { AuthUser } from '@surewaka/auth';
 import { randomUUID } from 'crypto';
 
@@ -59,6 +60,9 @@ payoutRoutes.post('/request', async (c) => {
 
       return inserted;
     });
+
+    // Enqueue the payout processing job
+    await enqueuePaymentJob('process-payout', { payoutRequestId: payout.id });
 
     return c.json({ data: payout, error: null, meta: null }, 201);
   } catch (err) {

@@ -87,6 +87,62 @@ export async function createDedicatedVirtualAccount(
   return json.data;
 }
 
+export type TransferRecipientData = {
+  recipient_code: string;
+  name: string;
+  type: string;
+};
+
+export type TransferData = {
+  transfer_code: string;
+  reference: string;
+  status: 'success' | 'pending' | 'failed';
+  amount: number;
+};
+
+export async function createTransferRecipient(
+  name: string,
+  accountNumber: string,
+  bankCode: string,
+): Promise<TransferRecipientData> {
+  const res = await fetch(`${BASE}/transferrecipient`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      type: 'nuban',
+      name,
+      account_number: accountNumber,
+      bank_code: bankCode,
+      currency: 'NGN',
+    }),
+  });
+  const json = (await res.json()) as { status: boolean; message?: string; data: TransferRecipientData };
+  if (!json.status) throw new Error(`Paystack recipient creation failed: ${json.message ?? res.status}`);
+  return json.data;
+}
+
+export async function initiateTransfer(
+  amount: number,
+  recipientCode: string,
+  reference: string,
+  reason?: string,
+): Promise<TransferData> {
+  const res = await fetch(`${BASE}/transfer`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      source: 'balance',
+      amount,
+      recipient: recipientCode,
+      reference,
+      reason: reason ?? 'SureWaka payout',
+    }),
+  });
+  const json = (await res.json()) as { status: boolean; message?: string; data: TransferData };
+  if (!json.status) throw new Error(`Paystack transfer failed: ${json.message ?? res.status}`);
+  return json.data;
+}
+
 export function verifyWebhookSignature(rawBody: string, signature: string): boolean {
   const hash = createHmac('sha512', getSecretKey())
     .update(rawBody)

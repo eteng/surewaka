@@ -5,6 +5,7 @@ import { handleEscrowRelease } from './jobs/escrow-release';
 import { handleRefund } from './jobs/refund';
 import { handleProvisionDva } from './jobs/provision-dva';
 import { handleNotifyTopup } from './jobs/notify-topup';
+import { handleProcessPayout } from './jobs/process-payout';
 import type {
   PaymentJobName,
   EscrowHoldJobData,
@@ -12,6 +13,7 @@ import type {
   RefundJobData,
   ProvisionDvaJobData,
   NotifyTopupJobData,
+  ProcessPayoutJobData,
 } from './queue';
 
 type PaymentJobData =
@@ -19,7 +21,8 @@ type PaymentJobData =
   | EscrowReleaseJobData
   | RefundJobData
   | ProvisionDvaJobData
-  | NotifyTopupJobData;
+  | NotifyTopupJobData
+  | ProcessPayoutJobData;
 
 const worker = new Worker<PaymentJobData, void, PaymentJobName>(
   'payment',
@@ -30,6 +33,7 @@ const worker = new Worker<PaymentJobData, void, PaymentJobName>(
       case 'refund':         return handleRefund(job.data as RefundJobData);
       case 'provision-dva':  return handleProvisionDva(job.data as ProvisionDvaJobData);
       case 'notify-topup':   return handleNotifyTopup(job.data as NotifyTopupJobData);
+      case 'process-payout': return handleProcessPayout(job.data as ProcessPayoutJobData);
       default:
         throw new Error(`Unknown job name: ${String(job.name)}`);
     }

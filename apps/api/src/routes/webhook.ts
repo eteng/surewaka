@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
-import { db, walletTransactions, users } from '@surewaka/db';
+import { db, walletTransactions, users, payoutRequests } from '@surewaka/db';
 import { verifyWebhookSignature } from '../lib/paystack';
 import { getWalletByUserId, creditWallet } from '../lib/wallet-service';
 import { paystackWebhookSchema } from '@surewaka/shared';
@@ -27,49 +27,104 @@ webhookRoutes.post('/paystack', async (c) => {
 
   const { event, data } = parsed.data;
 
-  if (event !== 'charge.success') return c.json({ data: { ok: true }, error: null, meta: null });
+  // ─── charge.success: wallet top-up ────────────────────────────────────────
+  if (event === 'charge.success') {
+    const reference = data.reference;
+    const amount = data.amount;
+    if (!reference || !amount) return c.json({ data: { ok: true }, error: null, meta: null });
 
-  // Idempotency: skip if reference was already processed
-  const existing = await db
-    .select({ id: walletTransactions.id })
-    .from(walletTransactions)
-    .where(eq(walletTransactions.reference, data.reference));
+    // Idempotency: skip if reference was already processed
+    const existing = await db
+      .select({ id: walletTransactions.id })
+      .from(walletTransactions)
+      .where(eq(walletTransactions.reference, reference));
 
-  if (existing.length > 0) return c.json({ data: { ok: true }, error: null, meta: null });
+    if (existing.length > 0) return c.json({ data: { ok: true }, error: null, meta: null });
 
-  try {
-    // Prefer user_id from metadata (set at transaction initialization) to avoid extra DB lookup
-    const rawUserId = data.metadata?.['user_id'];
-    const userId = typeof rawUserId === 'string' ? rawUserId : undefined;
+    try {
+      const rawUserId = data.metadata?.['user_id'];
+      const userId = typeof rawUserId === 'string' ? rawUserId : undefined;
+      let resolvedUserId: string | undefined = userId;
 
-    let resolvedUserId: string | undefined = userId;
+      if (!resolvedUserId) {
+        const email = data.customer?.email;
+        if (!email) {
+          console.error('[webhook] No user_id in metadata and no customer email');
+          return c.json({ data: { ok: true }, error: null, meta: null });
+        }
+        const [user] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, email));
 
-    if (!resolvedUserId) {
-      // Fallback: look up user by email
-      const [user] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.email, data.customer.email));
-
-      if (!user) {
-        console.error(`[webhook] No user found for email ${data.customer.email}`);
-        return c.json({ data: { ok: true }, error: null, meta: null });
+        if (!user) {
+          console.error(`[webhook] No user found for email ${email}`);
+          return c.json({ data: { ok: true }, error: null, meta: null });
+        }
+        resolvedUserId = user.id;
       }
 
-      resolvedUserId = user.id;
+      const wallet = await getWalletByUserId(resolvedUserId);
+      await creditWallet(
+        wallet.id,
+        amount,
+        'fund',
+        reference,
+        'Wallet top-up via Paystack',
+        data.metadata ?? {},
+      );
+    } catch (err) {
+      console.error('[webhook] Failed to process charge.success', err);
     }
+  }
 
-    const wallet = await getWalletByUserId(resolvedUserId);
-    await creditWallet(
-      wallet.id,
-      data.amount,
-      'fund',
-      data.reference,
-      'Wallet top-up via Paystack',
-      data.metadata ?? {},
-    );
-  } catch (err) {
-    console.error('[webhook] Failed to process charge.success', err);
+  // ─── transfer.success: payout completed ───────────────────────────────────
+  if (event === 'transfer.success') {
+    try {
+      const transferCode = data.transfer_code as string | undefined;
+      if (transferCode) {
+        await db
+          .update(payoutRequests)
+          .set({ status: 'completed', processedAt: new Date() })
+          .where(eq(payoutRequests.paystackTransferCode, transferCode));
+      }
+    } catch (err) {
+      console.error('[webhook] Failed to process transfer.success', err);
+    }
+  }
+
+  // ─── transfer.failed / transfer.reversed: payout failed ───────────────────
+  if (event === 'transfer.failed' || event === 'transfer.reversed') {
+    try {
+      const transferCode = data.transfer_code as string | undefined;
+      const reason = (data.reason as string) ?? (data.complete_message as string) ?? 'Transfer failed';
+      if (transferCode) {
+        const [payout] = await db
+          .select({ id: payoutRequests.id, walletId: payoutRequests.walletId, amount: payoutRequests.amount })
+          .from(payoutRequests)
+          .where(eq(payoutRequests.paystackTransferCode, transferCode));
+
+        if (payout && payout.walletId) {
+          // Mark payout as failed
+          await db
+            .update(payoutRequests)
+            .set({ status: 'failed', failureReason: reason })
+            .where(eq(payoutRequests.id, payout.id));
+
+          // Reverse the wallet debit — credit back the amount
+          await creditWallet(
+            payout.walletId,
+            payout.amount,
+            'adjustment',
+            `reversal_${payout.id}`,
+            `Payout failed: ${reason}`,
+            { payoutRequestId: payout.id, event },
+          );
+        }
+      }
+    } catch (err) {
+      console.error(`[webhook] Failed to process ${event}`, err);
+    }
   }
 
   return c.json({ data: { ok: true }, error: null, meta: null });

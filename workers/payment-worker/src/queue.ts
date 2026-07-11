@@ -12,7 +12,8 @@ export type PaymentJobName =
   | 'escrow-release'
   | 'refund'
   | 'provision-dva'
-  | 'notify-topup';
+  | 'notify-topup'
+  | 'process-payout';
 
 export type EscrowHoldJobData = {
   deliveryId: string;
@@ -45,4 +46,8 @@ export type ProvisionDvaJobData = {
 export type NotifyTopupJobData = {
   userId: string;
   amount: number;
+};
+
+export type ProcessPayoutJobData = {
+  payoutRequestId: string;
 };
