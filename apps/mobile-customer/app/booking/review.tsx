@@ -1,12 +1,26 @@
 import { useAuth } from '@clerk/expo';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useBookingStore, useAuthStore, createAuthClient } from '@surewaka/mobile-shared';
+import { useBookingStore, useQuoteExpiry, createAuthClient } from '@surewaka/mobile-shared';
 import { PaymentShortfallSheet } from './payment-shortfall';
+import type { VehicleType } from '@surewaka/shared';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+type QuoteLeg = {
+  legType: string;
+  legLabel: string;
+  lineItems: Array<{ label: string; amountKobo: number }>;
+  totalKobo: number;
+};
+
+type QuoteResponse = {
+  legs: QuoteLeg[];
+  compositeTotalKobo: number;
+  expiresAt?: string;
+};
 
 type DeliveryResponse = {
   id: string;
@@ -19,10 +33,17 @@ type DeliveryResponse = {
   packageDescription: string;
   packageWeight: number;
   packageCategory: string;
-  price: number | null;
+  priceKobo: number | null;
   createdAt: string;
   updatedAt: string;
+  quote?: QuoteResponse;
 };
+
+/** Formats kobo amount to naira with ₦ prefix (e.g. 350000 → ₦3,500.00) */
+function formatKoboToNaira(kobo: number): string {
+  const naira = kobo / 100;
+  return `₦${naira.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 export default function ReviewScreen() {
   const { bottom } = useSafeAreaInsets();
@@ -32,9 +53,16 @@ export default function ReviewScreen() {
   const packageDetails = useBookingStore((s) => s.packageDetails);
   const recipientDetails = useBookingStore((s) => s.recipientDetails);
   const selectedCarrier = useBookingStore((s) => s.selectedCarrier);
+  const vehicleType = useBookingStore((s) => s.vehicleType);
+  const storedDeliveryId = useBookingStore((s) => s.deliveryId);
+  const quoteExpiresAt = useBookingStore((s) => s.quoteExpiresAt);
+  const setDeliveryId = useBookingStore((s) => s.setDeliveryId);
+  const setQuoteExpiresAt = useBookingStore((s) => s.setQuoteExpiresAt);
   const resetBooking = useBookingStore((s) => s.reset);
   const { getToken } = useAuth();
   const [submitting, setSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [compositeQuote, setCompositeQuote] = useState<QuoteResponse | null>(null);
   const [showShortfall, setShowShortfall] = useState(false);
   const [shortfallData, setShortfallData] = useState<{
     shortfall: number;
@@ -42,7 +70,64 @@ export default function ReviewScreen() {
     totalAmount: number;
   } | null>(null);
 
-  const confirmBooking = async (deliveryId: string, amount: number) => {
+  // Quote expiry countdown — tracks time remaining on the authoritative quote
+  const { isExpiringSoon, isExpired, countdownDisplay } = useQuoteExpiry(quoteExpiresAt);
+
+  /**
+   * Refreshes the quote by calling the re-quote endpoint.
+   * Updates displayed amounts and resets the expiry countdown.
+   */
+  const handleRefreshQuote = useCallback(async () => {
+    const currentDeliveryId = storedDeliveryId;
+    if (!currentDeliveryId) return;
+    const token = await getToken();
+    if (!token) return;
+
+    setRefreshing(true);
+    try {
+      const client = createAuthClient(token);
+      const { data, error } = await client.post<{
+        quote: QuoteResponse;
+        previousTotalKobo: number;
+      }>(`/api/v1/deliveries/${currentDeliveryId}/requote`, {});
+
+      if (error || !data) {
+        Alert.alert('Refresh Failed', error?.message ?? 'Could not refresh quote. Please try again.');
+        return;
+      }
+
+      // Update displayed quote with fresh data
+      setCompositeQuote(data.quote);
+      // Update the expiry timestamp to restart the countdown
+      if (data.quote.expiresAt) {
+        setQuoteExpiresAt(data.quote.expiresAt);
+      }
+    } catch {
+      Alert.alert('Refresh Failed', 'Could not refresh quote. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [storedDeliveryId, getToken, setQuoteExpiresAt]);
+
+  /**
+   * Builds the legs array for delivery creation based on the selected carrier
+   * and vehicle type from the booking store.
+   */
+  function buildLegs() {
+    if (!selectedCarrier || selectedCarrier === 'instant') {
+      // On-demand delivery — single first_mile leg
+      return [{ legType: 'first_mile' as const, vehicleType }];
+    }
+
+    // Carrier-based delivery with on-demand first/last mile
+    return [
+      { legType: 'first_mile' as const, vehicleType },
+      { legType: 'intercity' as const, carrierId: selectedCarrier },
+      { legType: 'last_mile' as const, vehicleType },
+    ];
+  }
+
+  const confirmBooking = async (deliveryId: string) => {
     if (!await getToken()) return;
     try {
       const res = await fetch(`${API_URL}/api/v1/booking/confirm`, {
@@ -51,7 +136,7 @@ export default function ReviewScreen() {
           Authorization: `Bearer ${(await getToken())!}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ delivery_id: deliveryId, amount }),
+        body: JSON.stringify({ delivery_id: deliveryId }),
       });
       const json = (await res.json()) as { data: unknown; error?: { message: string } };
       if (!res.ok) {
@@ -77,9 +162,21 @@ export default function ReviewScreen() {
       return;
     }
 
+    // If quote is expired, prompt refresh instead of allowing a failed confirmation
+    if (isExpired && storedDeliveryId) {
+      Alert.alert(
+        'Quote Expired',
+        'Your quote has expired. Please refresh to get updated pricing.',
+        [{ text: 'Refresh', onPress: () => void handleRefreshQuote() }],
+      );
+      return;
+    }
+
     setSubmitting(true);
 
     const client = createAuthClient((await getToken())!);
+
+    const legs = buildLegs();
 
     const { data, error } = await client.post<DeliveryResponse>('/api/v1/deliveries', {
       pickup: {
@@ -106,6 +203,7 @@ export default function ReviewScreen() {
         recipientPhone: recipientDetails.recipientPhone ?? '',
         deliveryNotes: recipientDetails.deliveryNotes,
       },
+      legs,
     });
 
     if (error || !data) {
@@ -115,9 +213,27 @@ export default function ReviewScreen() {
     }
 
     const deliveryId = data.id;
+    const quote = data.quote;
 
-    // TODO: replace with real price from carrier selection
-    const deliveryAmount = 350000; // kobo placeholder
+    // Store delivery ID and quote expiry in booking store for countdown tracking
+    setDeliveryId(deliveryId);
+    if (quote?.expiresAt) {
+      setQuoteExpiresAt(quote.expiresAt);
+    }
+
+    // Store quote for display
+    if (quote) {
+      setCompositeQuote(quote);
+    }
+
+    // Use the server-computed composite total from the authoritative quotes
+    const deliveryAmount = quote?.compositeTotalKobo ?? data.priceKobo ?? 0;
+
+    if (deliveryAmount === 0) {
+      setSubmitting(false);
+      Alert.alert('Error', 'Could not determine delivery price. Please try again.');
+      return;
+    }
 
     try {
       const checkRes = await fetch(`${API_URL}/api/v1/wallet/check`, {
@@ -149,7 +265,7 @@ export default function ReviewScreen() {
       }
 
       setSubmitting(false);
-      await confirmBooking(deliveryId, deliveryAmount);
+      await confirmBooking(deliveryId);
     } catch (err) {
       setSubmitting(false);
       Alert.alert('Error', 'Could not verify wallet balance. Please try again.');
@@ -162,6 +278,51 @@ export default function ReviewScreen() {
       <Text className="text-2xl font-bold text-gray-900 mb-6">
         Review Booking
       </Text>
+
+      {/* Quote expiry warning — shows when < 2 minutes remaining */}
+      {isExpiringSoon && !isExpired && (
+        <Pressable
+          onPress={() => void handleRefreshQuote()}
+          disabled={refreshing}
+          className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex-row items-center justify-between"
+        >
+          <View className="flex-1">
+            <Text className="text-sm font-semibold text-amber-800">
+              Quote expiring soon
+            </Text>
+            <Text className="text-xs text-amber-600 mt-0.5">
+              Expires in {countdownDisplay}. Tap to refresh.
+            </Text>
+          </View>
+          {refreshing ? (
+            <ActivityIndicator size="small" color="#92400e" />
+          ) : (
+            <Text className="text-sm font-semibold text-amber-800">Refresh</Text>
+          )}
+        </Pressable>
+      )}
+
+      {isExpired && (
+        <Pressable
+          onPress={() => void handleRefreshQuote()}
+          disabled={refreshing}
+          className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 flex-row items-center justify-between"
+        >
+          <View className="flex-1">
+            <Text className="text-sm font-semibold text-red-800">
+              Quote expired
+            </Text>
+            <Text className="text-xs text-red-600 mt-0.5">
+              Tap to get updated pricing before confirming.
+            </Text>
+          </View>
+          {refreshing ? (
+            <ActivityIndicator size="small" color="#991b1b" />
+          ) : (
+            <Text className="text-sm font-semibold text-red-800">Refresh</Text>
+          )}
+        </Pressable>
+      )}
 
       <View className="bg-gray-50 rounded-xl p-4 mb-4">
         <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">
@@ -204,7 +365,7 @@ export default function ReviewScreen() {
         )}
       </View>
 
-      <View className="bg-gray-50 rounded-xl p-4 mb-6">
+      <View className="bg-gray-50 rounded-xl p-4 mb-4">
         <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">
           Service
         </Text>
@@ -213,11 +374,64 @@ export default function ReviewScreen() {
         </Text>
       </View>
 
+      {/* Price Breakdown — Composite Quote grouped by leg */}
+      {compositeQuote && (
+        <View className="bg-gray-50 rounded-xl p-4 mb-6">
+          <Text className="text-sm font-semibold text-gray-500 uppercase mb-3">
+            Price Breakdown
+          </Text>
+
+          {compositeQuote.legs.map((leg, index) => (
+            <View key={`${leg.legType}-${index}`} className={index > 0 ? 'mt-4' : ''}>
+              {/* Leg label as section header */}
+              <Text className="text-sm font-semibold text-gray-800 mb-2">
+                {leg.legLabel}
+              </Text>
+
+              {/* Line items under each leg */}
+              {leg.lineItems.map((item, itemIndex) => (
+                <View
+                  key={`${leg.legType}-item-${itemIndex}`}
+                  className="flex-row justify-between items-center py-1 px-1"
+                >
+                  <Text className="text-sm text-gray-600 flex-1">
+                    {item.label}
+                  </Text>
+                  <Text className="text-sm text-gray-900 font-medium">
+                    {formatKoboToNaira(item.amountKobo)}
+                  </Text>
+                </View>
+              ))}
+
+              {/* Leg subtotal */}
+              <View className="flex-row justify-between items-center pt-2 mt-1 border-t border-gray-200 px-1">
+                <Text className="text-sm font-medium text-gray-700">
+                  Subtotal
+                </Text>
+                <Text className="text-sm font-semibold text-gray-900">
+                  {formatKoboToNaira(leg.totalKobo)}
+                </Text>
+              </View>
+            </View>
+          ))}
+
+          {/* Composite total */}
+          <View className="flex-row justify-between items-center pt-3 mt-4 border-t border-gray-300 px-1">
+            <Text className="text-base font-bold text-gray-900">
+              Total
+            </Text>
+            <Text className="text-base font-bold text-primary">
+              {formatKoboToNaira(compositeQuote.compositeTotalKobo)}
+            </Text>
+          </View>
+        </View>
+      )}
+
       <Pressable
         onPress={handleSubmit}
-        disabled={submitting}
+        disabled={submitting || isExpired}
         className={`py-4 rounded-xl items-center ${
-          submitting ? 'bg-primary/50' : 'bg-primary'
+          submitting || isExpired ? 'bg-primary/50' : 'bg-primary'
         }`}
       >
         {submitting ? (
@@ -236,7 +450,7 @@ export default function ReviewScreen() {
               totalAmount={shortfallData.totalAmount}
               onSuccess={() => {
                 setShowShortfall(false);
-                void confirmBooking(shortfallData.deliveryId, shortfallData.totalAmount);
+                void confirmBooking(shortfallData.deliveryId);
               }}
               onDismiss={() => setShowShortfall(false)}
             />

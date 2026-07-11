@@ -1,6 +1,6 @@
 // Feature: carrier-vetting-pipeline
 // Admin carrier vetting routes — list/review/approve/reject applications, list carriers,
-// and create strategic partner accounts directly.
+// create strategic partner accounts, and view single carrier detail with rate history.
 
 import { Hono } from 'hono';
 import { requireAuth } from '../../middleware/auth';
@@ -13,6 +13,8 @@ import {
   carrierListQuerySchema,
 } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
+import { db, carriers, carrierRateHistory, users } from '@surewaka/db';
+import { eq, desc } from 'drizzle-orm';
 import {
   listApplications,
   getApplication,
@@ -156,6 +158,46 @@ adminCarriers.post('/applications/:id/reject', async (c) => {
 });
 
 // ─── Carrier Routes ───────────────────────────────────────────────────────────
+
+// GET /:id — single carrier detail with rate history
+adminCarriers.get('/:id', async (c) => {
+  const carrierId = c.req.param('id');
+
+  const [carrier] = await db
+    .select()
+    .from(carriers)
+    .where(eq(carriers.id, carrierId))
+    .limit(1);
+
+  if (!carrier) {
+    return c.json(
+      { data: null, error: { code: 'NOT_FOUND', message: 'Carrier not found' }, meta: null },
+      404,
+    );
+  }
+
+  // Fetch rate history with changed_by user names
+  const rateHistory = await db
+    .select({
+      id: carrierRateHistory.id,
+      oldBasePriceKobo: carrierRateHistory.oldBasePriceKobo,
+      newBasePriceKobo: carrierRateHistory.newBasePriceKobo,
+      changedBy: carrierRateHistory.changedBy,
+      changedByName: users.name,
+      reason: carrierRateHistory.reason,
+      createdAt: carrierRateHistory.createdAt,
+    })
+    .from(carrierRateHistory)
+    .leftJoin(users, eq(carrierRateHistory.changedBy, users.id))
+    .where(eq(carrierRateHistory.carrierId, carrierId))
+    .orderBy(desc(carrierRateHistory.createdAt));
+
+  return c.json({
+    data: { ...carrier, rateHistory },
+    error: null,
+    meta: null,
+  });
+});
 
 // GET / — list active carriers
 adminCarriers.get('/', async (c) => {

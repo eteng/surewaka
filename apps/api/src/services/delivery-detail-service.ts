@@ -20,7 +20,7 @@ export async function getDeliveryDetail(id: string): Promise<DeliveryDetail | nu
       packageWeight: deliveries.packageWeight,
       packageCategory: deliveries.packageCategory,
       deliveryNotes: deliveries.deliveryNotes,
-      price: deliveries.price,
+      price: deliveries.priceKobo,
       amountPaid: deliveries.amountPaid,
       paymentStatus: deliveries.paymentStatus,
       createdAt: deliveries.createdAt,

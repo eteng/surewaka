@@ -40,6 +40,22 @@ export function navigateToDeepLink(data: PushNotificationData, router: Router): 
       return;
     }
 
+    // Handle weight_correction type — needs deliveryId and correctionId from metadata
+    if (data.type === 'weight_correction') {
+      const deliveryId = data.resourceId;
+      const correctionId = data.metadata?.correctionId as string | undefined;
+
+      if (deliveryId && correctionId) {
+        router.push({
+          pathname: '/delivery/weight-correction' as never,
+          params: { deliveryId, correctionId },
+        } as never);
+      } else {
+        router.replace('/' as never);
+      }
+      return;
+    }
+
     // Look up route template from the deep link map
     const template = PUSH_DEEP_LINK_MAP[data.type];
 

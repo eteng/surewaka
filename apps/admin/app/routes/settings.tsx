@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { Bell, User } from 'lucide-react';
+import { Banknote, Bell, User } from 'lucide-react';
 import type { Route } from './+types/settings';
 
 export function meta({}: Route.MetaArgs) {
@@ -12,6 +12,12 @@ const SETTINGS_CARDS = [
     icon: Bell,
     title: 'Alert Settings',
     description: 'Thresholds, Pumble webhook, push routing',
+  },
+  {
+    to: '/settings/fee-settings',
+    icon: Banknote,
+    title: 'Fee Settings',
+    description: 'On-demand rates, commission, vehicle type multipliers',
   },
   {
     to: '/settings/profile',

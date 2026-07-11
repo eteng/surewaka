@@ -5,7 +5,15 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useBookingStore } from '@surewaka/mobile-shared';
-import { PACKAGE_CATEGORIES } from '@surewaka/shared';
+import { PACKAGE_CATEGORIES, VEHICLE_TYPES } from '@surewaka/shared';
+import type { VehicleType } from '@surewaka/shared';
+
+const VEHICLE_TYPE_LABELS: Record<VehicleType, { label: string; description: string }> = {
+  motorcycle: { label: 'Motorcycle', description: 'Small packages, fastest' },
+  car: { label: 'Car', description: 'Medium packages' },
+  van: { label: 'Van', description: 'Large packages' },
+  truck: { label: 'Truck', description: 'Heavy/bulk items' },
+};
 
 const packageSchema = z.object({
   description: z.string().min(3, 'Describe your package').max(500),
@@ -20,6 +28,8 @@ export default function PackageScreen() {
   const router = useRouter();
   const packageDetails = useBookingStore((s) => s.packageDetails);
   const setPackageDetails = useBookingStore((s) => s.setPackageDetails);
+  const vehicleType = useBookingStore((s) => s.vehicleType);
+  const setVehicleType = useBookingStore((s) => s.setVehicleType);
   const setStep = useBookingStore((s) => s.setStep);
 
   const { control, handleSubmit, formState: { errors } } = useForm<FormData>({
@@ -92,7 +102,7 @@ export default function PackageScreen() {
         )}
       />
 
-      <View className="mb-6">
+      <View className="mb-4">
         <Text className="text-sm font-medium text-gray-700 mb-2">Category</Text>
         <View className="flex-row flex-wrap gap-2">
           {PACKAGE_CATEGORIES.map((cat) => (
@@ -120,6 +130,46 @@ export default function PackageScreen() {
               )}
             />
           ))}
+        </View>
+      </View>
+
+      <View className="mb-6">
+        <Text className="text-sm font-medium text-gray-700 mb-2">Vehicle Type</Text>
+        <Text className="text-xs text-gray-400 mb-3">
+          Larger vehicles cost more but carry heavier packages
+        </Text>
+        <View className="gap-2">
+          {VEHICLE_TYPES.map((vt) => {
+            const { label, description } = VEHICLE_TYPE_LABELS[vt];
+            const isSelected = vehicleType === vt;
+            return (
+              <Pressable
+                key={vt}
+                onPress={() => setVehicleType(vt)}
+                className={`flex-row items-center justify-between px-4 py-3 rounded-xl border ${
+                  isSelected
+                    ? 'border-primary bg-primary/5'
+                    : 'border-gray-200 bg-white'
+                }`}
+              >
+                <View>
+                  <Text
+                    className={`text-base font-medium ${
+                      isSelected ? 'text-primary' : 'text-gray-900'
+                    }`}
+                  >
+                    {label}
+                  </Text>
+                  <Text className="text-xs text-gray-500">{description}</Text>
+                </View>
+                {isSelected && (
+                  <View className="h-5 w-5 rounded-full bg-primary items-center justify-center">
+                    <Text className="text-white text-xs font-bold">✓</Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 

@@ -3,17 +3,18 @@ import { eq } from 'drizzle-orm';
 import { db, deliveries, escrowHolds } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { getWalletByUserId, creditWallet, debitWallet } from '../lib/wallet-service';
-import { bookingConfirmSchema, cancelDeliverySchema } from '@surewaka/shared';
+import { bookingConfirmSchema, cancelDeliverySchema, FEE_ENGINE_ERRORS } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
 import { randomUUID } from 'crypto';
 import { notifyDeliveryCancelled } from '../services/push-triggers';
+import { confirmAll } from '../services/quote-service';
 
 type Env = { Variables: { user: AuthUser; accessToken: string } };
 
 const bookingPaymentRoutes = new Hono<Env>();
 bookingPaymentRoutes.use('*', requireAuth);
 
-// POST /booking/confirm — escrow hold + wallet debit
+// POST /booking/confirm — validate quotes, escrow hold + wallet debit
 bookingPaymentRoutes.post('/booking/confirm', async (c) => {
   const user = c.get('user');
   const body = await c.req.json();
@@ -25,11 +26,14 @@ bookingPaymentRoutes.post('/booking/confirm', async (c) => {
     );
   }
 
-  // TODO(security): amount should be fetched from server-side carrier quote,
-  // not trusted from the client. Blocked on carrier pricing sprint.
-  const { delivery_id, amount } = parsed.data;
+  const { delivery_id } = parsed.data;
 
   try {
+    // Confirm all active quotes — validates they exist and aren't expired,
+    // stamps confirmed_at, and returns the server-computed total.
+    // Uses FOR UPDATE row lock internally to prevent race with concurrent re-quote.
+    const { totalKobo } = await confirmAll(db, delivery_id);
+
     const wallet = await getWalletByUserId(user.id);
     const reference = `escrow_${delivery_id}_${randomUUID().slice(0, 8)}`;
 
@@ -51,14 +55,14 @@ bookingPaymentRoutes.post('/booking/confirm', async (c) => {
         throw Object.assign(new Error('ALREADY_CONFIRMED'), { code: 'ALREADY_CONFIRMED' });
       }
 
-      await debitWallet(wallet.id, amount, 'escrow_hold', reference, `Escrow for delivery ${delivery_id}`, { delivery_id, user_id: wallet.userId }, tx);
+      await debitWallet(wallet.id, totalKobo, 'escrow_hold', reference, `Escrow for delivery ${delivery_id}`, { delivery_id, user_id: wallet.userId }, tx);
 
       const [escrow] = await tx
         .insert(escrowHolds)
         .values({
           deliveryId: delivery_id,
           senderWalletId: wallet.id,
-          totalAmount: amount,
+          totalAmount: totalKobo,
           status: 'held',
           heldAt: new Date(),
         })
@@ -66,13 +70,30 @@ bookingPaymentRoutes.post('/booking/confirm', async (c) => {
 
       await tx
         .update(deliveries)
-        .set({ status: 'pending', paymentStatus: 'escrowed', escrowHoldId: escrow.id, amountPaid: amount })
+        .set({ status: 'pending', paymentStatus: 'escrowed', escrowHoldId: escrow.id, amountPaid: totalKobo })
         .where(eq(deliveries.id, delivery_id));
     });
 
-    return c.json({ data: { delivery_id, status: 'confirmed' }, error: null, meta: null });
+    return c.json({ data: { delivery_id, status: 'confirmed', totalKobo }, error: null, meta: null });
   } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
     const code = (err as { code?: string }).code;
+
+    // Quote validation errors from confirmAll
+    if (msg === FEE_ENGINE_ERRORS.QUOTE_MISSING) {
+      return c.json(
+        { data: null, error: { code: 'QUOTE_MISSING', message: 'No active quotes found for this delivery' }, meta: null },
+        422,
+      );
+    }
+    if (msg === FEE_ENGINE_ERRORS.QUOTE_EXPIRED) {
+      return c.json(
+        { data: null, error: { code: 'QUOTE_EXPIRED', message: 'One or more quotes have expired — please re-quote' }, meta: null },
+        409,
+      );
+    }
+
+    // Delivery ownership/status errors
     if (code === 'NOT_FOUND') {
       return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Delivery not found' }, meta: null }, 404);
     }
@@ -88,7 +109,6 @@ bookingPaymentRoutes.post('/booking/confirm', async (c) => {
         409,
       );
     }
-    const msg = err instanceof Error ? err.message : 'Unknown error';
     if (msg === 'INSUFFICIENT_BALANCE') {
       return c.json(
         { data: null, error: { code: 'INSUFFICIENT_BALANCE', message: 'Wallet balance too low' }, meta: null },
