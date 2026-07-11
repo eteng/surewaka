@@ -11,18 +11,19 @@ import type { EvaluationResult } from '../types';
 export async function evaluate(settings: AlertSettings): Promise<EvaluationResult[]> {
   const result = await db.execute(sql`
     SELECT
-      id          AS leg_id,
-      delivery_id,
-      driver_eta_at,
-      system_eta_at,
-      dropoff_zone AS zone,
-      actor_type
-    FROM delivery_legs
-    WHERE status IN (
+      dl.id          AS leg_id,
+      dl.delivery_id,
+      dl.driver_eta_at,
+      dl.system_eta_at,
+      z.name         AS zone,
+      dl.actor_type
+    FROM delivery_legs dl
+    LEFT JOIN zones z ON z.id = dl.dropoff_zone_id
+    WHERE dl.status IN (
         'accepted', 'en_route_pickup', 'arrived_pickup',
         'picked_up', 'en_route_dropoff', 'arrived_dropoff'
       )
-      AND (driver_eta_at IS NOT NULL OR system_eta_at IS NOT NULL)
+      AND (dl.driver_eta_at IS NOT NULL OR dl.system_eta_at IS NOT NULL)
   `);
 
   const now = Date.now();
@@ -47,12 +48,15 @@ export async function evaluate(settings: AlertSettings): Promise<EvaluationResul
       continue;
     }
 
-    const context = {
+    const zoneName = row.zone as string | null;
+    const context: Record<string, unknown> = {
       deliveryId: row.delivery_id,
       minutesOverdue: Math.floor(minutesOverdue),
-      zone: (row.zone as string | null) ?? 'Unknown',
       etaSource: row.driver_eta_at ? 'driver' : 'system',
     };
+    if (zoneName) {
+      context.zone = zoneName;
+    }
 
     if (minutesOverdue >= settings.legOverdueCriticalMin) {
       results.push({

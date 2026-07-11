@@ -1,6 +1,7 @@
 import * as React from 'react';
 import {
   LayoutDashboard,
+  MapPin,
   Settings2,
   Truck,
   Users,
@@ -53,12 +54,23 @@ const data = {
       ],
     },
     {
+      title: 'Coverage',
+      url: '#',
+      icon: MapPin,
+      items: [
+        { title: 'Zones', url: '/coverage/zones' },
+        { title: 'Service Areas', url: '/coverage/service-areas' },
+        { title: 'Pricing Regions', url: '/coverage/pricing-regions' },
+      ],
+    },
+    {
       title: 'Settings',
       url: '#',
       icon: Settings2,
       items: [
         { title: 'General', url: '/settings' },
         { title: 'Alerts', url: '/settings/alerts' },
+        { title: 'Fee Settings', url: '/settings/fee-settings' },
         { title: 'Profile', url: '/settings/profile' },
         { title: 'Name Changes', url: '/settings/name-changes' },
       ],

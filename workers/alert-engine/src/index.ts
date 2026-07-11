@@ -14,6 +14,7 @@ import { evaluate as evalDisputeFiled } from './rules/dispute-filed';
 import { evaluate as evalDeliveryFailed } from './rules/delivery-failed';
 import { evaluate as evalOntimeRate } from './rules/ontime-rate-drop';
 import { evaluate as evalCustomerUpdateGap } from './rules/customer-update-gap';
+import { runCorrectionExpiryCheck } from './rules/weight-correction-expiry';
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -122,7 +123,16 @@ const evaluators = [
 async function runTick(): Promise<void> {
   const [settings, adminUserIds] = await Promise.all([loadSettings(), getAdminUserIds()]);
 
-  const settled = await Promise.allSettled(evaluators.map((fn) => fn(settings)));
+  // Run alert-rule evaluators (notification-only) and the correction expiry check
+  // (business-state mutation) in parallel.
+  const [settled, correctionResult] = await Promise.all([
+    Promise.allSettled(evaluators.map((fn) => fn(settings))),
+    runCorrectionExpiryCheck().catch((err) => {
+      console.error('[alert-engine] weight-correction-expiry check failed:', err);
+      return { resolvedCount: 0 };
+    }),
+  ]);
+
   const allResults: EvaluationResult[] = [];
   for (const [i, result] of settled.entries()) {
     if (result.status === 'fulfilled') {
@@ -141,7 +151,10 @@ async function runTick(): Promise<void> {
   }
 
   console.log(
-    `[alert-engine] tick complete — ${allResults.filter((r) => r.shouldFire).length} active conditions`,
+    `[alert-engine] tick complete — ${allResults.filter((r) => r.shouldFire).length} active conditions` +
+      (correctionResult.resolvedCount > 0
+        ? `, ${correctionResult.resolvedCount} expired correction(s) resolved`
+        : ''),
   );
 }
 

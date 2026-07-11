@@ -16,6 +16,7 @@ export type AnalyticsParams = {
 };
 
 export type RootCauseFilters = {
+  city?: string;
   zone?: string;
   driverId?: string;
   carrierId?: string;
@@ -30,6 +31,7 @@ function buildQuery(params: AnalyticsParams & Partial<RootCauseFilters>): string
   if (params.period) q.set('period', params.period);
   if (params.from) q.set('from', params.from);
   if (params.to) q.set('to', params.to);
+  if (params.city) q.set('city', params.city);
   if (params.zone) q.set('zone', params.zone);
   if (params.driverId) q.set('driverId', params.driverId);
   if (params.carrierId) q.set('carrierId', params.carrierId);

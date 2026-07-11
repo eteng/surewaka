@@ -18,6 +18,7 @@ export * from './role-audit-log';
 
 // Carriers & drivers
 export * from './carriers';
+export * from './carrier-rate-history';
 export * from './carrier-vetting';
 export * from './drivers';
 
@@ -44,6 +45,24 @@ export * from './customer-segments';
 // Pre-launch
 export * from './waitlist';
 
+// Pricing & quotes
+export * from './quotes';
+
 // Alert system
 export * from './alerts';
 export * from './alert-settings';
+
+// Pricing & fees
+export * from './fee-settings';
+
+// Pricing & fee engine
+export * from './weight-discrepancy-corrections';
+
+// Coverage & zones
+export * from './zones';
+
+// Pricing & fee engine
+export * from './vehicle-type-rates';
+
+// Carrier reconciliation
+export * from './carrier-invoice-reconciliations';

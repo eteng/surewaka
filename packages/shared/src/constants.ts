@@ -41,6 +41,7 @@ export const PUSH_NOTIFICATION_TYPES = [
   'dispute_opened',
   'delivery_assigned',
   'carrier_verified',
+  'weight_correction',
   'broadcast',
   'system_alert',
 ] as const;
@@ -51,6 +52,7 @@ export const HIGH_PRIORITY_PUSH_TYPES: PushNotificationType[] = [
   'delivery_status_change',
   'delivery_cancelled',
   'driver_arrived',
+  'weight_correction',
   'system_alert',
 ];
 
@@ -62,6 +64,7 @@ export const PUSH_DEEP_LINK_MAP: Record<PushNotificationType, string> = {
   dispute_opened: '/delivery/:resourceId/dispute',
   delivery_assigned: '/delivery/:resourceId',
   carrier_verified: '/',
+  weight_correction: '/delivery/weight-correction',
   broadcast: '/:deepLink',
   system_alert: '/alerts',
 };
@@ -74,6 +77,7 @@ export const PUSH_APP_ROUTING: Record<PushNotificationType, PushTargetApp | 'all
   dispute_opened: 'customer', // overridden contextually for driver via targetAppOverride
   delivery_assigned: 'driver',
   carrier_verified: 'driver',
+  weight_correction: 'customer',
   broadcast: 'all',
   system_alert: 'admin',
 };
@@ -87,16 +91,6 @@ export const PUSH_BROADCAST_QUEUE_NAME = 'push-broadcasts';
 export const PUSH_BROADCAST_BATCH_SIZE = 500;
 
 // ─── Delivery Model ───────────────────────────────────────────────────────────
-
-export const LAGOS_ZONES = [
-  'Lekki',
-  'Victoria Island',
-  'Ikeja',
-  'Surulere',
-  'Mainland',
-  'Island',
-  'Other',
-] as const;
 
 export const LEG_TYPES = ['first_mile', 'intercity', 'last_mile'] as const;
 export const LEG_ACTOR_TYPES = ['driver', 'carrier'] as const;
@@ -149,3 +143,11 @@ export const ALERT_RULES = [
 ] as const;
 
 export const ALERT_SEVERITIES = ['info', 'warning', 'critical'] as const;
+
+// ─── Fee Engine Error Codes ───────────────────────────────────────────────────
+
+export const FEE_ENGINE_ERRORS = {
+  INVALID_VEHICLE_TYPE: 'INVALID_VEHICLE_TYPE',
+  QUOTE_EXPIRED: 'QUOTE_EXPIRED',
+  QUOTE_MISSING: 'QUOTE_MISSING',
+} as const;

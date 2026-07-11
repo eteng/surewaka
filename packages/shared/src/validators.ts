@@ -25,11 +25,27 @@ export const recipientDetailsSchema = z.object({
 
 export type RecipientDetails = z.infer<typeof recipientDetailsSchema>;
 
+// Leg definition for delivery creation — on-demand legs need vehicleType, carrier legs need carrierId
+const deliveryOnDemandLegSchema = z.object({
+  legType: z.enum(['first_mile', 'last_mile']),
+  vehicleType: z.enum(VEHICLE_TYPES),
+});
+
+const deliveryCarrierLegSchema = z.object({
+  legType: z.literal('intercity'),
+  carrierId: z.string().uuid(),
+});
+
+const deliveryLegInputSchema = z.union([deliveryOnDemandLegSchema, deliveryCarrierLegSchema]);
+
+export type DeliveryLegInput = z.infer<typeof deliveryLegInputSchema>;
+
 export const createDeliverySchema = z.object({
   pickup: locationSchema,
   dropoff: locationSchema,
   packageDetails: packageDetailsSchema,
   recipientDetails: recipientDetailsSchema,
+  legs: z.array(deliveryLegInputSchema).min(1).max(10).optional(),
 });
 
 export const otpRegisterSchema = z.object({
@@ -286,7 +302,7 @@ export type WalletCheck = z.infer<typeof walletCheckSchema>;
 
 export const bookingConfirmSchema = z.object({
   delivery_id: z.string().uuid(),
-  amount: z.number().int().positive(),  // kobo
+  amount: z.number().int().positive().optional(),  // kobo — deprecated, server computes from quotes
 });
 export type BookingConfirm = z.infer<typeof bookingConfirmSchema>;
 
@@ -505,15 +521,47 @@ export const overrideFailureCauseSchema = z.object({
   failureNote: z.string().max(500).optional(),
 });
 
+// ─── Zone Validators ──────────────────────────────────────────────────────────
+
+const zoneBaseSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  city: z.string().trim().min(1).max(100),
+  country: z.string().trim().min(1).max(100),
+  keywords: z.array(z.string().trim().min(1).max(100)).min(1).max(50),
+  swLat: z.number().min(-90).max(90).nullable().optional(),
+  swLng: z.number().min(-180).max(180).nullable().optional(),
+  neLat: z.number().min(-90).max(90).nullable().optional(),
+  neLng: z.number().min(-180).max(180).nullable().optional(),
+  isActive: z.boolean().default(true),
+});
+
+function bboxRefine(data: Record<string, unknown>, ctx: z.RefinementCtx) {
+  const bbox = [data.swLat, data.swLng, data.neLat, data.neLng];
+  const hasAny = bbox.some((v) => v != null);
+  const hasAll = bbox.every((v) => v != null);
+  if (hasAny && !hasAll) {
+    ctx.addIssue({ code: 'custom', message: 'All four bounding box coordinates are required when any is provided' });
+  }
+  if (hasAll) {
+    if ((data.swLat as number) >= (data.neLat as number)) ctx.addIssue({ code: 'custom', message: 'sw_lat must be less than ne_lat' });
+    if ((data.swLng as number) >= (data.neLng as number)) ctx.addIssue({ code: 'custom', message: 'sw_lng must be less than ne_lng' });
+  }
+}
+
+export const createZoneSchema = zoneBaseSchema.superRefine(bboxRefine);
+
+export const updateZoneSchema = zoneBaseSchema.partial().superRefine(bboxRefine);
+
+export type CreateZoneInput = z.infer<typeof createZoneSchema>;
+export type UpdateZoneInput = z.infer<typeof updateZoneSchema>;
+
+// ─── Carrier SLA Override ─────────────────────────────────────────────────────
+
 export const createCarrierSlaOverrideSchema = z.object({
   carrierId: z.string().uuid(),
-  originZone: z.enum([
-    'Lekki', 'Victoria Island', 'Ikeja', 'Surulere', 'Mainland', 'Island', 'Other',
-  ]),
-  destinationZone: z.enum([
-    'Lekki', 'Victoria Island', 'Ikeja', 'Surulere', 'Mainland', 'Island', 'Other',
-  ]),
-  slaHours: z.number().positive().max(720),
+  originZoneId: z.string().uuid(),
+  destinationZoneId: z.string().uuid(),
+  slaHours: z.number().positive(),
 });
 
 // ─── Admin Deliveries ────────────────────────────────────────────────────────
@@ -536,6 +584,84 @@ export const adminDeliveryListQuerySchema = z.object({
 // ─── Ops Hub ──────────────────────────────────────────────────────────────────
 
 export { escalationActionSchema } from './validators/ops-hub';
+
+// ─── Fee Engine Validators ────────────────────────────────────────────────────
+
+export const vehicleTypeSchema = z.enum(VEHICLE_TYPES);
+
+const quoteOnDemandLegSchema = z.object({
+  legType: z.enum(['first_mile', 'last_mile']),
+  vehicleType: vehicleTypeSchema,
+  pickup: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }),
+  dropoff: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }),
+});
+
+const quoteCarrierLegSchema = z.object({
+  legType: z.literal('intercity'),
+  carrierId: z.string().uuid(),
+});
+
+const quoteLegSchema = z.discriminatedUnion('legType', [
+  quoteOnDemandLegSchema.extend({ legType: z.literal('first_mile') }),
+  quoteOnDemandLegSchema.extend({ legType: z.literal('last_mile') }),
+  quoteCarrierLegSchema,
+]);
+
+export const quoteRequestSchema = z.object({
+  legs: z.array(quoteLegSchema).min(1).max(10),
+  packageWeight: z.number().positive().max(500),
+});
+
+export type QuoteRequest = z.infer<typeof quoteRequestSchema>;
+
+const lineItemSchema = z.object({
+  label: z.string().min(1),
+  amountKobo: z.number().int(),
+});
+
+const legQuoteResponseSchema = z.object({
+  legType: z.string(),
+  lineItems: z.array(lineItemSchema),
+  totalKobo: z.number().int(),
+});
+
+export const quoteResponseSchema = z.object({
+  legs: z.array(legQuoteResponseSchema),
+  compositeTotalKobo: z.number().int(),
+});
+
+export type QuoteResponse = z.infer<typeof quoteResponseSchema>;
+
+export const weightCorrectionRequestSchema = z.object({
+  reportedWeightKg: z.number().positive().max(500),
+});
+
+export type WeightCorrectionRequest = z.infer<typeof weightCorrectionRequestSchema>;
+
+export const weightCorrectionRespondSchema = z.object({
+  decision: z.enum(['approved', 'declined']),
+});
+
+export type WeightCorrectionRespond = z.infer<typeof weightCorrectionRespondSchema>;
+
+export const updateFeeSettingsSchema = z.object({
+  baseRateKobo: z.number().int().min(0).optional(),
+  perKgRateKobo: z.number().int().min(0).optional(),
+  perKmRateKobo: z.number().int().min(0).optional(),
+  carrierCommissionRatePct: z.number().min(0).max(100).optional(),
+  taxRatePct: z.number().min(0).max(100).optional(),
+  minPriceKobo: z.number().int().min(0).optional(),
+  weightCorrectionApprovalWindowMin: z.number().int().min(1).max(60).optional(),
+});
+
+export type UpdateFeeSettings = z.infer<typeof updateFeeSettingsSchema>;
+
+export const updateVehicleTypeRateSchema = z.object({
+  vehicleType: vehicleTypeSchema,
+  multiplier: z.number().positive(),
+});
+
+export type UpdateVehicleTypeRate = z.infer<typeof updateVehicleTypeRateSchema>;
 
 // ─── Alert Settings ───────────────────────────────────────────────────────────
 

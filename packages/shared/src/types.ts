@@ -1,6 +1,6 @@
 // Core domain types for SureWaka
 import type { DeliveryStatus, PaymentStatus } from './validators';
-import type { LAGOS_ZONES, LEG_TYPES, LEG_ACTOR_TYPES, FAILURE_CAUSES, ALERT_RULES } from './constants';
+import type { LEG_TYPES, LEG_ACTOR_TYPES, FAILURE_CAUSES, ALERT_RULES } from './constants';
 import type { AlertSeverity } from './types/ops-hub';
 
 export type { DeliveryStatus, PaymentStatus };
@@ -197,7 +197,7 @@ export type DriverDetailDelivery = {
   pickupAddress: string;
   dropoffAddress: string;
   date: string; // ISO string of deliveries.createdAt
-  price: number; // deliveries.price (0 if null)
+  price: number; // deliveries.price_kobo (0 if null)
 };
 
 export type DriverDetail = {
@@ -289,6 +289,7 @@ export type PushNotificationType =
   | 'dispute_opened'
   | 'delivery_assigned'
   | 'carrier_verified'
+  | 'weight_correction'
   | 'broadcast'
   | 'system_alert';
 
@@ -415,9 +416,20 @@ export type LocationUpdatePayload = {
   timestamp: string;
 };
 
+// ─── Zone Types ───────────────────────────────────────────────────────────────
+
+export type Zone = {
+  id: string;
+  name: string;
+  city: string;
+  country: string;
+  isActive: boolean;
+};
+
+export type ZoneName = string;
+
 // ─── Multi-Leg Delivery Model Types ──────────────────────────────────────────
 
-export type LagosZone = (typeof LAGOS_ZONES)[number];
 export type LegType = (typeof LEG_TYPES)[number];
 export type LegActorType = (typeof LEG_ACTOR_TYPES)[number];
 export type FailureCause = (typeof FAILURE_CAUSES)[number];
@@ -432,11 +444,11 @@ export type DeliveryLeg = {
   pickupAddress: string;
   pickupLat: number;
   pickupLng: number;
-  pickupZone: LagosZone | null;
+  pickupZoneId: string | null;
   dropoffAddress: string;
   dropoffLat: number;
   dropoffLng: number;
-  dropoffZone: LagosZone | null;
+  dropoffZoneId: string | null;
   status: DeliveryStatus;
   systemEtaAt: string | null;   // ISO 8601
   driverEtaAt: string | null;   // ISO 8601
@@ -480,8 +492,8 @@ export type DeliveryRating = {
 export type CarrierSlaOverride = {
   id: string;
   carrierId: string;
-  originZone: LagosZone;
-  destinationZone: LagosZone;
+  originZoneId: string;
+  destinationZoneId: string;
   slaHours: number;
 };
 
@@ -567,10 +579,41 @@ export type TopContributor = {
 };
 export type HeatCell = { zone: string; timeOfDay: string; avgDelayMinutes: number };
 
+export type HeatmapResponse = {
+  metro: string;
+  zones: string[];
+  cells: HeatCell[];
+};
+
 export type RootCauseData = {
   failureDecomposition: FailureShare[];
   topContributors: TopContributor[];
-  heatmap: HeatCell[];
+  heatmap: HeatmapResponse;
+};
+
+// ─── Fee Engine Types ─────────────────────────────────────────────────────────
+
+export type VehicleType = 'motorcycle' | 'car' | 'van' | 'truck';
+
+export type LineItem = { label: string; amountKobo: number };
+
+export type LegQuote = { lineItems: LineItem[]; totalKobo: number };
+
+export type FeeSettings = {
+  baseRateKobo: number;
+  perKgRateKobo: number;
+  perKmRateKobo: number;
+  carrierCommissionRatePct: number;
+  taxRatePct: number;
+  minPriceKobo: number;
+  weightCorrectionApprovalWindowMin: number;
+};
+
+export type VehicleTypeRates = Record<VehicleType, { multiplier: number }>;
+
+export type CompositeQuote = {
+  legs: { legType: LegType; legLabel: string; quote: LegQuote }[];
+  compositeTotalKobo: number;
 };
 
 // ─── Alert System Types ───────────────────────────────────────────────────────

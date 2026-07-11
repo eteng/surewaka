@@ -4,8 +4,10 @@ import type { AnalyticsParams } from '~/hooks/use-analytics';
 import { Skeleton } from '~/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { LAGOS_ZONES } from '@surewaka/shared';
+import { MapPin } from 'lucide-react';
 import { cn } from '~/lib/utils';
+
+const METROS = ['Lagos', 'Abuja', 'Port Harcourt', 'Ibadan', 'Kano'] as const;
 
 const CAUSE_COLORS: Record<string, string> = {
   driver: '#f59e0b',
@@ -19,13 +21,14 @@ const TIME_SLOTS = ['morning', 'midday', 'evening', 'night'] as const;
 type Props = { params: AnalyticsParams };
 
 export function RootCauseTab({ params }: Props) {
-  const [filters, setFilters] = useState<RootCauseFilters>({});
+  const [filters, setFilters] = useState<RootCauseFilters>({ city: 'Lagos' });
   const { data, isLoading, error } = useAnalyticsRootCause({ ...params, ...filters });
 
   const setFilter = (key: keyof RootCauseFilters, value: string | undefined) =>
     setFilters((f) => ({ ...f, [key]: value === 'all' ? undefined : value || undefined }));
 
-  const heatCells = data?.heatmap ?? [];
+  const heatmapZones = data?.heatmap?.zones ?? [];
+  const heatCells = data?.heatmap?.cells ?? [];
   const maxDelay = Math.max(...heatCells.map((c) => c.avgDelayMinutes), 1);
 
   if (error) return <p className="text-sm text-destructive">Failed to load root cause data: {error}</p>;
@@ -34,16 +37,19 @@ export function RootCauseTab({ params }: Props) {
     <div className="flex gap-6">
       <aside className="w-52 shrink-0 space-y-4">
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Lagos Zone</label>
-          <Select value={filters.zone ?? 'all'} onValueChange={(v) => setFilter('zone', v)}>
-            <SelectTrigger className="h-8 text-xs" aria-label="Filter by Lagos zone">
-              <SelectValue placeholder="All zones" />
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Metro / City</label>
+          <Select
+            value={filters.city ?? 'Lagos'}
+            onValueChange={(v) => setFilters((f) => ({ ...f, city: v }))}
+          >
+            <SelectTrigger className="h-8 text-xs" aria-label="Select metro or city">
+              <MapPin className="mr-1 h-3 w-3 text-muted-foreground" />
+              <SelectValue placeholder="Select city" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All zones</SelectItem>
-              {LAGOS_ZONES.map((z) => (
-                <SelectItem key={z} value={z}>
-                  {z}
+              {METROS.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {m}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -169,9 +175,17 @@ export function RootCauseTab({ params }: Props) {
             </section>
 
             <section>
-              <h3 className="mb-3 text-sm font-semibold">Delay Heatmap — Time of Day × Zone</h3>
-              {heatCells.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No delay data for this filter.</p>
+              <h3 className="mb-3 text-sm font-semibold">
+                Delay Heatmap — Time of Day × Zone
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  ({data.heatmap.metro})
+                </span>
+              </h3>
+              {heatmapZones.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-10">
+                  <MapPin className="h-6 w-6 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No zone data for this period.</p>
+                </div>
               ) : (
                 <>
                   <div className="overflow-x-auto">
@@ -182,7 +196,7 @@ export function RootCauseTab({ params }: Props) {
                       <thead>
                         <tr>
                           <th className="py-1 pr-3 text-left font-medium text-muted-foreground">Time of Day</th>
-                          {LAGOS_ZONES.slice(0, 6).map((z) => (
+                          {heatmapZones.map((z) => (
                             <th
                               key={z}
                               className="whitespace-nowrap px-2 py-1 text-center font-medium text-muted-foreground"
@@ -196,7 +210,7 @@ export function RootCauseTab({ params }: Props) {
                         {TIME_SLOTS.map((slot) => (
                           <tr key={slot}>
                             <td className="py-1 pr-3 font-medium capitalize">{slot}</td>
-                            {LAGOS_ZONES.slice(0, 6).map((zone) => {
+                            {heatmapZones.map((zone) => {
                               const cell = heatCells.find((c) => c.zone === zone && c.timeOfDay === slot);
                               const delay = cell?.avgDelayMinutes ?? 0;
                               const intensity = delay / maxDelay;

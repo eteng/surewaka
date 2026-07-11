@@ -10,6 +10,7 @@ export default [
     route('drivers', 'routes/drivers.tsx'),
     route('drivers/:driverId', 'routes/drivers.$driverId.tsx'),
     route('carriers', 'routes/carriers.tsx'),
+    route('carriers/:carrierId', 'routes/carriers.$carrierId.tsx'),
     route('carriers/applications', 'routes/carriers.applications.tsx'),
     route('carriers/applications/:applicationId', 'routes/carriers.applications.$applicationId.tsx'),
     route('users', 'routes/users.tsx'),
@@ -19,6 +20,7 @@ export default [
     route('analytics', 'routes/analytics.tsx'),
     route('settings', 'routes/settings.tsx'),
     route('settings/alerts', 'routes/settings/alerts.tsx'),
+    route('settings/fee-settings', 'routes/settings/fee-settings.tsx'),
     route('settings/profile', 'routes/settings/profile.tsx'),
     route('settings/name-changes', 'routes/settings/name-changes.tsx'),
     route('notifications', 'routes/notifications.tsx'),
@@ -26,5 +28,6 @@ export default [
     route('disputes', 'routes/disputes.tsx'),
     route('verifications', 'routes/verifications.tsx'),
     route('waitlist', 'routes/waitlist.tsx'),
+    route('coverage/zones', 'routes/coverage/zones.tsx'),
   ]),
 ] satisfies RouteConfig;

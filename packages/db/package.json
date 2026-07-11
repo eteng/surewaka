@@ -13,7 +13,10 @@
     "db:studio": "drizzle-kit studio",
     "db:seed-deliveries": "tsx src/seeds/seed-deliveries.ts",
     "seed:ops": "tsx src/seeds/ops-intelligence.ts",
-    "seed:carriers": "tsx src/seeds/seed-carriers.ts"
+    "seed:fee-settings": "tsx src/seeds/seed-fee-settings.ts",
+    "seed:carriers": "tsx src/seeds/seed-carriers.ts",
+    "seed:zones": "tsx src/scripts/seed-zones.ts",
+    "seed:vehicle-type-rates": "tsx src/seeds/seed-vehicle-type-rates.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

@@ -14,11 +14,12 @@ export async function evaluate(settings: AlertSettings): Promise<EvaluationResul
       dl.id          AS leg_id,
       dl.delivery_id,
       u.name         AS driver_name,
-      dl.dropoff_zone AS zone,
+      z.name         AS zone,
       MAX(dloc.recorded_at) AS last_ping
     FROM delivery_legs dl
     JOIN drivers dr ON dr.id = dl.actor_id
     JOIN users u    ON u.id  = dr.user_id
+    LEFT JOIN zones z ON z.id = dl.dropoff_zone_id
     LEFT JOIN driver_locations dloc
       ON dloc.driver_id   = dl.actor_id
      AND dloc.delivery_id = dl.delivery_id
@@ -27,7 +28,7 @@ export async function evaluate(settings: AlertSettings): Promise<EvaluationResul
         'accepted', 'en_route_pickup', 'arrived_pickup',
         'picked_up', 'en_route_dropoff', 'arrived_dropoff'
       )
-    GROUP BY dl.id, dl.delivery_id, u.name, dl.dropoff_zone
+    GROUP BY dl.id, dl.delivery_id, u.name, z.name
   `);
 
   const now = Date.now();
@@ -38,12 +39,15 @@ export async function evaluate(settings: AlertSettings): Promise<EvaluationResul
 
     const minutesSilent = (now - new Date(row.last_ping as string).getTime()) / 60_000;
 
-    const context = {
+    const zoneName = row.zone as string | null;
+    const context: Record<string, unknown> = {
       deliveryId: row.delivery_id,
       driverName: (row.driver_name as string | null) ?? 'Unknown',
       minutesSilent: Math.floor(minutesSilent),
-      zone: (row.zone as string | null) ?? 'Unknown',
     };
+    if (zoneName) {
+      context.zone = zoneName;
+    }
 
     if (minutesSilent >= settings.driverSilentCriticalMin) {
       results.push({

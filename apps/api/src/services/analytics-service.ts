@@ -106,6 +106,7 @@ export type CustomerExperienceData = {
 export type RootCauseParams = {
   start: Date;
   end: Date;
+  city?: string;
   zone?: string;
   driverId?: string;
   carrierId?: string;
@@ -125,10 +126,16 @@ export type TopContributor = {
 };
 export type HeatCell = { zone: string; timeOfDay: string; avgDelayMinutes: number };
 
+export type HeatmapResponse = {
+  metro: string;
+  zones: string[];
+  cells: HeatCell[];
+};
+
 export type RootCauseData = {
   failureDecomposition: FailureShare[];
   topContributors: TopContributor[];
-  heatmap: HeatCell[];
+  heatmap: HeatmapResponse;
 };
 
 // ─── Time-of-day helper ───────────────────────────────────────────────────────
@@ -473,8 +480,8 @@ export async function getCarrierPerformance(from: Date, to: Date): Promise<Carri
     JOIN carriers c ON c.id = dl.actor_id
     LEFT JOIN carrier_sla_overrides cso
       ON cso.carrier_id = dl.actor_id
-      AND cso.origin_zone = dl.pickup_zone
-      AND cso.destination_zone = dl.dropoff_zone
+      AND cso.origin_zone_id = dl.pickup_zone_id
+      AND cso.destination_zone_id = dl.dropoff_zone_id
     WHERE dl.actor_type = 'carrier'
       AND dl.created_at >= ${from.toISOString()} AND dl.created_at <= ${to.toISOString()}
     GROUP BY dl.actor_id, c.name
@@ -483,15 +490,15 @@ export async function getCarrierPerformance(from: Date, to: Date): Promise<Carri
 
   const [overrideResult] = (await db.execute<{ configured: number; total: number }>(sql`
     SELECT
-      COUNT(DISTINCT (dl.actor_id, dl.pickup_zone, dl.dropoff_zone)) FILTER (
+      COUNT(DISTINCT (dl.actor_id, dl.pickup_zone_id, dl.dropoff_zone_id)) FILTER (
         WHERE EXISTS (
           SELECT 1 FROM carrier_sla_overrides cso
           WHERE cso.carrier_id = dl.actor_id
-            AND cso.origin_zone = dl.pickup_zone
-            AND cso.destination_zone = dl.dropoff_zone
+            AND cso.origin_zone_id = dl.pickup_zone_id
+            AND cso.destination_zone_id = dl.dropoff_zone_id
         )
       )::int AS configured,
-      COUNT(DISTINCT (dl.actor_id, dl.pickup_zone, dl.dropoff_zone))::int AS total
+      COUNT(DISTINCT (dl.actor_id, dl.pickup_zone_id, dl.dropoff_zone_id))::int AS total
     FROM delivery_legs dl
     WHERE dl.actor_type = 'carrier'
       AND dl.created_at >= ${from.toISOString()} AND dl.created_at <= ${to.toISOString()}
@@ -621,9 +628,9 @@ export async function getCustomerExperience(from: Date, to: Date): Promise<Custo
 // ─── Root Cause ────────────────────────────────────────────────────────────────
 
 export async function getRootCause(params: RootCauseParams): Promise<RootCauseData> {
-  const { start, end, zone, driverId, carrierId, legType, timeOfDay } = params;
+  const { start, end, city = 'Lagos', zone, driverId, carrierId, legType, timeOfDay } = params;
 
-  const zoneClause = zone ? sql`AND dl.dropoff_zone = ${zone}` : sql``;
+  const zoneClause = zone ? sql`AND z_filter.name = ${zone}` : sql``;
   const driverClause = driverId ? sql`AND dl.actor_id = ${driverId} AND dl.actor_type = 'driver'` : sql``;
   const carrierClause = carrierId ? sql`AND dl.actor_id = ${carrierId} AND dl.actor_type = 'carrier'` : sql``;
   const legTypeClause = legType ? sql`AND dl.leg_type = ${legType}` : sql``;
@@ -635,6 +642,7 @@ export async function getRootCause(params: RootCauseParams): Promise<RootCauseDa
       COUNT(*)::int AS count
     FROM delivery_events de
     JOIN delivery_legs dl ON dl.id = de.leg_id
+    LEFT JOIN zones z_filter ON z_filter.id = dl.dropoff_zone_id
     WHERE de.created_at >= ${start.toISOString()} AND de.created_at <= ${end.toISOString()}
       AND de.failure_cause IS NOT NULL
       AND ${todClause}
@@ -670,7 +678,7 @@ export async function getRootCause(params: RootCauseParams): Promise<RootCauseDa
       AVG(
         EXTRACT(EPOCH FROM (dl.completed_at - COALESCE(dl.driver_eta_at, dl.system_eta_at))) / 60
       )::int AS avg_late_minutes,
-      MODE() WITHIN GROUP (ORDER BY dl.dropoff_zone) AS top_zone,
+      MODE() WITHIN GROUP (ORDER BY COALESCE(z_top.name, 'Unclassified')) AS top_zone,
       MODE() WITHIN GROUP (ORDER BY
         CASE
           WHEN EXTRACT(HOUR FROM dl.completed_at) BETWEEN 6 AND 10 THEN 'morning'
@@ -680,6 +688,7 @@ export async function getRootCause(params: RootCauseParams): Promise<RootCauseDa
         END
       ) AS top_tod
     FROM delivery_legs dl
+    LEFT JOIN zones z_top ON z_top.id = dl.dropoff_zone_id
     LEFT JOIN drivers dr ON dr.id = dl.actor_id AND dl.actor_type = 'driver'
     LEFT JOIN users u ON u.id = dr.user_id
     LEFT JOIN carriers c ON c.id = dl.actor_id AND dl.actor_type = 'carrier'
@@ -693,9 +702,12 @@ export async function getRootCause(params: RootCauseParams): Promise<RootCauseDa
     LIMIT 5
   `)).rows;
 
+  // Metro-scoped dynamic heatmap: query only active zones in the city that have
+  // at least one delivery leg with a matching dropoff_zone_id and non-null completed_at
+  // in the date range.
   const heatRows = (await db.execute<{ zone: string; time_of_day: string; avg_delay: number }>(sql`
     SELECT
-      COALESCE(dl.dropoff_zone, 'Other') AS zone,
+      z.name AS zone,
       CASE
         WHEN EXTRACT(HOUR FROM dl.completed_at) BETWEEN 6 AND 10 THEN 'morning'
         WHEN EXTRACT(HOUR FROM dl.completed_at) BETWEEN 10 AND 15 THEN 'midday'
@@ -706,11 +718,17 @@ export async function getRootCause(params: RootCauseParams): Promise<RootCauseDa
         EXTRACT(EPOCH FROM (dl.completed_at - COALESCE(dl.driver_eta_at, dl.system_eta_at))) / 60
       )::int AS avg_delay
     FROM delivery_legs dl
-    WHERE dl.completed_at > COALESCE(dl.driver_eta_at, dl.system_eta_at)
-      AND dl.completed_at IS NOT NULL
+    INNER JOIN zones z ON z.id = dl.dropoff_zone_id
+      AND z.is_active = true
+      AND z.city = ${city}
+    WHERE dl.completed_at IS NOT NULL
+      AND dl.completed_at > COALESCE(dl.driver_eta_at, dl.system_eta_at)
       AND dl.created_at >= ${start.toISOString()} AND dl.created_at <= ${end.toISOString()}
-    GROUP BY zone, time_of_day
+    GROUP BY z.name, time_of_day
   `)).rows;
+
+  // Extract unique zone names that actually have data
+  const zoneNames = [...new Set(heatRows.map((r) => r.zone))].sort();
 
   return {
     failureDecomposition,
@@ -720,13 +738,17 @@ export async function getRootCause(params: RootCauseParams): Promise<RootCauseDa
       name: r.name,
       lateCount: r.late_count as number,
       avgMinutesLate: r.avg_late_minutes as number,
-      topZone: (r.top_zone as string) ?? 'Other',
+      topZone: (r.top_zone as string) ?? 'Unclassified',
       topTimeOfDay: (r.top_tod as string) ?? 'midday',
     })),
-    heatmap: heatRows.map((r) => ({
-      zone: r.zone,
-      timeOfDay: r.time_of_day,
-      avgDelayMinutes: (r.avg_delay as number) ?? 0,
-    })),
+    heatmap: {
+      metro: city,
+      zones: zoneNames,
+      cells: heatRows.map((r) => ({
+        zone: r.zone,
+        timeOfDay: r.time_of_day,
+        avgDelayMinutes: (r.avg_delay as number) ?? 0,
+      })),
+    },
   };
 }

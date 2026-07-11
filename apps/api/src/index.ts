@@ -19,16 +19,22 @@ import adminDriverRoutes from './routes/admin/drivers';
 import carrierApplicationRoutes from './routes/carrier-applications';
 import walletRoutes from './routes/wallet';
 import webhookRoutes from './routes/webhook';
+import zoneRoutes from './routes/zones';
 import bookingPaymentRoutes from './routes/booking-payment';
+import bookingQuoteRoutes from './routes/booking-quote';
 import payoutRoutes from './routes/payouts';
 import pushTokenRoutes from './routes/push-tokens';
 import adminBroadcastRoutes from './routes/admin/broadcast';
 import adminDeliveryRoutes from './routes/admin/deliveries';
+import adminZoneRoutes from './routes/admin/zones';
 import driverLocationRoutes from './routes/driver-locations';
 import opsHubRoutes from './routes/admin/ops-hub';
 import alertRoutes from './routes/admin/alerts';
 import alertSettingsRoutes from './routes/admin/alert-settings';
+import adminFeeSettingsRoutes from './routes/admin/fee-settings';
 import adminAnalyticsRoutes from './routes/admin/analytics';
+import adminCarrierRateRoutes from './routes/admin/carrier-rates';
+import { adminCarrierReconciliations } from './routes/admin/carrier-rates';
 
 const app = new Hono();
 
@@ -65,6 +71,7 @@ app.route('/api/v1/carrier-applications', carrierApplicationRoutes);
 app.route('/api/v1/wallet', walletRoutes);
 app.route('/api/v1/webhook', webhookRoutes);
 app.route('/api/v1', bookingPaymentRoutes);
+app.route('/api/v1', bookingQuoteRoutes);
 app.route('/api/v1/payouts', payoutRoutes);
 app.route('/api/v1/push-tokens', pushTokenRoutes);
 app.route('/api/v1/admin/broadcast', adminBroadcastRoutes);
@@ -73,7 +80,12 @@ app.route('/api/v1/driver/location', driverLocationRoutes);
 app.route('/api/v1/admin/ops-hub', opsHubRoutes);
 app.route('/api/v1/admin/alerts', alertRoutes);
 app.route('/api/v1/admin/alert-settings', alertSettingsRoutes);
+app.route('/api/v1/admin/fee-settings', adminFeeSettingsRoutes);
 app.route('/api/v1/admin/analytics', adminAnalyticsRoutes);
+app.route('/api/v1/admin/carriers', adminCarrierRateRoutes);
+app.route('/api/v1/admin/carrier-reconciliations', adminCarrierReconciliations);
+app.route('/api/v1/admin/zones', adminZoneRoutes);
+app.route('/api/v1/zones', zoneRoutes);
 
 // Start server
 const port = Number(process.env.PORT) || 4000;

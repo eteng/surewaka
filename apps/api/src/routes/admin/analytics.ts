@@ -104,6 +104,7 @@ analyticsRoutes.get('/root-cause', async (c) => {
     const data = await getRootCause({
       start,
       end,
+      city: c.req.query('city') ?? 'Lagos',
       zone: c.req.query('zone'),
       driverId: c.req.query('driverId'),
       carrierId: c.req.query('carrierId'),
