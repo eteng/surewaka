@@ -73,6 +73,7 @@ export const transactionType = pgEnum('transaction_type', [
   'payout',
   'commission',
   'adjustment',
+  'payout_reversal',
 ]);
 
 export const userRole = pgEnum('user_role', [

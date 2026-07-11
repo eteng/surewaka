@@ -29,7 +29,7 @@ export const payoutRequests = pgTable(
     check('payout_requests_amount_check', sql`amount > 0`),
     check(
       'payout_requests_status_check',
-      sql`status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])`,
+      sql`status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text, 'reversed'::text])`,
     ),
   ],
 );
