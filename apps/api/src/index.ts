@@ -35,6 +35,7 @@ import adminFeeSettingsRoutes from './routes/admin/fee-settings';
 import adminAnalyticsRoutes from './routes/admin/analytics';
 import adminCarrierRateRoutes from './routes/admin/carrier-rates';
 import { adminCarrierReconciliations } from './routes/admin/carrier-rates';
+import adminPayoutRoutes from './routes/admin/payouts';
 
 const app = new Hono();
 
@@ -85,6 +86,7 @@ app.route('/api/v1/admin/analytics', adminAnalyticsRoutes);
 app.route('/api/v1/admin/carriers', adminCarrierRateRoutes);
 app.route('/api/v1/admin/carrier-reconciliations', adminCarrierReconciliations);
 app.route('/api/v1/admin/zones', adminZoneRoutes);
+app.route('/api/v1/admin/payouts', adminPayoutRoutes);
 app.route('/api/v1/zones', zoneRoutes);
 
 // Start server
