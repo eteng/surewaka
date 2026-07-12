@@ -291,7 +291,8 @@ export type PushNotificationType =
   | 'carrier_verified'
   | 'weight_correction'
   | 'broadcast'
-  | 'system_alert';
+  | 'system_alert'
+  | 'wallet_withdrawal';
 
 export type PushTargetApp = 'customer' | 'driver' | 'admin';
 

@@ -44,6 +44,7 @@ export const PUSH_NOTIFICATION_TYPES = [
   'weight_correction',
   'broadcast',
   'system_alert',
+  'wallet_withdrawal',
 ] as const;
 
 export const PUSH_TARGET_APPS = ['customer', 'driver', 'admin'] as const;
@@ -67,6 +68,7 @@ export const PUSH_DEEP_LINK_MAP: Record<PushNotificationType, string> = {
   weight_correction: '/delivery/weight-correction',
   broadcast: '/:deepLink',
   system_alert: '/alerts',
+  wallet_withdrawal: '/wallet',
 };
 
 export const PUSH_APP_ROUTING: Record<PushNotificationType, PushTargetApp | 'all'> = {
@@ -80,6 +82,7 @@ export const PUSH_APP_ROUTING: Record<PushNotificationType, PushTargetApp | 'all
   weight_correction: 'customer',
   broadcast: 'all',
   system_alert: 'admin',
+  wallet_withdrawal: 'all', // both customer and driver apps can withdraw
 };
 
 export const MAX_PUSH_TOKENS_PER_USER_PER_APP = 10;
