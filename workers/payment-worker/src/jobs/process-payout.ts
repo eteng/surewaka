@@ -1,5 +1,6 @@
-import { db, payoutRequests } from '@surewaka/db';
+import { db, payoutRequests, wallets, walletTransactions } from '@surewaka/db';
 import { eq } from 'drizzle-orm';
+import type { Job } from 'bullmq';
 import type { ProcessPayoutJobData } from '../queue';
 
 const BASE = 'https://api.paystack.co';
@@ -45,34 +46,68 @@ async function initiateTransfer(amount: number, recipientCode: string, reference
   return json.data;
 }
 
-export async function handleProcessPayout(data: ProcessPayoutJobData) {
-  // 1. Fetch the payout request
+async function reversePayoutInWallet(walletId: string, amount: number, payoutId: string, reason: string) {
+  await db.transaction(async (tx) => {
+    const [wallet] = await tx
+      .select({ balance: wallets.balance })
+      .from(wallets)
+      .where(eq(wallets.id, walletId))
+      .for('update');
+
+    if (!wallet) throw new Error(`Wallet ${walletId} not found during reversal`);
+    const newBalance = Number(wallet.balance) + amount;
+
+    await tx
+      .update(wallets)
+      .set({ balance: newBalance, updatedAt: new Date() })
+      .where(eq(wallets.id, walletId));
+
+    await tx.insert(walletTransactions).values({
+      walletId,
+      type: 'payout_reversal',
+      amount,
+      balanceAfter: newBalance,
+      reference: `reversal_${payoutId}`,
+      description: reason,
+    });
+
+    await tx
+      .update(payoutRequests)
+      .set({ status: 'failed', failureReason: reason, processedAt: new Date() })
+      .where(eq(payoutRequests.id, payoutId));
+  });
+}
+
+export async function handleProcessPayout(job: Job<ProcessPayoutJobData>) {
+  const { payoutRequestId } = job.data;
+
   const [payout] = await db
     .select()
     .from(payoutRequests)
-    .where(eq(payoutRequests.id, data.payoutRequestId));
+    .where(eq(payoutRequests.id, payoutRequestId));
 
-  if (!payout) throw new Error(`Payout request not found: ${data.payoutRequestId}`);
-  if (payout.status !== 'pending') {
-    console.log(`[ProcessPayout] Skipping non-pending payout ${payout.id} (status: ${payout.status})`);
+  if (!payout) throw new Error(`Payout request not found: ${payoutRequestId}`);
+
+  // Skip terminal states — already handled (by webhook or a prior exhaustion)
+  if (payout.status === 'completed' || payout.status === 'failed' || payout.status === 'reversed') {
+    console.log(`[ProcessPayout] Skipping terminal payout ${payout.id} (status: ${payout.status})`);
     return { skipped: true, status: payout.status };
   }
 
-  // 2. Mark as processing
+  // Transfer already initiated — webhook will complete it, no need to re-call Paystack
+  if (payout.paystackTransferCode) {
+    console.log(`[ProcessPayout] Transfer already initiated for ${payout.id}, awaiting webhook`);
+    return { skipped: true, reason: 'transfer_already_initiated' };
+  }
+
+  // Mark as processing
   await db
     .update(payoutRequests)
     .set({ status: 'processing' })
     .where(eq(payoutRequests.id, payout.id));
 
   try {
-    // 3. Create transfer recipient on Paystack
-    const recipient = await createRecipient(
-      payout.accountName,
-      payout.accountNumber,
-      payout.bankCode,
-    );
-
-    // 4. Initiate the transfer
+    const recipient = await createRecipient(payout.accountName, payout.accountNumber, payout.bankCode);
     const reference = `payout_transfer_${payout.id}`;
     const transfer = await initiateTransfer(
       payout.amount,
@@ -81,29 +116,46 @@ export async function handleProcessPayout(data: ProcessPayoutJobData) {
       `SureWaka payout to ${payout.accountName}`,
     );
 
-    // 5. Update payout request with Paystack codes
     await db
       .update(payoutRequests)
       .set({
         paystackRecipientCode: recipient.recipient_code,
         paystackTransferCode: transfer.transfer_code,
-        // If Paystack returns immediate success (OTP disabled), mark completed
-        ...(transfer.status === 'success'
-          ? { status: 'completed', processedAt: new Date() }
-          : {}),
+        ...(transfer.status === 'success' ? { status: 'completed', processedAt: new Date() } : {}),
       })
       .where(eq(payoutRequests.id, payout.id));
 
     return { transfer_code: transfer.transfer_code, status: transfer.status };
   } catch (err) {
-    // Transfer failed — mark payout as failed, but DON'T reverse the wallet debit here.
-    // Reversal should be a separate admin action or retry flow.
     const reason = err instanceof Error ? err.message : 'Unknown error';
-    await db
-      .update(payoutRequests)
-      .set({ status: 'failed', failureReason: reason })
-      .where(eq(payoutRequests.id, payout.id));
+    const maxAttempts = job.opts.attempts ?? 1;
+    const isLastAttempt = job.attemptsMade + 1 >= maxAttempts;
 
-    throw err; // Re-throw so BullMQ can retry
+    if (isLastAttempt) {
+      console.error(`[ProcessPayout] Exhausted retries for ${payout.id}:`, err);
+      try {
+        await reversePayoutInWallet(
+          payout.walletId,
+          payout.amount,
+          payout.id,
+          `Payout failed after ${job.attemptsMade} attempts: ${reason}`,
+        );
+      } catch (reversalErr) {
+        console.error(`[ProcessPayout] REVERSAL FAILED for ${payout.id} — manual re-credit required`, reversalErr);
+        await db
+          .update(payoutRequests)
+          .set({ status: 'failed', failureReason: 'Exhausted retries; reversal also failed — manual re-credit required' })
+          .where(eq(payoutRequests.id, payout.id))
+          .catch(() => {});
+        throw reversalErr;
+      }
+    } else {
+      // Intermediate failure — revert to pending so the next attempt can proceed
+      await db
+        .update(payoutRequests)
+        .set({ status: 'pending' })
+        .where(eq(payoutRequests.id, payout.id));
+      throw err;
+    }
   }
 }
