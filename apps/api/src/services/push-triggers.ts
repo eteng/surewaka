@@ -333,3 +333,58 @@ export async function notifyCarrierVerified(carrierId: string): Promise<boolean>
 
   return enqueuePush(admin.userId, 'carrier_verified', payload);
 }
+
+// ─── Payout Completed ────────────────────────────────────────────────────────
+
+/**
+ * Notify user when their payout transfer succeeds.
+ *
+ * @param payoutRequestId - The payout_requests UUID (used as resourceId)
+ * @param userId - The user's UUID (from wallets.userId)
+ * @param amount - Amount in kobo
+ */
+export async function notifyPayoutCompleted(
+  payoutRequestId: string,
+  userId: string,
+  amount: number,
+): Promise<boolean> {
+  const formatted = `₦${(amount / 100).toLocaleString('en-NG')}`;
+  const payload = buildPayload(
+    'wallet_withdrawal',
+    'Withdrawal Successful',
+    `Your ${formatted} withdrawal is on its way to your bank account.`,
+    payoutRequestId,
+  );
+  return enqueuePush(userId, 'wallet_withdrawal', payload);
+}
+
+// ─── Payout Failed / Reversed ────────────────────────────────────────────────
+
+/**
+ * Notify user when their payout transfer fails or is reversed.
+ *
+ * @param payoutRequestId - The payout_requests UUID (used as resourceId)
+ * @param userId - The user's UUID (from wallets.userId)
+ * @param amount - Amount in kobo
+ * @param reason - 'failed' | 'reversed'
+ */
+export async function notifyPayoutFailed(
+  payoutRequestId: string,
+  userId: string,
+  amount: number,
+  reason: 'failed' | 'reversed',
+): Promise<boolean> {
+  const formatted = `₦${(amount / 100).toLocaleString('en-NG')}`;
+  const body =
+    reason === 'reversed'
+      ? `Your ${formatted} withdrawal was returned by the bank. Your wallet has been refunded.`
+      : `Your ${formatted} withdrawal could not be completed. Your wallet has been refunded.`;
+
+  const payload = buildPayload(
+    'wallet_withdrawal',
+    'Withdrawal Failed',
+    body,
+    payoutRequestId,
+  );
+  return enqueuePush(userId, 'wallet_withdrawal', payload);
+}
