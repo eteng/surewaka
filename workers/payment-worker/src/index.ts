@@ -15,6 +15,7 @@ import type {
   NotifyTopupJobData,
   ProcessPayoutJobData,
 } from './queue';
+import type { Job } from 'bullmq';
 
 type PaymentJobData =
   | EscrowHoldJobData
@@ -33,7 +34,7 @@ const worker = new Worker<PaymentJobData, void, PaymentJobName>(
       case 'refund':         return handleRefund(job.data as RefundJobData);
       case 'provision-dva':  return handleProvisionDva(job.data as ProvisionDvaJobData);
       case 'notify-topup':   return handleNotifyTopup(job.data as NotifyTopupJobData);
-      case 'process-payout': return handleProcessPayout(job.data as ProcessPayoutJobData);
+      case 'process-payout': return handleProcessPayout(job as Job<ProcessPayoutJobData>);
       default:
         throw new Error(`Unknown job name: ${String(job.name)}`);
     }
