@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
-import { db, walletTransactions, users, payoutRequests } from '@surewaka/db';
+import { db, walletTransactions, wallets, users, payoutRequests } from '@surewaka/db';
 import { verifyWebhookSignature } from '../lib/paystack';
 import { getWalletByUserId, creditWallet } from '../lib/wallet-service';
 import { paystackWebhookSchema } from '@surewaka/shared';
+import { notifyPayoutCompleted, notifyPayoutFailed } from '../services/push-triggers';
 
 const webhookRoutes = new Hono();
 
@@ -27,7 +28,7 @@ webhookRoutes.post('/paystack', async (c) => {
 
   const { event, data } = parsed.data;
 
-  // ─── charge.success: wallet top-up ────────────────────────────────────────
+  // ── charge.success — wallet top-up ──────────────────────────────────────────
   if (event === 'charge.success') {
     const reference = data.reference;
     const amount = data.amount;
@@ -76,55 +77,100 @@ webhookRoutes.post('/paystack', async (c) => {
     } catch (err) {
       console.error('[webhook] Failed to process charge.success', err);
     }
+
+    return c.json({ data: { ok: true }, error: null, meta: null });
   }
 
-  // ─── transfer.success: payout completed ───────────────────────────────────
-  if (event === 'transfer.success') {
+  // ── transfer events — payout callbacks ──────────────────────────────────────
+  if (event === 'transfer.success' || event === 'transfer.failed' || event === 'transfer.reversed') {
+    const transferCode = data.transfer_code;
+    if (!transferCode) return c.json({ data: { ok: true }, error: null, meta: null });
+
     try {
-      const transferCode = data.transfer_code as string | undefined;
-      if (transferCode) {
+      const rows = await db
+        .select({
+          id: payoutRequests.id,
+          walletId: payoutRequests.walletId,
+          amount: payoutRequests.amount,
+          status: payoutRequests.status,
+          userId: wallets.userId,
+        })
+        .from(payoutRequests)
+        .innerJoin(wallets, eq(wallets.id, payoutRequests.walletId))
+        .where(eq(payoutRequests.paystackTransferCode, transferCode));
+
+      if (rows.length === 0) {
+        console.warn(`[webhook] No payout found for transfer_code ${transferCode}`);
+        return c.json({ data: { ok: true }, error: null, meta: null });
+      }
+
+      const payout = rows[0];
+
+      // Idempotency: skip if already in target terminal state
+      if (
+        (event === 'transfer.success' && payout.status === 'completed') ||
+        (event === 'transfer.failed' && payout.status === 'failed') ||
+        (event === 'transfer.reversed' && payout.status === 'reversed')
+      ) {
+        return c.json({ data: { ok: true }, error: null, meta: null });
+      }
+
+      if (event === 'transfer.success') {
         await db
           .update(payoutRequests)
           .set({ status: 'completed', processedAt: new Date() })
-          .where(eq(payoutRequests.paystackTransferCode, transferCode));
-      }
-    } catch (err) {
-      console.error('[webhook] Failed to process transfer.success', err);
-    }
-  }
+          .where(eq(payoutRequests.id, payout.id));
 
-  // ─── transfer.failed / transfer.reversed: payout failed ───────────────────
-  if (event === 'transfer.failed' || event === 'transfer.reversed') {
-    try {
-      const transferCode = data.transfer_code as string | undefined;
-      const reason = (data.reason as string) ?? (data.complete_message as string) ?? 'Transfer failed';
-      if (transferCode) {
-        const [payout] = await db
-          .select({ id: payoutRequests.id, walletId: payoutRequests.walletId, amount: payoutRequests.amount })
-          .from(payoutRequests)
-          .where(eq(payoutRequests.paystackTransferCode, transferCode));
+        await notifyPayoutCompleted(payout.id, payout.userId, payout.amount).catch((e) =>
+          console.error('[webhook] notifyPayoutCompleted failed', e),
+        );
+      } else {
+        const newStatus = event === 'transfer.reversed' ? 'reversed' : 'failed';
+        const failureReason =
+          event === 'transfer.reversed'
+            ? 'Transfer reversed by receiving bank'
+            : (data.complete_message ?? 'Transfer failed');
 
-        if (payout && payout.walletId) {
-          // Mark payout as failed
-          await db
+        await db.transaction(async (tx) => {
+          const [wallet] = await tx
+            .select({ balance: wallets.balance })
+            .from(wallets)
+            .where(eq(wallets.id, payout.walletId))
+            .for('update');
+
+          if (!wallet) throw new Error(`Wallet ${payout.walletId} not found`);
+          const newBalance = Number(wallet.balance) + payout.amount;
+
+          await tx
+            .update(wallets)
+            .set({ balance: newBalance, updatedAt: new Date() })
+            .where(eq(wallets.id, payout.walletId));
+
+          await tx.insert(walletTransactions).values({
+            walletId: payout.walletId,
+            type: 'payout_reversal',
+            amount: payout.amount,
+            balanceAfter: newBalance,
+            reference: `reversal_${payout.id}`,
+            description: failureReason,
+          });
+
+          await tx
             .update(payoutRequests)
-            .set({ status: 'failed', failureReason: reason })
+            .set({ status: newStatus, failureReason, processedAt: new Date() })
             .where(eq(payoutRequests.id, payout.id));
+        });
 
-          // Reverse the wallet debit — credit back the amount
-          await creditWallet(
-            payout.walletId,
-            payout.amount,
-            'adjustment',
-            `reversal_${payout.id}`,
-            `Payout failed: ${reason}`,
-            { payoutRequestId: payout.id, event },
-          );
-        }
+        const notifyReason = event === 'transfer.reversed' ? 'reversed' : 'failed';
+        await notifyPayoutFailed(payout.id, payout.userId, payout.amount, notifyReason).catch((e) =>
+          console.error('[webhook] notifyPayoutFailed failed', e),
+        );
       }
     } catch (err) {
       console.error(`[webhook] Failed to process ${event}`, err);
     }
+
+    return c.json({ data: { ok: true }, error: null, meta: null });
   }
 
   return c.json({ data: { ok: true }, error: null, meta: null });
