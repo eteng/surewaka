@@ -27,6 +27,7 @@ export default [
     route('notifications/broadcast', 'routes/notifications.broadcast.tsx'),
     route('disputes', 'routes/disputes.tsx'),
     route('verifications', 'routes/verifications.tsx'),
+    route('payouts', 'routes/payouts.tsx'),
     route('waitlist', 'routes/waitlist.tsx'),
     route('coverage/zones', 'routes/coverage/zones.tsx'),
   ]),

@@ -39,6 +39,7 @@ const data = {
         { title: 'Customers', url: '/customers' },
         { title: 'Disputes', url: '/disputes' },
         { title: 'Analytics', url: '/analytics' },
+        { title: 'Payouts', url: '/payouts' },
         { title: 'Waitlist', url: '/waitlist' },
       ],
     },
