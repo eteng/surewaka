@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, desc } from 'drizzle-orm';
-import { db, payoutRequests } from '@surewaka/db';
+import { db, payoutRequests, feeSettings } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { getWalletByUserId, debitWallet } from '../lib/wallet-service';
 import { payoutRequestSchema } from '@surewaka/shared';
@@ -32,17 +32,21 @@ payoutRoutes.post('/request', async (c) => {
   }
 
   try {
+    const [settings] = await db.select({ withdrawalFeeKobo: feeSettings.withdrawalFeeKobo }).from(feeSettings).limit(1);
+    const fee = settings?.withdrawalFeeKobo ?? 10000;
+
     const wallet = await getWalletByUserId(user.id);
     const reference = `payout_${randomUUID()}`;
+    const totalDebit = parsed.data.amount + fee;
 
     const payout = await db.transaction(async (tx) => {
       await debitWallet(
         wallet.id,
-        parsed.data.amount,
+        totalDebit,
         'payout',
         reference,
-        `Payout to ${parsed.data.account_name} (${parsed.data.bank_code})`,
-        {},
+        `Payout to ${parsed.data.account_name} (${parsed.data.bank_code}) — includes ₦${fee / 100} withdrawal fee`,
+        { fee_kobo: fee },
         tx,
       );
 
@@ -51,6 +55,7 @@ payoutRoutes.post('/request', async (c) => {
         .values({
           walletId: wallet.id,
           amount: parsed.data.amount,
+          feeKobo: fee,
           bankCode: parsed.data.bank_code,
           accountNumber: parsed.data.account_number,
           accountName: parsed.data.account_name,
@@ -64,7 +69,7 @@ payoutRoutes.post('/request', async (c) => {
     // Enqueue the payout processing job
     await enqueuePaymentJob('process-payout', { payoutRequestId: payout.id });
 
-    return c.json({ data: payout, error: null, meta: null }, 201);
+    return c.json({ data: { ...payout, fee_kobo: fee }, error: null, meta: null }, 201);
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';
     if (msg === 'WALLET_NOT_FOUND') {
@@ -81,7 +86,7 @@ payoutRoutes.post('/request', async (c) => {
       return c.json(
         {
           data: null,
-          error: { code: 'INSUFFICIENT_BALANCE', message: 'Wallet balance too low' },
+          error: { code: 'INSUFFICIENT_BALANCE', message: 'Wallet balance too low (withdrawal amount + ₦100 fee must be covered)' },
           meta: null,
         },
         422,

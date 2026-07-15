@@ -6,6 +6,7 @@ export type PayoutStatus = 'pending' | 'processing' | 'completed' | 'failed' | '
 export type PayoutRow = {
   id: string;
   amount: number;
+  feeKobo: number;
   bankCode: string;
   accountNumber: string;
   accountName: string;

@@ -11,6 +11,7 @@ export const payoutRequests = pgTable(
     bankCode: text('bank_code').notNull(),
     accountNumber: text('account_number').notNull(),
     accountName: text('account_name').notNull(),
+    feeKobo: bigint('fee_kobo', { mode: 'number' }).notNull().default(0),
     paystackTransferCode: text('paystack_transfer_code'),
     paystackRecipientCode: text('paystack_recipient_code'),
     status: text().default('pending').notNull(),

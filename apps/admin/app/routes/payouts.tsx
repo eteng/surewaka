@@ -234,7 +234,12 @@ function PayoutsPage() {
                       <div className="text-xs text-muted-foreground">{row.userEmail}</div>
                     </TableCell>
                     <TableCell className="font-medium tabular-nums">
-                      {formatNaira(row.amount / 100)}
+                      <div>{formatNaira(row.amount / 100)}</div>
+                      {row.feeKobo > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          +{formatNaira(row.feeKobo / 100)} fee
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">{row.accountName}</div>

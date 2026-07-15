@@ -136,7 +136,7 @@ export async function handleProcessPayout(job: Job<ProcessPayoutJobData>) {
       try {
         await reversePayoutInWallet(
           payout.walletId,
-          payout.amount,
+          payout.amount + (payout.feeKobo ?? 0),
           payout.id,
           `Payout failed after ${job.attemptsMade} attempts: ${reason}`,
         );

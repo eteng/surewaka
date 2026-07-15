@@ -655,6 +655,7 @@ export const updateFeeSettingsSchema = z.object({
   carrierCommissionRatePct: z.number().min(0).max(100).optional(),
   taxRatePct: z.number().min(0).max(100).optional(),
   minPriceKobo: z.number().int().min(0).optional(),
+  withdrawalFeeKobo: z.number().int().min(0).optional(),
   weightCorrectionApprovalWindowMin: z.number().int().min(1).max(60).optional(),
 });
 

@@ -13,7 +13,7 @@
 - [] use points /SureWakaCoins 
 - [] Package weight and category are captured on delivery creation ywith AI 
 
-- [] Withdrawal fee — add `withdrawal_fee_kobo` to fee_settings, deduct fee on payout request. Decide model: fee added on top of withdrawal amount vs deducted from transfer. Covers Paystack ₦10 transfer cost + platform margin.
+- [x] DONE: Withdrawal fee (2026-07-16) — flat ₦100 fee per payout request. `withdrawal_fee_kobo` added to fee_settings (default 10000, admin-configurable via Fee Settings page). Deducted from wallet on payout request alongside transfer amount; refunded in full if transfer exhausts retries. Admin payout list shows fee as sub-line under Amount.
 
 - [] Intercity routing / path optimization — "SureWaka way" end-to-end auto-routing, cheapest path across carrier network, may chain multiple intercity legs. Needs delivery_legs.leg_number cap lifted first (see .kiro/specs/pricing-transparency out-of-scope)
 - [] Carrier settlement/payout — no carrierWalletId exists anywhere, escrow_holds only pays drivers (see ADR-009)

@@ -18,6 +18,7 @@ export const feeSettings = pgTable('fee_settings', {
     .notNull()
     .default('0.00'), // applies only to SureWaka's own revenue line
   minPriceKobo: integer('min_price_kobo').notNull().default(50000), // floor on Composite_Quote total
+  withdrawalFeeKobo: integer('withdrawal_fee_kobo').notNull().default(10000), // ₦100 flat fee per withdrawal
   weightCorrectionApprovalWindowMin: integer('weight_correction_approval_window_min')
     .notNull()
     .default(10),

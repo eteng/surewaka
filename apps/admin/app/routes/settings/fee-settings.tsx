@@ -86,6 +86,15 @@ const FEE_FIELDS: FeeField[] = [
     step: 100,
   },
   {
+    key: 'withdrawalFeeKobo',
+    label: 'Withdrawal Fee',
+    description: 'Flat fee charged per payout request (covers Paystack transfer cost)',
+    unit: 'naira',
+    min: 0,
+    max: 100000,
+    step: 100,
+  },
+  {
     key: 'weightCorrectionApprovalWindowMin',
     label: 'Weight Correction Window',
     description: 'Time customer has to approve a weight discrepancy',

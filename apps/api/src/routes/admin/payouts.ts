@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, desc, sql } from 'drizzle-orm';
-import { db, payoutRequests, wallets, users } from '@surewaka/db';
+import { db, payoutRequests, wallets, users, feeSettings } from '@surewaka/db';
 import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
 import type { AuthUser } from '@surewaka/auth';
@@ -22,6 +22,7 @@ adminPayoutRoutes.get('/', async (c) => {
       .select({
         id: payoutRequests.id,
         amount: payoutRequests.amount,
+        feeKobo: payoutRequests.feeKobo,
         bankCode: payoutRequests.bankCode,
         accountNumber: payoutRequests.accountNumber,
         accountName: payoutRequests.accountName,

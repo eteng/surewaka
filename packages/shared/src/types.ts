@@ -607,6 +607,7 @@ export type FeeSettings = {
   carrierCommissionRatePct: number;
   taxRatePct: number;
   minPriceKobo: number;
+  withdrawalFeeKobo: number;
   weightCorrectionApprovalWindowMin: number;
 };
 
