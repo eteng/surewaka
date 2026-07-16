@@ -1,32 +1,34 @@
-/**
- * Cron/scheduled tasks for SureWaka.
- * Runs on a schedule to handle recurring operations.
- */
+import { Worker } from 'bullmq';
+import { cronQueue, connection } from './queue';
+import type { CronJobName } from './queue';
+import { handleSyncInfraCosts } from './jobs/sync-infra-costs/index';
 
-const JOBS = {
-  // Every 5 minutes: check for stale deliveries
-  checkStaleDeliveries: async () => {
-    console.log('⏰ Checking for stale deliveries...');
-    // TODO: Find deliveries stuck in 'matched' for > 30 min
+// Seed repeating job — idempotent (BullMQ deduplicates by jobId)
+await cronQueue.add(
+  'sync-infra-costs',
+  {},
+  {
+    jobId: 'sync-infra-costs-daily',
+    repeat: { pattern: '0 5 * * *' },  // 05:00 UTC daily
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 60000 },
   },
+);
 
-  // Every hour: update driver availability
-  refreshDriverAvailability: async () => {
-    console.log('⏰ Refreshing driver availability...');
-    // TODO: Mark inactive drivers as unavailable
+const worker = new Worker<Record<string, never>, void, CronJobName>(
+  'cron',
+  async (job) => {
+    switch (job.name) {
+      case 'sync-infra-costs':
+        return handleSyncInfraCosts();
+      default:
+        throw new Error(`Unknown cron job: ${String(job.name)}`);
+    }
   },
+  { connection, concurrency: 1 },
+);
 
-  // Daily at midnight: generate daily report
-  generateDailyReport: async () => {
-    console.log('⏰ Generating daily report...');
-    // TODO: Aggregate daily metrics, send to team
-  },
+worker.on('completed', (job) => console.log(`✅ Cron job ${job.name} completed`));
+worker.on('failed', (job, err) => console.error(`❌ Cron job ${job?.name} failed:`, err));
 
-  // Weekly: send driver performance summaries
-  weeklyDriverSummary: async () => {
-    console.log('⏰ Sending weekly driver summaries...');
-    // TODO: Calculate ratings, earnings, send to drivers
-  },
-};
-
-export default JOBS;
+console.log('⏰ Cron worker started — sync-infra-costs scheduled at 05:00 UTC daily');
