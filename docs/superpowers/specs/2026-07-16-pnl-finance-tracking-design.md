@@ -164,19 +164,18 @@ If a provider API call fails, that provider is skipped for the day and logged �
 
 All routes under `/api/v1/admin/finance/`, gated with `requireRole('surewaka_admin')`.
 
+`currency` and `unit` always appear in `meta` — consistent across all four endpoints regardless of whether `data` is an object or array.
+
 ### `GET /summary`
 
 Query params: `from` (date), `to` (date). Defaults to current calendar month.
 
 Aggregates `platform_ledger` + `cost_snapshots` for the period. Returns zeros for all fields when no data exists — never returns 404 or null fields.
 
-Response shape:
 ```json
 {
   "data": {
     "period": { "from": "2026-07-01", "to": "2026-07-31" },
-    "currency": "NGN",
-    "unit": "kobo",
     "revenue": {
       "commission": 4200000,
       "withdrawal_fees": 150000,
@@ -208,7 +207,7 @@ Response shape:
     }
   },
   "error": null,
-  "meta": null
+  "meta": { "currency": "NGN", "unit": "kobo" }
 }
 ```
 
@@ -221,7 +220,7 @@ Formulas:
 
 Query param: `months` (integer, default 6, max 12).
 
-Returns one flat object per calendar month, oldest first. Each item contains only the metrics needed for chart rendering — the frontend draws charts directly without additional calculations:
+Returns one flat object per calendar month, oldest first. Each item contains only the metrics needed for chart rendering — the frontend draws charts directly without additional calculations. No per-provider infra breakdown; `infrastructure_expenses` is the subtotal only.
 
 ```json
 {
@@ -233,24 +232,75 @@ Returns one flat object per calendar month, oldest first. Each item contains onl
       "infrastructure_expenses": 770000,
       "gross_profit": 3832000,
       "net_profit": 3062000
+    },
+    {
+      "period": "2026-03",
+      "revenue": 4100000,
+      "operational_expenses": 122000,
+      "infrastructure_expenses": 775000,
+      "gross_profit": 3978000,
+      "net_profit": 3203000
     }
   ],
   "error": null,
-  "meta": null
+  "meta": { "currency": "NGN", "unit": "kobo", "months": 6 }
 }
 ```
 
 ### `GET /ledger`
 
-Query params: `from`, `to`, `type` (optional filter), `limit` (max 100, default 50), `offset`.
+Query params: `from`, `to`, `type` (optional — one of the five enum values), `limit` (max 100, default 50), `offset`.
 
-Returns paginated `platform_ledger` rows for drill-down. Response includes `meta.total`.
+Returns paginated `platform_ledger` rows for drill-down.
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "type": "revenue_commission",
+      "amount_kobo": 630000,
+      "source_id": "uuid",
+      "source_type": "escrow_hold",
+      "occurred_at": "2026-07-15T14:22:11Z",
+      "created_at": "2026-07-15T14:22:11Z"
+    }
+  ],
+  "error": null,
+  "meta": { "currency": "NGN", "unit": "kobo", "total": 142, "limit": 50, "offset": 0 }
+}
+```
 
 ### `GET /costs`
 
 Query params: `from`, `to`.
 
-Returns `cost_snapshots` rows grouped by provider for the infrastructure cost breakdown.
+Returns `cost_snapshots` rows for the period. `estimated: true` on Clerk and Ably rows — the UI uses this to show the `~` prefix and tooltip, rather than hardcoding which providers are estimates.
+
+```json
+{
+  "data": [
+    {
+      "provider": "vercel",
+      "amount_usd": 18.40,
+      "usd_to_ngn_rate": 1580.50,
+      "amount_kobo": 2908120,
+      "snapshot_date": "2026-07-15",
+      "estimated": false
+    },
+    {
+      "provider": "clerk",
+      "amount_usd": 2.00,
+      "usd_to_ngn_rate": 1580.50,
+      "amount_kobo": 316100,
+      "snapshot_date": "2026-07-15",
+      "estimated": true
+    }
+  ],
+  "error": null,
+  "meta": { "currency": "NGN", "unit": "kobo" }
+}
+```
 
 ---
 
