@@ -20,21 +20,27 @@ SureWaka needs a Finance page in the admin dashboard that shows true net profit 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid PK | |
-| `type` | enum | See event types below |
-| `amount_kobo` | bigint NOT NULL | Always positive — sign is implied by type prefix |
+| `category` | text | `revenue` or `expense` |
+| `type` | text | Specific event type within the category (see table below) |
+| `amount_kobo` | bigint NOT NULL | Always positive — sign is implied by category |
 | `source_id` | uuid | ID of originating record |
 | `source_type` | text | `escrow_hold`, `payout_request`, `wallet_transaction` |
 | `occurred_at` | timestamptz | When the underlying event happened (`now()` at insert) |
 | `created_at` | timestamptz | |
 
-`UNIQUE(source_id, type)` — prevents duplicate rows if a webhook fires more than once. Inserts use `ON CONFLICT DO NOTHING`.
+`UNIQUE(source_id, category, type)` — prevents duplicate rows if a webhook fires more than once. Inserts use `ON CONFLICT DO NOTHING`.
 
-`type` enum values:
-- `revenue_commission` — SureWaka's cut from a completed delivery
-- `revenue_withdrawal_fee` — flat ₦100 fee charged per payout request
-- `cost_paystack_transfer` — Paystack fee on outgoing transfer
-- `cost_paystack_collection` — Paystack fee on incoming wallet topup
-- `cost_commission_reversal` — reverses a prior `revenue_commission` when escrow is refunded or disputed after release
+Valid `(category, type)` combinations:
+
+| category | type | Description |
+|---|---|---|
+| `revenue` | `commission` | SureWaka's cut from a completed delivery |
+| `revenue` | `withdrawal_fee` | Flat ₦100 fee charged per payout request |
+| `expense` | `paystack_transfer` | Paystack fee on outgoing transfer |
+| `expense` | `paystack_collection` | Paystack fee on incoming wallet topup |
+| `expense` | `commission_reversal` | Reverses a prior commission when escrow is refunded or disputed after release |
+
+Aggregation is simple and stable — `WHERE category = 'revenue'` sums all revenue; `WHERE category = 'expense'` sums all operational costs. Adding new types never requires updating aggregate queries.
 
 **`cost_snapshots`** — one row per provider per day, written by the daily infrastructure cron.
 
@@ -55,13 +61,16 @@ SureWaka needs a Finance page in the admin dashboard that shows true net profit 
 
 ## Ledger Event Wiring
 
-Three write points. All ledger inserts are **non-blocking** — a failure must never prevent the primary financial operation from completing. On failure, a retry job is enqueued to the dedicated `ledger` BullMQ queue (separate from the `payment` queue, same Redis instance) with exponential backoff. All inserts use `ON CONFLICT (source_id, type) DO NOTHING`.
+Three write points. All ledger inserts are **non-blocking** — a failure must never prevent the primary financial operation from completing. On failure, a retry job is enqueued to the dedicated `ledger` BullMQ queue (separate from the `payment` queue, same Redis instance) with exponential backoff. All inserts use `ON CONFLICT (source_id, category, type) DO NOTHING`.
 
 A reconciliation query can surface any gaps:
 ```sql
 SELECT id FROM escrow_holds
 WHERE status = 'released'
-  AND id NOT IN (SELECT source_id FROM platform_ledger WHERE type = 'revenue_commission');
+  AND id NOT IN (
+    SELECT source_id FROM platform_ledger
+    WHERE category = 'revenue' AND type = 'commission'
+  );
 ```
 
 ### A. Escrow release → commission revenue
@@ -70,7 +79,8 @@ WHERE status = 'released'
 
 ```
 INSERT platform_ledger (
-  type = 'revenue_commission',
+  category = 'revenue',
+  type = 'commission',
   amount_kobo = commissionAmount,       -- already computed in escrow-release.ts
   source_id = hold.id,
   source_type = 'escrow_hold',
@@ -84,7 +94,8 @@ INSERT platform_ledger (
 
 ```
 INSERT platform_ledger (
-  type = 'cost_commission_reversal',
+  category = 'expense',
+  type = 'commission_reversal',
   amount_kobo = commissionAmount,
   source_id = hold.id,
   source_type = 'escrow_hold',
@@ -99,11 +110,11 @@ INSERT platform_ledger (
 Two rows inserted:
 
 ```
-INSERT platform_ledger (type = 'revenue_withdrawal_fee', amount_kobo = payout.feeKobo, source_id = payout.id, source_type = 'payout_request', ...)
-INSERT platform_ledger (type = 'cost_paystack_transfer', amount_kobo = paystackTransferFee(payout.amount), source_id = payout.id, source_type = 'payout_request', ...)
+INSERT platform_ledger (category = 'revenue',  type = 'withdrawal_fee',    amount_kobo = payout.feeKobo,                       source_id = payout.id, source_type = 'payout_request', ...)
+INSERT platform_ledger (category = 'expense',  type = 'paystack_transfer', amount_kobo = paystackTransferFee(payout.amount),   source_id = payout.id, source_type = 'payout_request', ...)
 ```
 
-Note: `UNIQUE(source_id, type)` allows both rows since their types differ.
+Note: `UNIQUE(source_id, category, type)` allows both rows since their category+type pairs differ.
 
 **Paystack transfer fee formula** (verified from Paystack pricing):
 
@@ -249,16 +260,17 @@ Returns one flat object per calendar month, oldest first. Each item contains onl
 
 ### `GET /ledger`
 
-Query params: `from`, `to`, `type` (optional — one of the five enum values), `limit` (max 100, default 50), `offset`.
+Query params: `from`, `to`, `category` (optional — `revenue` or `expense`), `type` (optional — specific type within category), `limit` (max 100, default 50), `offset`.
 
-Returns paginated `platform_ledger` rows for drill-down.
+Returns paginated `platform_ledger` rows for drill-down. `category` is the primary filter for aggregation views; `type` allows drill-down to a specific event kind.
 
 ```json
 {
   "data": [
     {
       "id": "uuid",
-      "type": "revenue_commission",
+      "category": "revenue",
+      "type": "commission",
       "amount_kobo": 630000,
       "source_id": "uuid",
       "source_type": "escrow_hold",
@@ -324,7 +336,7 @@ Returns `cost_snapshots` rows for the period. `estimated: true` on Clerk and Abl
 
 **Trend chart:** 6-month grouped bar chart — Revenue, Gross Profit, Net Profit per month.
 
-**Ledger table:** Paginated, filterable by type via tab strip. Columns: Date, Type (badge), Amount, Source reference.
+**Ledger table:** Paginated, filterable by `category` via tab strip (All / Revenue / Expense), then by `type` within category. Columns: Date, Category (badge), Type, Amount, Source reference.
 
 ---
 
