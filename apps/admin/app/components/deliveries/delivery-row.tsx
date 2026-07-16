@@ -46,10 +46,9 @@ function formatStatus(status: DeliveryStatus): string {
     .replace(/^\w/, (c) => c.toUpperCase());
 }
 
-/** Formats price with Naira symbol and commas (e.g., ₦2,500.00). */
-function formatPrice(price: number | null): string {
-  if (price == null) return '—';
-  return `₦${price.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function formatPrice(priceKobo: number | null): string {
+  if (priceKobo == null) return '—';
+  return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceKobo / 100);
 }
 
 /** Formats date to short format (e.g., "Jan 15, 2025"). */

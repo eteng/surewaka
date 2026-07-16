@@ -42,9 +42,9 @@ function getStatusBadgeClasses(status: DeliveryStatus): string {
   }
 }
 
-function formatPrice(price: number | null): string {
-  if (price == null) return '—';
-  return `₦${price.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function formatPrice(priceKobo: number | null): string {
+  if (priceKobo == null) return '—';
+  return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceKobo / 100);
 }
 
 /**

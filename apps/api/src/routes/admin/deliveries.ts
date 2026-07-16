@@ -122,7 +122,7 @@ deliveryRoutes.get('/', async (c) => {
       createdAt: deliveries.createdAt,
       status: deliveries.status,
       customerName: customerUser.name,
-      price: deliveries.price,
+      price: deliveries.priceKobo,
     } as const;
 
     const sortColumn = sortColumnMap[sortBy] ?? deliveries.createdAt;
@@ -156,7 +156,7 @@ deliveryRoutes.get('/', async (c) => {
       dropoffAddress: deliveries.dropoffAddress,
       dropoffCity: deliveries.dropoffCity,
       packageCategory: deliveries.packageCategory,
-      price: deliveries.price,
+      price: deliveries.priceKobo,
       createdAt: deliveries.createdAt,
       updatedAt: deliveries.updatedAt,
       customerName: customerUser.name,

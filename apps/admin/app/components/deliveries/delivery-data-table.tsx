@@ -85,9 +85,9 @@ export function formatElapsedTime(createdAt: string): string {
   return `${totalDays}d ${remainingHours}h`;
 }
 
-function formatPrice(price: number | null): string {
-  if (price === null) return '—';
-  return `₦${price.toLocaleString('en-NG')}`;
+function formatPrice(priceKobo: number | null): string {
+  if (priceKobo === null) return '—';
+  return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceKobo / 100);
 }
 
 function formatDate(isoDate: string): string {
