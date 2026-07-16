@@ -61,6 +61,22 @@ const statusLabels: Record<DeliveryStatus, string> = {
   returned: 'Returned',
 };
 
+// [C4] Unambiguous labels for compact mode — naive split() produced duplicate "En" / "At"
+const compactStatusLabels: Record<DeliveryStatus, string> = {
+  draft: 'Draft',
+  pending: 'Pending',
+  accepted: 'Accepted',
+  en_route_pickup: 'To Pickup',
+  arrived_pickup: 'At Pickup',
+  picked_up: 'Picked Up',
+  en_route_dropoff: 'To Drop',
+  arrived_dropoff: 'At Drop',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+  failed: 'Failed',
+  returned: 'Returned',
+};
+
 // ─── Utility Functions ─────────────────────────────────────────────────────────
 
 /**
@@ -133,11 +149,11 @@ function formatCategory(category: string): string {
 
 const sortableColumns = new Set<string>(['customerName', 'status', 'price', 'createdAt']);
 
-function getColumns(activeTab?: DeliveryTab): ColumnDef<DeliveryListItem, unknown>[] {
-  const baseColumns: ColumnDef<DeliveryListItem, unknown>[] = [
+function getColumns(activeTab?: DeliveryTab, compact?: boolean): ColumnDef<DeliveryListItem, unknown>[] {
+  const allColumns: ColumnDef<DeliveryListItem, unknown>[] = [
     {
       id: 'tracking',
-      header: 'Tracking',
+      header: 'ID',
       enableSorting: false,
       cell: ({ row }) => (
         <span className="font-mono text-xs text-muted-foreground">
@@ -153,18 +169,21 @@ function getColumns(activeTab?: DeliveryTab): ColumnDef<DeliveryListItem, unknow
         <span className="font-medium">{row.original.customerName}</span>
       ),
     },
-    {
-      id: 'pickupCity',
-      header: 'Pickup',
-      enableSorting: false,
-      cell: ({ row }) => row.original.pickupCity,
-    },
-    {
-      id: 'dropoffCity',
-      header: 'Dropoff',
-      enableSorting: false,
-      cell: ({ row }) => row.original.dropoffCity,
-    },
+    // Hidden in compact mode
+    ...(!compact ? [
+      {
+        id: 'pickupCity',
+        header: 'Pickup',
+        enableSorting: false,
+        cell: ({ row }: { row: { original: DeliveryListItem } }) => row.original.pickupCity,
+      } as ColumnDef<DeliveryListItem, unknown>,
+      {
+        id: 'dropoffCity',
+        header: 'Dropoff',
+        enableSorting: false,
+        cell: ({ row }: { row: { original: DeliveryListItem } }) => row.original.dropoffCity,
+      } as ColumnDef<DeliveryListItem, unknown>,
+    ] : []),
     {
       accessorKey: 'status',
       header: 'Status',
@@ -178,74 +197,79 @@ function getColumns(activeTab?: DeliveryTab): ColumnDef<DeliveryListItem, unknow
               statusBadgeStyles[status],
             )}
           >
-            {statusLabels[status]}
+            {compact ? compactStatusLabels[status] : statusLabels[status]}
           </span>
         );
       },
     },
-    {
-      id: 'driver',
-      header: 'Driver',
-      enableSorting: false,
-      cell: ({ row }) =>
-        row.original.driverName ? (
-          <span className="text-sm">{row.original.driverName}</span>
-        ) : (
-          <span className="text-xs italic text-muted-foreground">Unassigned</span>
-        ),
-    },
-    {
-      id: 'packageCategory',
-      header: 'Category',
-      enableSorting: false,
-      cell: ({ row }) => formatCategory(row.original.packageCategory),
-    },
+    // Hidden in compact mode
+    ...(!compact ? [
+      {
+        id: 'driver',
+        header: 'Driver',
+        enableSorting: false,
+        cell: ({ row }: { row: { original: DeliveryListItem } }) =>
+          row.original.driverName ? (
+            <span className="text-sm">{row.original.driverName}</span>
+          ) : (
+            <span className="text-xs italic text-muted-foreground">Unassigned</span>
+          ),
+      } as ColumnDef<DeliveryListItem, unknown>,
+      {
+        id: 'packageCategory',
+        header: 'Category',
+        enableSorting: false,
+        cell: ({ row }: { row: { original: DeliveryListItem } }) => formatCategory(row.original.packageCategory),
+      } as ColumnDef<DeliveryListItem, unknown>,
+    ] : []),
   ];
 
   // For "requests" tab, add elapsed time column instead of price
   if (activeTab === 'requests') {
-    baseColumns.push({
+    allColumns.push({
       id: 'elapsedTime',
       header: 'Elapsed',
       enableSorting: false,
       cell: ({ row }) => <ElapsedTimeBadge createdAt={row.original.createdAt} />,
     });
   } else {
-    baseColumns.push({
+    allColumns.push({
       accessorKey: 'price',
       header: 'Price',
       enableSorting: true,
       cell: ({ row }) => (
-        <span className="text-right tabular-nums">
+        <span className="tabular-nums">
           {formatPrice(row.original.price)}
         </span>
       ),
     });
   }
 
-  baseColumns.push({
-    accessorKey: 'createdAt',
-    header: 'Created',
-    enableSorting: true,
-    cell: ({ row }) => (
-      <span className="text-muted-foreground">
-        {formatDate(row.original.createdAt)}
-      </span>
-    ),
-  });
+  if (!compact) {
+    allColumns.push({
+      accessorKey: 'createdAt',
+      header: 'Created',
+      enableSorting: true,
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">
+          {formatDate(row.original.createdAt)}
+        </span>
+      ),
+    });
+  }
 
-  return baseColumns;
+  return allColumns;
 }
 
 // ─── Skeleton Loader ───────────────────────────────────────────────────────────
 
-function SkeletonRows({ columnCount }: { columnCount: number }) {
+function SkeletonRows({ columnCount, compact }: { columnCount: number; compact?: boolean }) {
   return (
     <>
       {Array.from({ length: 8 }).map((_, rowIndex) => (
         <tr key={rowIndex} className="border-b">
           {Array.from({ length: columnCount }).map((_, colIndex) => (
-            <td key={colIndex} className="px-4 py-3">
+            <td key={colIndex} className={compact ? 'px-3 py-1.5' : 'px-4 py-3'}>
               <Skeleton className="h-4 w-full" />
             </td>
           ))}
@@ -306,7 +330,8 @@ export function DeliveryDataTable({
   activeTab,
   selectedDeliveryId,
 }: DeliveryDataTableProps) {
-  const columns = useMemo(() => getColumns(activeTab), [activeTab]);
+  const compact = !!selectedDeliveryId;
+  const columns = useMemo(() => getColumns(activeTab, compact), [activeTab, compact]);
 
   const sorting: SortingState = sortBy
     ? [{ id: sortBy, desc: sortDir === 'desc' }]
@@ -347,7 +372,8 @@ export function DeliveryDataTable({
                   <th
                     key={header.id}
                     className={cn(
-                      'px-4 py-3 text-left font-medium text-muted-foreground',
+                      'text-left font-medium text-muted-foreground',
+                      compact ? 'px-3 py-2' : 'px-4 py-3',
                       canSort && 'cursor-pointer select-none hover:text-foreground',
                     )}
                     onClick={
@@ -375,7 +401,7 @@ export function DeliveryDataTable({
         </thead>
         <tbody>
           {isLoading ? (
-            <SkeletonRows columnCount={columns.length} />
+            <SkeletonRows columnCount={columns.length} compact={compact} />
           ) : table.getRowModel().rows.length === 0 ? (
             <tr>
               <td
@@ -404,7 +430,7 @@ export function DeliveryDataTable({
                 onClick={() => onRowClick(row.original.id)}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-4 py-3">
+                  <td key={cell.id} className={compact ? 'px-3 py-1.5' : 'px-4 py-3'}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}

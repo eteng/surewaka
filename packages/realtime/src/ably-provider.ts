@@ -8,7 +8,8 @@ import type { RealtimeProvider, Unsubscribe } from './types';
  * Client-side: uses Realtime client for subscriptions (WebSocket).
  */
 export function createAblyProvider(options?: { apiKey?: string; clientId?: string }): RealtimeProvider {
-  const apiKey = options?.apiKey || process.env.ABLY_API_KEY;
+  // process.env works in Node; in browser environments it is injected at build time via Vite define
+  const apiKey = options?.apiKey || (typeof process !== 'undefined' ? process.env.ABLY_API_KEY : undefined);
 
   if (!apiKey) {
     throw new Error('ABLY_API_KEY must be set');
@@ -29,7 +30,7 @@ export function createAblyProvider(options?: { apiKey?: string; clientId?: strin
     if (!realtimeClient) {
       realtimeClient = new Ably.Realtime({
         key: apiKey,
-        clientId: options?.clientId,
+        clientId: options?.clientId ?? null,
       });
     }
     return realtimeClient;

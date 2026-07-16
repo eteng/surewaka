@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Info, MapPin, X } from 'lucide-react';
 import type { DeliveryListItem } from '@surewaka/shared';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 

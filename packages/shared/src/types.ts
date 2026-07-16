@@ -471,6 +471,10 @@ export type DeliveryEvent = {
   createdAt: string;
 };
 
+export type DeliveryEventWithActor = DeliveryEvent & {
+  actorName: string | null;
+};
+
 export type DriverLocation = {
   id: string;
   driverId: string;

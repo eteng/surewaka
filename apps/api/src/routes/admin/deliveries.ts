@@ -10,6 +10,7 @@ import type { AuthUser } from '@surewaka/auth';
 import { db, deliveries, users, drivers, carriers } from '@surewaka/db';
 import { eq, and, or, ilike, inArray, sql, asc, desc } from 'drizzle-orm';
 import { getDeliveryDetail } from '../../services/delivery-detail-service';
+import { getDeliveryEvents } from '../../services/delivery-events-service';
 
 type DeliveryManagementEnv = {
   Variables: {
@@ -252,6 +253,26 @@ deliveryRoutes.get('/', async (c) => {
     },
     200,
   );
+});
+
+// ─── GET /:id/events — Get delivery event trail ───────────────────────────────
+
+deliveryRoutes.get('/:id/events', async (c) => {
+  const id = c.req.param('id');
+
+  if (!UUID_RE.test(id)) {
+    return c.json(
+      {
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'Invalid delivery ID format' },
+        meta: null,
+      },
+      400,
+    );
+  }
+
+  const events = await getDeliveryEvents(id);
+  return c.json({ data: events, error: null, meta: null }, 200);
 });
 
 // ─── GET /:id — Get delivery detail ──────────────────────────────────────────
