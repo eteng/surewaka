@@ -300,7 +300,7 @@ async function main() {
       const createdAt = generatePastTimestamp(30);
       const updatedAt = new Date(createdAt.getTime() + randomBetween(0, 48) * 60 * 60 * 1000);
 
-      const priceKobo = Math.round(randomBetween(10000, 5000000)); // 100 to 50,000 naira in kobo
+      const priceKobo = Math.round(randomBetween(200000, 2500000)); // ₦2,000–₦25,000 in kobo
       const packageWeight = Math.round(randomBetween(0.1, 500) * 10) / 10;
 
       await db.insert(deliveries).values({
