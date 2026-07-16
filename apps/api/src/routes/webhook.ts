@@ -5,6 +5,8 @@ import { verifyWebhookSignature } from '../lib/paystack';
 import { getWalletByUserId, creditWallet } from '../lib/wallet-service';
 import { paystackWebhookSchema } from '@surewaka/shared';
 import { notifyPayoutCompleted, notifyPayoutFailed } from '../services/push-triggers';
+import { writeLedgerEvent } from '../lib/ledger';
+import { paystackTransferFee, paystackCollectionFee } from '../lib/paystack-fees';
 
 const webhookRoutes = new Hono();
 
@@ -66,7 +68,7 @@ webhookRoutes.post('/paystack', async (c) => {
       }
 
       const wallet = await getWalletByUserId(resolvedUserId);
-      await creditWallet(
+      const txn = await creditWallet(
         wallet.id,
         amount,
         'fund',
@@ -74,6 +76,21 @@ webhookRoutes.post('/paystack', async (c) => {
         'Wallet top-up via Paystack',
         data.metadata ?? {},
       );
+
+      // Ledger: Paystack collection cost — non-blocking
+      if (txn) {
+        const channel = typeof data.channel === 'string' ? data.channel : 'card';
+        const collectionFee = paystackCollectionFee(amount, channel);
+        if (collectionFee > 0) {
+          writeLedgerEvent({
+            category: 'expense',
+            type: 'paystack_collection',
+            amountKobo: collectionFee,
+            sourceId: txn.id,
+            sourceType: 'wallet_transaction',
+          }).catch((err) => console.error('[Webhook:Ledger] paystack_collection write failed:', err));
+        }
+      }
     } catch (err) {
       console.error('[webhook] Failed to process charge.success', err);
     }
@@ -92,6 +109,7 @@ webhookRoutes.post('/paystack', async (c) => {
           id: payoutRequests.id,
           walletId: payoutRequests.walletId,
           amount: payoutRequests.amount,
+          feeKobo: payoutRequests.feeKobo,
           status: payoutRequests.status,
           userId: wallets.userId,
         })
@@ -124,6 +142,25 @@ webhookRoutes.post('/paystack', async (c) => {
         await notifyPayoutCompleted(payout.id, payout.userId, payout.amount).catch((e) =>
           console.error('[webhook] notifyPayoutCompleted failed', e),
         );
+
+        // Ledger: withdrawal fee revenue + Paystack transfer cost — non-blocking
+        if (payout.feeKobo > 0) {
+          writeLedgerEvent({
+            category: 'revenue',
+            type: 'withdrawal_fee',
+            amountKobo: payout.feeKobo,
+            sourceId: payout.id,
+            sourceType: 'payout_request',
+          }).catch((err) => console.error('[Webhook:Ledger] withdrawal_fee write failed:', err));
+        }
+
+        writeLedgerEvent({
+          category: 'expense',
+          type: 'paystack_transfer',
+          amountKobo: paystackTransferFee(payout.amount),
+          sourceId: payout.id,
+          sourceType: 'payout_request',
+        }).catch((err) => console.error('[Webhook:Ledger] paystack_transfer write failed:', err));
       } else {
         const newStatus = event === 'transfer.reversed' ? 'reversed' : 'failed';
         const failureReason =
