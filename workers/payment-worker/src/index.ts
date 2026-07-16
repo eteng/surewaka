@@ -1,5 +1,7 @@
 import { Worker } from 'bullmq';
 import { connection } from './queue';
+import { db, platformLedger } from '@surewaka/db';
+import type { LedgerEvent } from './ledger';
 import { handleEscrowHold } from './jobs/escrow-hold';
 import { handleEscrowRelease } from './jobs/escrow-release';
 import { handleRefund } from './jobs/refund';
@@ -44,5 +46,19 @@ const worker = new Worker<PaymentJobData, void, PaymentJobName>(
 
 worker.on('completed', (job) => console.log(`✅ Job ${job.id} (${job.name}) completed`));
 worker.on('failed', (job, err) => console.error(`❌ Job ${job?.id} (${job?.name}) failed:`, err));
+
+// Ledger retry worker — processes failed direct-write events from the 'ledger' queue
+const ledgerWorker = new Worker<LedgerEvent>('ledger', async (job) => {
+  await db.insert(platformLedger).values({
+    category: job.data.category,
+    type: job.data.type,
+    amountKobo: job.data.amountKobo,
+    sourceId: job.data.sourceId,
+    sourceType: job.data.sourceType,
+    occurredAt: new Date(),
+  }).onConflictDoNothing();
+}, { connection, concurrency: 2 });
+
+ledgerWorker.on('failed', (job, err) => console.error(`[LedgerWorker] Job ${job?.id} failed:`, err));
 
 console.log('💰 Payment worker started');
