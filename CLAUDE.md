@@ -1,12 +1,10 @@
 # SureWaka — Claude Code Guide
 
-> Eteng & Yobo | Nigeria Logistics Marketplace
-
 ---
 
 ## Product
 
-SureWaka connects senders with verified logistics providers and independent drivers across Nigeria. Two models: **carrier aggregation** (compare and book registered companies like GIG, DHL) and **on-demand matching** (real-time driver dispatch for last-mile). We don't own vehicles — we build the technology layer: booking, matching, payments, KYC, ratings.
+SureWaka connects senders with verified logistics providers and independent drivers across Nigeria, using a **multi-leg delivery model**: a delivery is composed of one or more legs — `first_mile`, `intercity`, `last_mile` — each served by either **on-demand dispatch** (SureWaka's own drivers; first/last-mile only) or a **carrier** (registered companies like GIG, DHL; intercity only — carriers never do first/last-mile). Customers choose in-city on-demand, a specific carrier's fixed intercity route, or end-to-end "SureWaka way" auto-routing, where the system picks the cheapest path across carrier routes — possibly chaining more than one intercity leg when no direct route exists (routing/path-optimization engine not yet specced). See `CONTEXT.md` for the full leg/actor-type glossary and `docs/decisions/009-carrier-vs-ondemand-pricing-model.md` for how pricing splits across leg types. We don't own vehicles — we build the technology layer: booking, matching, pricing, payments, KYC, ratings.
 
 **Primary market:** SME e-commerce sellers and everyday senders in Lagos.  
 **Revenue:** Commission per delivery + service coordination + premium fees.  
@@ -27,7 +25,7 @@ SureWaka connects senders with verified logistics providers and independent driv
 
    **No RLS policies** — all DB access goes through the Hono API using the service-level `DATABASE_URL`. Authorization is enforced at the API layer.
 
-   The `supabase/migrations/` directory contains historical SQL from before the NeonDB switch — do not add new files there.
+   The legacy `supabase/` directory has been removed. All schema management is via Drizzle ORM in `packages/db/src/schema/`.
 3. **Never read `.env`, `.env.local`, or `.env.*.local`.** Reference `.env.example` for structure only. (Kiro `block-env-reads` hook enforces this.)
 4. **Auth is Clerk.** Session tokens are verified by `requireAuth` middleware in the API layer. Roles stored in Clerk `publicMetadata.roles` (synced from `user_roles` DB table). Mobile: `@clerk/expo`. Web: `@clerk/react-router`. Never expose `CLERK_SECRET_KEY` to the client. `packages/auth` provides `verifyToken()`, `getClerkClient()`, `AuthUser` type.
 5. **Zod schemas are the single source of truth** for validation — keep in sync with DB schema.
@@ -168,9 +166,11 @@ Check before writing — never duplicate existing entries.
 [x] Auth migrated to Clerk (from Supabase Auth)
 [x] Database migrated to NeonDB (from Supabase Postgres)
 [x] Realtime via Ably (from Supabase Realtime)
-[ ] Payment integration (Paystack flow)
-[ ] Push notifications
-[ ] Alert system (ops monitoring engine)
+[x] Payment integration (Paystack flow) — wallet-first + escrow, see ADR-006
+[x] Push notifications — spec complete (17/17); extend push-triggers.ts per-feature as new notification types are needed
+[x] Alert system (ops monitoring engine) — 7 rules live in workers/alert-engine (spec 39/47, core loop functional)
+[ ] Multi-leg pricing / fee engine — spec drafted (.kiro/specs/pricing-transparency/, 0/68 tasks), not yet implemented
+[ ] Intercity routing / path optimization — not yet specced; prerequisite for "SureWaka way" auto-routed multi-hop delivery
 [ ] Production launch in Lagos
 [ ] Seed funding closed
 ```
@@ -181,8 +181,9 @@ For active spec progress, check `.kiro/specs/*/tasks.md` directly — those are 
 
 - `packages/shared` test files have pre-existing type errors (missing RBAC validator exports) — source files are clean, only tests affected
 - `packages/mobile-shared/src/maps/locationiq.ts` — `API_KEY` uses `?? ''` fallback; throws at runtime if env var is not set
-- Real carrier data still mocked in `booking/carriers.tsx` — `GET /api/v1/carriers` endpoint exists but is not wired to the screen
+- `booking/carriers.tsx`'s "Instant Match" on-demand option still shows a hardcoded `₦3,000` (registered-carrier prices are real, fetched from `GET /api/v1/carriers` since commit `721ffdc`) — same class of placeholder as `review.tsx`'s hardcoded `350000` kobo total; both are fixed by `.kiro/specs/pricing-transparency/`, not yet implemented
 - Mobile app requires an EAS development build — `@rnmapbox/maps` has native modules, Expo Go won't work
+- Finance ledger: any future admin-initiated cancellation or refund route that bypasses the existing cancel (`booking-payment.ts`) and payment-worker refund flows must wire `writeLedgerEvent` for `commission_reversal` if escrow was already released. The current cancel endpoint is safe (delivered deliveries are non-cancellable, so commission can't have been earned yet), but this constraint must be preserved when admin override cancellation is built.
 
 ---
 
