@@ -1,4 +1,5 @@
 import { db, deliveries, escrowHolds, walletTransactions, wallets } from '@surewaka/db';
+import { writeLedgerEvent } from '../ledger';
 import { eq, sql } from 'drizzle-orm';
 import { drivers } from '@surewaka/db';
 import type { EscrowReleaseJobData } from '../queue';
@@ -104,6 +105,15 @@ export async function handleEscrowRelease(data: EscrowReleaseJobData) {
     // Push failure is non-critical — log and continue
     console.error('[EscrowRelease:Push] Failed to enqueue payment_received push:', err);
   }
+
+  // Ledger: record commission revenue — fire-and-forget, non-blocking
+  writeLedgerEvent({
+    category: 'revenue',
+    type: 'commission',
+    amountKobo: commissionAmount,
+    sourceId: data.escrowHoldId,
+    sourceType: 'escrow_hold',
+  }).catch((err) => console.error('[EscrowRelease:Ledger] Failed to write commission event:', err));
 
   return { commissionAmount, driverAmount };
 }
