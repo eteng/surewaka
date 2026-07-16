@@ -40,6 +40,7 @@ const data = {
         { title: 'Disputes', url: '/disputes' },
         { title: 'Analytics', url: '/analytics' },
         { title: 'Payouts', url: '/payouts' },
+        { title: 'Finance', url: '/finance' },
         { title: 'Waitlist', url: '/waitlist' },
       ],
     },

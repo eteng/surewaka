@@ -24,6 +24,7 @@ const routeTitles: Record<string, { title: string; parent?: string }> = {
   '/verifications': { title: 'Verifications', parent: 'Network' },
   '/disputes': { title: 'Disputes', parent: 'Operations' },
   '/analytics': { title: 'Analytics', parent: 'Operations' },
+  '/finance': { title: 'Finance', parent: 'Operations' },
   '/settings': { title: 'Settings' },
 };
 

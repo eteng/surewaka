@@ -28,6 +28,7 @@ export default [
     route('disputes', 'routes/disputes.tsx'),
     route('verifications', 'routes/verifications.tsx'),
     route('payouts', 'routes/payouts.tsx'),
+    route('finance', 'routes/finance.tsx'),
     route('waitlist', 'routes/waitlist.tsx'),
     route('coverage/zones', 'routes/coverage/zones.tsx'),
   ]),
