@@ -1,10 +1,20 @@
 import { db, wallets, escrowHolds, deliveries, walletTransactions } from '@surewaka/db';
 import { eq, sql } from 'drizzle-orm';
 import type { RefundJobData } from '../queue';
+import { writeLedgerEvent } from '../ledger';
 
 export async function handleRefund(data: RefundJobData) {
   const refundAmount = Math.floor(data.amount * data.rate);
   if (refundAmount <= 0) return { refundAmount: 0 };
+
+  // Check if commission was previously earned (escrow was released before refund)
+  const [hold] = await db
+    .select({ id: escrowHolds.id, status: escrowHolds.status, commissionAmount: escrowHolds.commissionAmount })
+    .from(escrowHolds)
+    .where(eq(escrowHolds.deliveryId, data.deliveryId))
+    .limit(1);
+
+  const commissionWasEarned = hold?.status === 'released' && (hold.commissionAmount ?? 0) > 0;
 
   await db.transaction(async (tx) => {
     // Refund to sender wallet and capture new balance for audit
@@ -40,6 +50,17 @@ export async function handleRefund(data: RefundJobData) {
       .set({ paymentStatus: 'refunded', updatedAt: new Date() })
       .where(eq(deliveries.id, data.deliveryId));
   });
+
+  // Ledger: reverse commission if it was previously recognized
+  if (commissionWasEarned && hold) {
+    writeLedgerEvent({
+      category: 'expense',
+      type: 'commission_reversal',
+      amountKobo: hold.commissionAmount!,
+      sourceId: hold.id,
+      sourceType: 'escrow_hold',
+    }).catch((err) => console.error('[Refund:Ledger] Failed to write commission_reversal:', err));
+  }
 
   return { refundAmount };
 }
