@@ -64,6 +64,13 @@
       "when": 1784090303262,
       "tag": "0008_gorgeous_korg",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784196726303,
+      "tag": "0009_glorious_pyro",
+      "breakpoints": true
     }
   ]
 }
