@@ -27,7 +27,7 @@ function parseDateRange(fromStr?: string, toStr?: string) {
   return { from, to };
 }
 
-function buildSummary(
+export function buildSummary(
   revenueRows: { type: string; total: number }[],
   expenseRows: { type: string; total: number }[],
   infraRows: { provider: string; total: number }[],
@@ -85,7 +85,7 @@ financeRoutes.get('/summary', async (c) => {
   const [revenueRows, expenseRows, infraRows] = await Promise.all([
     db.select({
       type: platformLedger.type,
-      total: sql<number>`COALESCE(SUM(${platformLedger.amountKobo}), 0)::bigint`,
+      total: sql<number>`COALESCE(SUM(${platformLedger.amountKobo}), 0)::float8`,
     })
       .from(platformLedger)
       .where(and(sql`${platformLedger.category} = 'revenue'`, gte(platformLedger.occurredAt, from), lte(platformLedger.occurredAt, to)))
@@ -93,7 +93,7 @@ financeRoutes.get('/summary', async (c) => {
 
     db.select({
       type: platformLedger.type,
-      total: sql<number>`COALESCE(SUM(${platformLedger.amountKobo}), 0)::bigint`,
+      total: sql<number>`COALESCE(SUM(${platformLedger.amountKobo}), 0)::float8`,
     })
       .from(platformLedger)
       .where(and(sql`${platformLedger.category} = 'expense'`, gte(platformLedger.occurredAt, from), lte(platformLedger.occurredAt, to)))
@@ -101,7 +101,7 @@ financeRoutes.get('/summary', async (c) => {
 
     db.select({
       provider: costSnapshots.provider,
-      total: sql<number>`COALESCE(SUM(${costSnapshots.amountKobo}), 0)::bigint`,
+      total: sql<number>`COALESCE(SUM(${costSnapshots.amountKobo}), 0)::float8`,
     })
       .from(costSnapshots)
       .where(and(sql`${costSnapshots.snapshotDate} >= ${fromDateStr}`, sql`${costSnapshots.snapshotDate} <= ${toDateStr}`))
@@ -124,8 +124,8 @@ financeRoutes.get('/trend', async (c) => {
   const [ledgerRows, infraRows] = await Promise.all([
     db.select({
       period: sql<string>`to_char(date_trunc('month', ${platformLedger.occurredAt}), 'YYYY-MM')`,
-      revenue: sql<number>`COALESCE(SUM(CASE WHEN ${platformLedger.category} = 'revenue' THEN ${platformLedger.amountKobo} ELSE 0 END), 0)::bigint`,
-      operationalExpenses: sql<number>`COALESCE(SUM(CASE WHEN ${platformLedger.category} = 'expense' THEN ${platformLedger.amountKobo} ELSE 0 END), 0)::bigint`,
+      revenue: sql<number>`COALESCE(SUM(CASE WHEN ${platformLedger.category} = 'revenue' THEN ${platformLedger.amountKobo} ELSE 0 END), 0)::float8`,
+      operationalExpenses: sql<number>`COALESCE(SUM(CASE WHEN ${platformLedger.category} = 'expense' THEN ${platformLedger.amountKobo} ELSE 0 END), 0)::float8`,
     })
       .from(platformLedger)
       .where(gte(platformLedger.occurredAt, since))
@@ -134,7 +134,7 @@ financeRoutes.get('/trend', async (c) => {
 
     db.select({
       period: sql<string>`to_char(date_trunc('month', ${costSnapshots.snapshotDate}::timestamp), 'YYYY-MM')`,
-      infrastructureExpenses: sql<number>`COALESCE(SUM(${costSnapshots.amountKobo}), 0)::bigint`,
+      infrastructureExpenses: sql<number>`COALESCE(SUM(${costSnapshots.amountKobo}), 0)::float8`,
     })
       .from(costSnapshots)
       .where(sql`${costSnapshots.snapshotDate}::date >= ${since.toISOString().split('T')[0]}`)

@@ -1,13 +1,21 @@
 /**
- * Seed script: Generate realistic platform_ledger and cost_snapshots rows for dev.
+ * Seed script: 6-month finance history with a realistic loss-to-profit arc.
  *
  * Run: pnpm --filter @surewaka/db seed:finance
  *
- * Generates 6 months of backfilled data:
- *   - platform_ledger: commission, withdrawal_fee, paystack_transfer, paystack_collection events
- *   - cost_snapshots: daily infra costs for all 5 providers
+ * P&L model:
+ *   Infrastructure costs are relatively fixed (~$6.50/day = ₦10,530/day) regardless of volume.
+ *   Net revenue per delivery is ~₦1,115 (15% commission minus Paystack collection fee).
+ *   Break-even requires ~10 deliveries/day — hit around day 75 (month 3).
  *
- * Idempotent — skips if data already exists for the date range.
+ *   Month 1 (days   1-30):  2–5  deliveries/day  →  deep losses  (~-₦7k/day)
+ *   Month 2 (days  31-60):  4–9  deliveries/day  →  still losing (~-₦2k/day)
+ *   Month 3 (days  61-90):  7–16 deliveries/day  →  break-even zone
+ *   Month 4 (days  91-120): 14–28 deliveries/day →  growing profit
+ *   Month 5 (days 121-150): 25–47 deliveries/day →  solid profit
+ *   Month 6 (days 151-180): 38–66 deliveries/day →  strong profit
+ *
+ * Always truncates and re-inserts — re-running replaces existing seed data.
  */
 
 import { config } from 'dotenv';
@@ -27,15 +35,10 @@ const db = drizzle(neon(connectionString));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function randomUUID(): string {
-  return crypto.randomUUID();
-}
-
 function randBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-/** Returns an array of Date objects for every day from `daysAgo` days back to yesterday. */
 function pastDays(daysAgo: number): Date[] {
   const days: Date[] = [];
   const today = new Date();
@@ -48,16 +51,30 @@ function pastDays(daysAgo: number): Date[] {
   return days;
 }
 
-/** Format a Date as YYYY-MM-DD for cost_snapshots.snapshot_date */
 function toDateStr(d: Date): string {
   return d.toISOString().split('T')[0]!;
 }
 
-/** Scatter a timestamp randomly within a given day */
 function randomTimeOnDay(day: Date): Date {
   const t = new Date(day);
-  t.setUTCHours(randBetween(0, 23), randBetween(0, 59), randBetween(0, 59));
+  t.setUTCHours(randBetween(6, 22), randBetween(0, 59), randBetween(0, 59));
   return t;
+}
+
+// ── Growth curve ──────────────────────────────────────────────────────────────
+
+/**
+ * Exponential growth from 4% → 100% over the seed window.
+ * Produces realistic early losses that flip to profit around day 75.
+ *
+ * growth(0)   ≈ 0.04  (just launched)
+ * growth(60)  ≈ 0.14  (month 2 — still losing)
+ * growth(75)  ≈ 0.19  (month 3 entry — approaching break-even)
+ * growth(120) ≈ 0.40  (month 4 — profitable and growing)
+ * growth(179) = 1.00  (month 6 — at scale)
+ */
+function growthAt(i: number, total: number): number {
+  return 0.04 * Math.pow(25, i / (total - 1));
 }
 
 // ── Ledger seed ───────────────────────────────────────────────────────────────
@@ -65,35 +82,41 @@ function randomTimeOnDay(day: Date): Date {
 type LedgerSeedRow = typeof platformLedger.$inferInsert;
 
 /**
- * Per day:
- *   - 5–15 deliveries completed → each writes a commission event + paystack_collection
- *   - 1–4 payouts completed → each writes withdrawal_fee + paystack_transfer
- *   - ~10% of days: 1 commission_reversal (refund after release)
+ * Peak volume (at growth = 1.0):
+ *   Deliveries: 40–80/day (avg 60)   → drops to 2–3/day at launch
+ *   Payouts:    5–15/day (avg 10)    → drops to 0–1/day at launch
  *
- * Revenue grows ~8% month-over-month to simulate early traction.
+ * Delivery fee: ₦3,000–₦15,000 (300,000–1,500,000 kobo)
+ * Commission:   15% → ₦450–₦2,250 (avg ₦1,350 = 135,000 kobo)
+ * Paystack collection: 1.5% + ₦100, capped ₦2,000 (avg ₦235 = 23,500 kobo)
+ * Net per delivery: ₦1,115 (111,500 kobo)
+ *
+ * Infra break-even: 10 deliveries/day (see cost model below)
  */
 function buildLedgerRows(days: Date[]): LedgerSeedRow[] {
   const rows: LedgerSeedRow[] = [];
-  const totalDays = days.length;
+  const total = days.length;
 
   for (let i = 0; i < days.length; i++) {
     const day = days[i]!;
-    // Growth factor: starts at 0.4, reaches 1.0 at end of period
-    const growth = 0.4 + (0.6 * i) / totalDays;
+    const g = growthAt(i, total);
 
-    const deliveriesPerDay = Math.round(randBetween(5, 15) * growth);
-    const payoutsPerDay = Math.round(randBetween(1, 4) * growth);
+    // Add ±20% daily noise so the chart isn't too smooth
+    const noise = 0.80 + Math.random() * 0.40;
+    const deliveriesPerDay = Math.max(1, Math.round(randBetween(40, 80) * g * noise));
+    const payoutsPerDay = Math.max(0, Math.round(randBetween(5, 15) * g * noise));
 
-    // Commission + paystack_collection per completed delivery
+    // Commission + Paystack collection per completed delivery
     for (let d = 0; d < deliveriesPerDay; d++) {
-      const deliveryValue = randBetween(200000, 1500000); // ₦2,000–₦15,000
-      const commissionKobo = Math.floor(deliveryValue * 0.15); // 15% commission
-      const collectionFee = Math.min(Math.round(deliveryValue * 0.015) + 10000, 200000);
-      const sourceId = randomUUID();
+      const deliveryFeeKobo = randBetween(300_000, 1_500_000); // ₦3k–₦15k
+      const commissionKobo = Math.floor(deliveryFeeKobo * 0.15);
+      // Paystack collection: 1.5% + ₦100, capped ₦2,000
+      const collectionFeeKobo = Math.min(Math.round(deliveryFeeKobo * 0.015) + 10_000, 200_000);
+      const sourceId = crypto.randomUUID();
       const occurredAt = randomTimeOnDay(day);
 
       rows.push({
-        id: randomUUID(),
+        id: crypto.randomUUID(),
         category: 'revenue',
         type: 'commission',
         amountKobo: commissionKobo,
@@ -103,57 +126,57 @@ function buildLedgerRows(days: Date[]): LedgerSeedRow[] {
       });
 
       rows.push({
-        id: randomUUID(),
+        id: crypto.randomUUID(),
         category: 'expense',
         type: 'paystack_collection',
-        amountKobo: collectionFee,
-        // Different sourceId — collection fee is on the wallet transaction, not escrow hold
-        sourceId: randomUUID(),
+        amountKobo: collectionFeeKobo,
+        sourceId: crypto.randomUUID(), // collection is on the wallet_transaction, not the escrow
         sourceType: 'wallet_transaction',
         occurredAt,
       });
     }
 
-    // Withdrawal fee + paystack_transfer per completed payout
+    // Withdrawal fee + Paystack transfer per completed payout
     for (let p = 0; p < payoutsPerDay; p++) {
-      const payoutAmount = randBetween(500000, 5000000); // ₦5,000–₦50,000
-      const withdrawalFee = 10000; // flat ₦100
-      const transferFee = payoutAmount <= 500000 ? 1000 : payoutAmount <= 5000000 ? 2500 : 5000;
-      const stampDuty = payoutAmount > 1000000 ? 5000 : 0;
-      const paystackTransferTotal = transferFee + stampDuty;
-      const sourceId = randomUUID();
+      const payoutKobo = randBetween(500_000, 5_000_000); // ₦5k–₦50k
+      const withdrawalFeeKobo = 10_000; // flat ₦100
+      // Transfer fee tiers: ₦10 / ₦25 / ₦50 + ₦50 stamp duty if > ₦10k
+      const baseFee = payoutKobo <= 500_000 ? 1_000 : payoutKobo <= 5_000_000 ? 2_500 : 5_000;
+      const stampDuty = payoutKobo > 1_000_000 ? 5_000 : 0;
+      const sourceId = crypto.randomUUID();
       const occurredAt = randomTimeOnDay(day);
 
       rows.push({
-        id: randomUUID(),
+        id: crypto.randomUUID(),
         category: 'revenue',
         type: 'withdrawal_fee',
-        amountKobo: withdrawalFee,
+        amountKobo: withdrawalFeeKobo,
         sourceId,
         sourceType: 'payout_request',
         occurredAt,
       });
 
       rows.push({
-        id: randomUUID(),
+        id: crypto.randomUUID(),
         category: 'expense',
         type: 'paystack_transfer',
-        amountKobo: paystackTransferTotal,
+        amountKobo: baseFee + stampDuty,
         sourceId,
         sourceType: 'payout_request',
         occurredAt,
       });
     }
 
-    // ~10% of days: one commission reversal (refund after release)
-    if (Math.random() < 0.10) {
-      const reversedCommission = randBetween(15000, 150000);
+    // ~3% chance of a commission reversal on any given day (rare post-release refund)
+    if (Math.random() < 0.03) {
+      // Can only reverse commissions already earned — use a plausible amount
+      const reversedKobo = randBetween(45_000, 225_000); // ₦450–₦2,250 (one delivery's worth)
       rows.push({
-        id: randomUUID(),
+        id: crypto.randomUUID(),
         category: 'expense',
         type: 'commission_reversal',
-        amountKobo: reversedCommission,
-        sourceId: randomUUID(),
+        amountKobo: reversedKobo,
+        sourceId: crypto.randomUUID(),
         sourceType: 'escrow_hold',
         occurredAt: randomTimeOnDay(day),
       });
@@ -167,29 +190,49 @@ function buildLedgerRows(days: Date[]): LedgerSeedRow[] {
 
 type CostSnapshotRow = typeof costSnapshots.$inferInsert;
 
-// Approximate daily costs in USD — loosely based on early-stage startup spend
-const DAILY_COST_USD: Record<string, { min: number; max: number }> = {
-  vercel:  { min: 0.10, max: 0.50 },  // hobby/pro plan amortised
-  fly:     { min: 0.30, max: 1.20 },  // 1-2 small VMs in London
-  neon:    { min: 0.05, max: 0.30 },  // compute usage
-  clerk:   { min: 0.20, max: 0.60 },  // estimated per MAU
-  ably:    { min: 0.01, max: 0.15 },  // message volume
+/**
+ * Infrastructure costs modelled as real monthly plans amortised to daily.
+ * These are mostly fixed — they don't drop just because volume is low.
+ * Total: $5.00–$8.50/day (~₦8,100–₦13,770/day at ₦1,620/$).
+ *
+ * At day-1 delivery volume (₦3,375 revenue/day), infra alone guarantees a loss.
+ * At break-even volume (~10 deliveries/day, ₦11,150 net revenue), infra is covered.
+ *
+ * Infra grows slightly over time — autoscaling Fly machines, more Neon compute,
+ * higher Clerk MAU billing as the user base grows.
+ */
+const DAILY_COST_USD: Record<string, { launch: number; peak: number }> = {
+  //                     launch $/day     peak $/day
+  vercel:  { launch: 1.30, peak: 2.00 }, // $40–$60/month (pro plan)
+  fly:     { launch: 1.60, peak: 3.20 }, // $49–$98/month (scaled VMs in lhr)
+  neon:    { launch: 0.50, peak: 1.50 }, // $15–$46/month (compute hours)
+  clerk:   { launch: 0.80, peak: 2.00 }, // $25–$61/month (MAU-based)
+  ably:    { launch: 0.16, peak: 0.65 }, // $5–$20/month (message volume)
+  //         ────────────  ────────────
+  //         $4.36/day      $9.35/day
 };
 
-const USD_NGN_RATE = 1620; // mid-market approximation for seeding
+const USD_NGN_RATE = 1620;
 
 function buildCostRows(days: Date[]): CostSnapshotRow[] {
   const rows: CostSnapshotRow[] = [];
+  const total = days.length;
 
-  for (const day of days) {
+  for (let i = 0; i < days.length; i++) {
+    const day = days[i]!;
+    const g = growthAt(i, total);
     const dateStr = toDateStr(day);
 
     for (const [provider, range] of Object.entries(DAILY_COST_USD)) {
-      const amountUsd = parseFloat((Math.random() * (range.max - range.min) + range.min).toFixed(4));
+      // Cost grows from launch rate toward peak rate as the platform scales
+      const baseCost = range.launch + (range.peak - range.launch) * g;
+      // ±8% daily noise (invoice proration, metered usage fluctuation)
+      const noise = 0.92 + Math.random() * 0.16;
+      const amountUsd = parseFloat((baseCost * noise).toFixed(4));
       const amountKobo = Math.round(amountUsd * USD_NGN_RATE * 100);
 
       rows.push({
-        id: randomUUID(),
+        id: crypto.randomUUID(),
         provider,
         amountUsd: String(amountUsd),
         usdToNgnRate: String(USD_NGN_RATE),
@@ -206,51 +249,45 @@ function buildCostRows(days: Date[]): CostSnapshotRow[] {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('🌱 Seeding finance data (6 months)...\n');
+  console.log('🌱 Seeding finance data (6 months — loss-to-profit arc)...\n');
 
   const DAYS_BACK = 180;
   const days = pastDays(DAYS_BACK);
 
-  // Check if ledger data already exists
-  const [existingLedger] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(platformLedger);
+  // Always truncate — re-running replaces existing seed data
+  console.log('  Truncating existing seed data...');
+  await db.delete(platformLedger);
+  await db.delete(costSnapshots);
+  console.log('  ✓ Tables cleared\n');
 
-  if ((existingLedger?.count ?? 0) > 0) {
-    console.log(`  ℹ️  platform_ledger already has ${existingLedger!.count} rows — skipping ledger seed.\n`);
-  } else {
-    const ledgerRows = buildLedgerRows(days);
-    console.log(`  Inserting ${ledgerRows.length} ledger rows...`);
+  // ── Ledger ────────────────────────────────────────────────────────────────
+  const ledgerRows = buildLedgerRows(days);
+  console.log(`  Inserting ${ledgerRows.length} ledger rows...`);
 
-    // Insert in batches of 200 to avoid query size limits
-    const BATCH = 200;
-    for (let i = 0; i < ledgerRows.length; i += BATCH) {
-      await db.insert(platformLedger).values(ledgerRows.slice(i, i + BATCH));
-    }
-    console.log(`  ✅ platform_ledger seeded — ${ledgerRows.length} rows\n`);
+  const BATCH = 200;
+  for (let i = 0; i < ledgerRows.length; i += BATCH) {
+    await db.insert(platformLedger).values(ledgerRows.slice(i, i + BATCH));
   }
+  console.log(`  ✅ platform_ledger seeded — ${ledgerRows.length} rows\n`);
 
-  // Check if cost snapshot data already exists
-  const [existingCosts] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(costSnapshots);
+  // ── Cost snapshots ────────────────────────────────────────────────────────
+  const costRows = buildCostRows(days);
+  console.log(`  Inserting ${costRows.length} cost snapshot rows (${days.length} days × 5 providers)...`);
 
-  if ((existingCosts?.count ?? 0) > 0) {
-    console.log(`  ℹ️  cost_snapshots already has ${existingCosts!.count} rows — skipping cost seed.\n`);
-  } else {
-    const costRows = buildCostRows(days);
-    console.log(`  Inserting ${costRows.length} cost snapshot rows (${days.length} days × 5 providers)...`);
-
-    const BATCH = 200;
-    for (let i = 0; i < costRows.length; i += BATCH) {
-      await db.insert(costSnapshots).values(costRows.slice(i, i + BATCH));
-    }
-    console.log(`  ✅ cost_snapshots seeded — ${costRows.length} rows\n`);
+  for (let i = 0; i < costRows.length; i += BATCH) {
+    await db.insert(costSnapshots).values(costRows.slice(i, i + BATCH));
   }
+  console.log(`  ✅ cost_snapshots seeded — ${costRows.length} rows\n`);
 
-  console.log('✅ Finance seed complete.');
-  console.log(`   USD/NGN rate used: ${USD_NGN_RATE} (static approximation for dev)`);
-  console.log('   Re-run is safe — idempotent on non-empty tables.\n');
+  // ── Summary ───────────────────────────────────────────────────────────────
+  const [ledgerCount] = await db.select({ count: sql<number>`count(*)::int` }).from(platformLedger);
+  const [costCount] = await db.select({ count: sql<number>`count(*)::int` }).from(costSnapshots);
+
+  console.log('✅ Finance seed complete.\n');
+  console.log('   Arc: deep losses (month 1-2) → break-even (month 3) → growing profit (month 4-6)');
+  console.log(`   Break-even: ~10 deliveries/day, typically crossed around day 75`);
+  console.log(`   USD/NGN rate: ${USD_NGN_RATE} (static approximation)`);
+  console.log(`   Rows: ${ledgerCount?.count} ledger, ${costCount?.count} cost snapshots\n`);
 }
 
 main().catch((err) => {
