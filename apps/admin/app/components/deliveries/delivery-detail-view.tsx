@@ -448,6 +448,8 @@ export function DeliveryDetailView({ deliveryId, onClose, tab, onTabChange }: De
                 hasDriver={data.driver !== null}
                 driverLat={driverPos?.lat}
                 driverLng={driverPos?.lng}
+                pickupAddress={data.pickupAddress}
+                dropoffAddress={data.dropoffAddress}
               />
             </div>
 

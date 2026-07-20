@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DeliveryStatus } from '@surewaka/shared';
@@ -45,8 +45,11 @@ export function DeliveriesPage() {
 
   const selectedDeliveryId = searchParams.get('id') || null;
   const viewMode: ViewMode = searchParams.get('view') === 'map' ? 'map' : 'table';
-  // [N1] Detail tab persisted in URL so refreshing / sharing preserves the selected tab
-  const detailTab: DetailTab = searchParams.get('dtab') === 'details' ? 'details' : 'timeline';
+
+  // Detail tab is ephemeral panel state — keeping it in the URL caused history-stack
+  // collisions between replace:false row-click pushes and replace:true tab-switch replaces.
+  const [detailTab, setDetailTab] = useState<DetailTab>('timeline');
+  useEffect(() => { setDetailTab('timeline'); }, [selectedDeliveryId]);
 
   // ─── URL mutation helper ────────────────────────────────────────────────────
   // replace: true keeps the history stack clean for filter/sort/page changes.
@@ -79,7 +82,7 @@ export function DeliveriesPage() {
   // ─── Event Handlers ─────────────────────────────────────────────────────────
 
   const handleTabChange = useCallback((tab: DeliveryTab) => {
-    patch({ tab, status: null, page: null });
+    patch({ tab, status: null, page: null, id: null });
   }, []);
 
   const handleSearchChange = useCallback((value: string) => {
@@ -107,17 +110,15 @@ export function DeliveriesPage() {
   }, []);
 
   const handleRowClick = useCallback((deliveryId: string) => {
-    // Reset dtab to default (timeline) when switching to a new delivery
-    patch({ id: deliveryId, dtab: null }, { replace: false });
+    patch({ id: deliveryId }, { replace: false });
   }, []);
 
   const handleDetailClose = useCallback(() => {
-    patch({ id: null, dtab: null });
+    patch({ id: null });
   }, []);
 
   const handleDetailTabChange = useCallback((t: DetailTab) => {
-    // Only write dtab to URL for the non-default tab to keep URLs clean
-    patch({ dtab: t === 'timeline' ? null : t });
+    setDetailTab(t);
   }, []);
 
   const handleViewModeChange = useCallback((mode: ViewMode) => {

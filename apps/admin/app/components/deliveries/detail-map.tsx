@@ -14,6 +14,8 @@ export type DetailMapProps = {
   driverLat?: number | null;
   driverLng?: number | null;
   hasDriver: boolean;
+  pickupAddress?: string;
+  dropoffAddress?: string;
 };
 
 type RouteData = {
@@ -71,6 +73,42 @@ async function fetchDrivingRoute(
     distanceKm: r.distance / 1000,
     durationMin: Math.round(r.duration / 60),
   };
+}
+
+// ─── No-token fallback ────────────────────────────────────────────────────────
+
+function MapFallback({ pickupAddress, dropoffAddress }: { pickupAddress?: string; dropoffAddress?: string }) {
+  return (
+    <div className="relative h-64 overflow-hidden rounded-lg border border-dashed bg-muted/40 flex items-center justify-center">
+      <div className="flex flex-col items-start gap-3 px-6 w-full max-w-xs">
+        <div className="flex items-start gap-2.5">
+          <div
+            className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+            style={{ backgroundColor: '#dcfce7', color: PICKUP_COLOR }}
+          >
+            <MapPin className="h-3 w-3" aria-hidden="true" />
+          </div>
+          <span className="text-sm text-foreground leading-snug">
+            {pickupAddress ?? 'Pickup location'}
+          </span>
+        </div>
+
+        <div className="ml-3 h-5 border-l-2 border-dashed border-muted-foreground/30" />
+
+        <div className="flex items-start gap-2.5">
+          <div
+            className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+            style={{ backgroundColor: '#fef2f2', color: DROPOFF_COLOR }}
+          >
+            <Navigation className="h-3 w-3" aria-hidden="true" />
+          </div>
+          <span className="text-sm text-foreground leading-snug">
+            {dropoffAddress ?? 'Dropoff location'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── Map renderer ─────────────────────────────────────────────────────────────
@@ -242,6 +280,7 @@ function MapRenderer({
 export function DetailMap({
   pickupLat, pickupLng, dropoffLat, dropoffLng,
   driverLat, driverLng, hasDriver,
+  pickupAddress, dropoffAddress,
 }: DetailMapProps) {
   const [route, setRoute] = useState<RouteData | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
@@ -263,6 +302,10 @@ export function DetailMap({
 
   const showDriver =
     hasDriver && driverLat != null && driverLng != null && isValidCoord(driverLat, driverLng);
+
+  if (!token) {
+    return <MapFallback pickupAddress={pickupAddress} dropoffAddress={dropoffAddress} />;
+  }
 
   return (
     <MapRenderer
