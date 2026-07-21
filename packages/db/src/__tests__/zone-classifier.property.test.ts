@@ -403,9 +403,8 @@ describe('Zone Classifier — Property Tests', () => {
     });
 
     it('if Phase 1 (local match) returns a result, Phase 2 (remote) never executes', async () => {
-      // We need to test the actual classifyZone function with mocked DB
-      // Mock the DB module to return controlled zone data
-      vi.doMock('@surewaka/db', () => ({
+      // Mock the DB client and schema so no real DB connection is needed
+      vi.doMock('../client', () => ({
         db: {
           select: () => ({
             from: () => ({
@@ -437,7 +436,10 @@ describe('Zone Classifier — Property Tests', () => {
             }),
           }),
         },
-        zones: {},
+      }));
+
+      vi.doMock('../schema', () => ({
+        zones: { isActive: 'is_active' },
       }));
 
       vi.doMock('drizzle-orm', () => ({

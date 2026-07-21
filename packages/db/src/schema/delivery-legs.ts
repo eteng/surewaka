@@ -4,6 +4,7 @@ import {
   smallint,
   text,
   real,
+  boolean,
   timestamp,
   index,
   unique,
@@ -38,11 +39,15 @@ export const deliveryLegs = pgTable(
     slaHours: real('sla_hours'),
     startedAt: timestamp('started_at', { withTimezone: true }),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     unique('delivery_legs_delivery_id_leg_number_unique').on(table.deliveryId, table.legNumber),
     index('idx_delivery_legs_delivery_id').using('btree', table.deliveryId),
+    index('idx_delivery_legs_delivery_id_active')
+      .on(table.deliveryId)
+      .where(sql`is_active = true`),
     index('idx_delivery_legs_actor_id').using('btree', table.actorId),
     index('idx_delivery_legs_pickup_zone_id').using('btree', table.pickupZoneId),
     index('idx_delivery_legs_dropoff_zone_id').using('btree', table.dropoffZoneId),
@@ -67,7 +72,7 @@ export const deliveryLegs = pgTable(
     ),
     check(
       'delivery_legs_leg_type_check',
-      sql`leg_type = ANY (ARRAY['first_mile'::text, 'intercity'::text, 'last_mile'::text])`,
+      sql`leg_type = ANY (ARRAY['first_mile'::text, 'intercity'::text, 'transfer'::text, 'last_mile'::text])`,
     ),
     check(
       'delivery_legs_actor_type_check',

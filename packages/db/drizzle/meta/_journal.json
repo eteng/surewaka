@@ -71,6 +71,13 @@
       "when": 1784196726303,
       "tag": "0009_glorious_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784651249952,
+      "tag": "0010_third_captain_flint",
+      "breakpoints": true
     }
   ]
 }

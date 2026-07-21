@@ -46,6 +46,7 @@ export const createDeliverySchema = z.object({
   packageDetails: packageDetailsSchema,
   recipientDetails: recipientDetailsSchema,
   legs: z.array(deliveryLegInputSchema).min(1).max(10).optional(),
+  mode: z.enum(['on_demand', 'carrier_direct', 'surewaka_way']).optional(),
 });
 
 export const otpRegisterSchema = z.object({
@@ -566,6 +567,57 @@ export const createCarrierSlaOverrideSchema = z.object({
   originZoneId: z.string().uuid(),
   destinationZoneId: z.string().uuid(),
   slaHours: z.number().positive(),
+});
+
+// ─── Carrier Parks ────────────────────────────────────────────────────────────
+
+export const createCarrierParkSchema = z.object({
+  carrierId: z.string().uuid(),
+  city: z.string().min(2).max(100),
+  name: z.string().min(2).max(200),
+  address: z.string().min(5).max(500),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+});
+export type CreateCarrierPark = z.infer<typeof createCarrierParkSchema>;
+
+export const updateCarrierParkSchema = createCarrierParkSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+// ─── Carrier Routes ───────────────────────────────────────────────────────────
+
+export const createCarrierRouteSchema = z.object({
+  carrierId: z.string().uuid(),
+  originParkId: z.string().uuid(),
+  destinationParkId: z.string().uuid(),
+  basePriceKobo: z.number().int().positive(),
+  estimatedTransitHrs: z.number().positive(),
+  maxWeightKg: z.number().positive().optional(),
+}).refine(d => d.originParkId !== d.destinationParkId, {
+  message: 'Origin and destination parks must differ',
+  path: ['destinationParkId'],
+});
+export type CreateCarrierRoute = z.infer<typeof createCarrierRouteSchema>;
+
+export const updateCarrierRouteSchema = z.object({
+  basePriceKobo: z.number().int().positive().optional(),
+  estimatedTransitHrs: z.number().positive().optional(),
+  maxWeightKg: z.number().positive().optional(),
+  isActive: z.boolean().optional(),
+});
+
+// ─── Carrier Route Schedules ──────────────────────────────────────────────────
+
+export const createCarrierRouteScheduleSchema = z.object({
+  hour: z.number().int().min(0).max(23),
+  minute: z.number().int().min(0).max(59).default(0),
+  daysOfWeek: z.array(z.number().int().min(1).max(7)).default([]),
+});
+export type CreateCarrierRouteSchedule = z.infer<typeof createCarrierRouteScheduleSchema>;
+
+export const updateCarrierRouteScheduleSchema = createCarrierRouteScheduleSchema.partial().extend({
+  isActive: z.boolean().optional(),
 });
 
 // ─── Admin Deliveries ────────────────────────────────────────────────────────

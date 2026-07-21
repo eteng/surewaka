@@ -25,6 +25,8 @@ export const carrierMemberRole = pgEnum('carrier_member_role', [
 export const deliveryStatus = pgEnum('delivery_status', [
   'draft',
   'pending',
+  'pending_routing',
+  'routing_failed',
   'accepted',
   'en_route_pickup',
   'arrived_pickup',

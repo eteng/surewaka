@@ -1,5 +1,6 @@
 export * from './schema';
 export { db } from './client';
+export { classifyZone, invalidateZoneCache } from './zone-classifier';
 
 // Backwards-compat aliases — generated schema dropped the "Enum" suffix
 export {

@@ -45,6 +45,8 @@ export const PUSH_NOTIFICATION_TYPES = [
   'broadcast',
   'system_alert',
   'wallet_withdrawal',
+  'routing-complete',
+  'routing-failed',
 ] as const;
 
 export const PUSH_TARGET_APPS = ['customer', 'driver', 'admin'] as const;
@@ -55,6 +57,8 @@ export const HIGH_PRIORITY_PUSH_TYPES: PushNotificationType[] = [
   'driver_arrived',
   'weight_correction',
   'system_alert',
+  'routing-complete',
+  'routing-failed',
 ];
 
 export const PUSH_DEEP_LINK_MAP: Record<PushNotificationType, string> = {
@@ -69,6 +73,8 @@ export const PUSH_DEEP_LINK_MAP: Record<PushNotificationType, string> = {
   broadcast: '/:deepLink',
   system_alert: '/alerts',
   wallet_withdrawal: '/wallet',
+  'routing-complete': '/delivery/:resourceId',
+  'routing-failed': '/deliveries',
 };
 
 export const PUSH_APP_ROUTING: Record<PushNotificationType, PushTargetApp | 'all'> = {
@@ -83,6 +89,8 @@ export const PUSH_APP_ROUTING: Record<PushNotificationType, PushTargetApp | 'all
   broadcast: 'all',
   system_alert: 'admin',
   wallet_withdrawal: 'all', // both customer and driver apps can withdraw
+  'routing-complete': 'customer',
+  'routing-failed': 'customer',
 };
 
 export const MAX_PUSH_TOKENS_PER_USER_PER_APP = 10;

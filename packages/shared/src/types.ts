@@ -292,7 +292,9 @@ export type PushNotificationType =
   | 'weight_correction'
   | 'broadcast'
   | 'system_alert'
-  | 'wallet_withdrawal';
+  | 'wallet_withdrawal'
+  | 'routing-complete'
+  | 'routing-failed';
 
 export type PushTargetApp = 'customer' | 'driver' | 'admin';
 
@@ -417,6 +419,10 @@ export type LocationUpdatePayload = {
   timestamp: string;
 };
 
+// ─── Delivery Mode ────────────────────────────────────────────────────────────
+
+export type DeliveryMode = 'on_demand' | 'carrier_direct' | 'surewaka_way';
+
 // ─── Zone Types ───────────────────────────────────────────────────────────────
 
 export type Zone = {
@@ -500,6 +506,50 @@ export type CarrierSlaOverride = {
   originZoneId: string;
   destinationZoneId: string;
   slaHours: number;
+};
+
+// ─── Carrier Park / Route / Schedule Types ────────────────────────────────────
+
+export type DepartureSlot = {
+  hour: number;       // WAT local time 0–23
+  minute: number;     // 0–59
+  daysOfWeek: number[]; // ISO weekday 1–7; empty = every day
+};
+
+export type CarrierPark = {
+  id: string;
+  carrierId: string;
+  city: string;      // slug e.g. "lagos"
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CarrierRoute = {
+  id: string;
+  carrierId: string;
+  originParkId: string;
+  destinationParkId: string;
+  basePriceKobo: number;
+  estimatedTransitHrs: number;
+  maxWeightKg: number | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CarrierRouteSchedule = {
+  id: string;
+  carrierRouteId: string;
+  hour: number;
+  minute: number;
+  daysOfWeek: number[];
+  isActive: boolean;
+  createdAt: string;
 };
 
 // ─── Ops Hub ──────────────────────────────────────────────────────────────────

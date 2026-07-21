@@ -30,7 +30,7 @@ export function createAblyProvider(options?: { apiKey?: string; clientId?: strin
     if (!realtimeClient) {
       realtimeClient = new Ably.Realtime({
         key: apiKey,
-        clientId: options?.clientId ?? null,
+        clientId: options?.clientId ?? undefined,
       });
     }
     return realtimeClient;

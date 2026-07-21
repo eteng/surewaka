@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { eq } from 'drizzle-orm';
-import { db, deliveries, escrowHolds } from '@surewaka/db';
+import { eq, and, isNull, sql } from 'drizzle-orm';
+import { db, deliveries, escrowHolds, deliveryLegs, quotes } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { getWalletByUserId, creditWallet, debitWallet } from '../lib/wallet-service';
 import { bookingConfirmSchema, cancelDeliverySchema, FEE_ENGINE_ERRORS } from '@surewaka/shared';
@@ -8,6 +8,8 @@ import type { AuthUser } from '@surewaka/auth';
 import { randomUUID } from 'crypto';
 import { notifyDeliveryCancelled } from '../services/push-triggers';
 import { confirmAll } from '../services/quote-service';
+import { writeLedgerEvent } from '../lib/ledger';
+import { enqueueRouteDelivery } from '../lib/routing-queue';
 
 type Env = { Variables: { user: AuthUser; accessToken: string } };
 
@@ -87,6 +89,62 @@ bookingPaymentRoutes.post('/booking/confirm', async (c) => {
       );
     }
     if (msg === FEE_ENGINE_ERRORS.QUOTE_EXPIRED) {
+      // For surewaka_way deliveries: soft-deactivate legs, supersede quotes, reset to
+      // pending_routing, and re-enqueue the routing job so the customer doesn't have to
+      // manually re-quote — they just wait for the new route on the routing-pending screen.
+      try {
+        const [deliveryForReRoute] = await db
+          .select({ id: deliveries.id, customerId: deliveries.customerId, deliveryMode: deliveries.deliveryMode })
+          .from(deliveries)
+          .where(eq(deliveries.id, delivery_id));
+
+        if (
+          deliveryForReRoute?.deliveryMode === 'surewaka_way' &&
+          deliveryForReRoute.customerId === user.id
+        ) {
+          await db.transaction(async (tx) => {
+            // Soft-deactivate all legs (preserves audit trail — append-only pattern)
+            await tx
+              .update(deliveryLegs)
+              .set({ isActive: false })
+              .where(eq(deliveryLegs.deliveryId, delivery_id));
+
+            // Supersede all active quotes
+            await tx
+              .update(quotes)
+              .set({ supersededAt: sql`now()` })
+              .where(
+                and(
+                  eq(quotes.deliveryId, delivery_id),
+                  isNull(quotes.supersededAt),
+                  isNull(quotes.confirmedAt),
+                ),
+              );
+
+            // Reset delivery: status → pending_routing, clear deadline and price
+            await tx
+              .update(deliveries)
+              .set({ status: 'pending_routing', cancellationDeadlineAt: null, priceKobo: null })
+              .where(eq(deliveries.id, delivery_id));
+          });
+
+          // Re-enqueue routing job so the worker picks up a fresh route
+          await enqueueRouteDelivery({
+            deliveryId: delivery_id,
+            bookingTime: new Date().toISOString(),
+            vehicleType: 'motorcycle',
+          });
+
+          return c.json(
+            { data: null, error: { code: 'QUOTE_EXPIRED', message: 'Quote expired — re-routing started', reroutingStarted: true }, meta: null },
+            409,
+          );
+        }
+      } catch (rerouteErr) {
+        console.error('[POST /booking/confirm] QUOTE_EXPIRED re-route failed:', rerouteErr);
+      }
+
+      // Non-surewaka_way, or re-route sequence failed — fall back to standard 409
       return c.json(
         { data: null, error: { code: 'QUOTE_EXPIRED', message: 'One or more quotes have expired — please re-quote' }, meta: null },
         409,
@@ -153,6 +211,9 @@ bookingPaymentRoutes.post('/deliveries/:id/cancel', async (c) => {
     const wallet = await getWalletByUserId(user.id);
 
     let refundAmount = 0;
+    // Captured outside the tx for post-commit ledger write (fire-and-forget)
+    let cancellationFeeKobo = 0;
+    let feeSourceEscrowId: string | null = null;
 
     await db.transaction(async (tx) => {
       // SELECT with row lock inside the transaction
@@ -165,13 +226,69 @@ bookingPaymentRoutes.post('/deliveries/:id/cancel', async (c) => {
       if (!locked || locked.customerId !== user.id) {
         throw Object.assign(new Error('NOT_FOUND'), { code: 'NOT_FOUND' });
       }
+
+      // Special case: surewaka_way draft — free cancel, no escrow at this stage
+      if (locked.status === 'draft' && locked.deliveryMode === 'surewaka_way') {
+        await tx
+          .update(deliveries)
+          .set({ status: 'cancelled', paymentStatus: 'released' })
+          .where(eq(deliveries.id, deliveryId));
+        return; // refundAmount stays 0
+      }
+
       if (NON_CANCELLABLE.has(locked.status)) {
         throw Object.assign(new Error('CANNOT_CANCEL'), { code: 'CANNOT_CANCEL', status: locked.status });
       }
 
-      const rate = REFUND_RATES[locked.status] ?? 0;
+      // pending_routing: routing not yet complete, no escrow — free cancel
+      if (locked.status === 'pending_routing') {
+        await tx
+          .update(deliveries)
+          .set({ status: 'cancelled', paymentStatus: 'released' })
+          .where(eq(deliveries.id, deliveryId));
+        return; // refundAmount stays 0
+      }
+
       const amountPaid = Number(locked.amountPaid ?? 0);
-      refundAmount = Math.floor(amountPaid * rate);
+
+      if (locked.cancellationDeadlineAt) {
+        // surewaka_way pending — apply deadline-based refund logic
+        const now = new Date();
+        if (now < locked.cancellationDeadlineAt) {
+          // Within free-cancel window — full refund
+          refundAmount = amountPaid;
+        } else {
+          // Late cancellation — deduct first active intercity leg quote as cancellation fee
+          const [intercityLegQuote] = await tx
+            .select({ totalKobo: quotes.totalKobo })
+            .from(deliveryLegs)
+            .innerJoin(
+              quotes,
+              and(
+                eq(quotes.deliveryLegId, deliveryLegs.id),
+                isNull(quotes.supersededAt),
+              ),
+            )
+            .where(
+              and(
+                eq(deliveryLegs.deliveryId, deliveryId),
+                eq(deliveryLegs.legType, 'intercity'),
+                eq(deliveryLegs.isActive, true),
+              ),
+            )
+            .limit(1);
+
+          const feeKobo = intercityLegQuote?.totalKobo ?? 0;
+          refundAmount = Math.max(0, amountPaid - feeKobo);
+          // Capture for post-commit ledger write
+          cancellationFeeKobo = feeKobo;
+          feeSourceEscrowId = locked.escrowHoldId;
+        }
+      } else {
+        // on_demand or carrier_direct — existing tiered refund rates
+        const rate = REFUND_RATES[locked.status] ?? 0;
+        refundAmount = Math.floor(amountPaid * rate);
+      }
 
       await tx
         .update(deliveries)
@@ -196,12 +313,24 @@ bookingPaymentRoutes.post('/deliveries/:id/cancel', async (c) => {
           // Deterministic reference — duplicate cancel attempts will fail on UNIQUE constraint,
           // preventing double-refunds.
           `refund_${deliveryId}`,
-          `Cancellation refund for delivery ${deliveryId} (${Math.round(rate * 100)}%)`,
-          { delivery_id: deliveryId, original_amount: amountPaid, refund_rate: rate },
+          `Cancellation refund for delivery ${deliveryId}`,
+          { delivery_id: deliveryId, original_amount: amountPaid, refund_amount: refundAmount },
           tx,
         );
       }
     });
+
+    // Write cancellation fee commission ledger event after transaction commits.
+    // Fire-and-forget with internal retry queue — cancel response is not blocked by this.
+    if (cancellationFeeKobo > 0 && feeSourceEscrowId) {
+      writeLedgerEvent({
+        category: 'revenue',
+        type: 'commission',
+        amountKobo: cancellationFeeKobo,
+        sourceId: feeSourceEscrowId,
+        sourceType: 'escrow_hold',
+      }).catch((err) => console.error('[cancel] commission ledger write failed:', err));
+    }
 
     // Push notification: notify customer of cancellation.
     // This endpoint is customer-initiated (requireAuth ensures user is the delivery owner),

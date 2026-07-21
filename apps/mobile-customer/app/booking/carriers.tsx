@@ -27,6 +27,7 @@ export default function CarriersScreen() {
   const { getToken } = useAuth();
   const setStep = useBookingStore((s) => s.setStep);
   const setSelectedCarrier = useBookingStore((s) => s.setSelectedCarrier);
+  const setMode = useBookingStore((s) => s.setMode);
   const pickup = useBookingStore((s) => s.pickup);
   const dropoff = useBookingStore((s) => s.dropoff);
   const packageDetails = useBookingStore((s) => s.packageDetails);
@@ -153,7 +154,15 @@ export default function CarriersScreen() {
   }, [loading, error, carriers, pickup, dropoff, packageWeight, vehicleType]);
 
   function selectCarrier(id: string) {
+    setMode('carrier_direct');
     setSelectedCarrier(id);
+    setStep(4);
+    router.push('/booking/review');
+  }
+
+  function selectSurewakaWay() {
+    setMode('surewaka_way');
+    setSelectedCarrier(null);
     setStep(4);
     router.push('/booking/review');
   }
@@ -269,8 +278,25 @@ export default function CarriersScreen() {
       <Text className="text-2xl font-bold text-gray-900 mb-2">Choose a Service</Text>
       <Text className="text-base text-gray-500 mb-6">Compare prices and delivery times</Text>
 
+      {pickup?.city && dropoff?.city && pickup.city !== dropoff.city && (
+        <Pressable
+          onPress={selectSurewakaWay}
+          className="bg-emerald-50 rounded-xl p-4 mb-4 border-2 border-emerald-600"
+        >
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1 mr-4">
+              <Text className="text-lg font-bold text-emerald-700">SureWaka picks best route</Text>
+              <Text className="text-sm text-gray-500 mt-1">
+                We find the cheapest intercity path for you
+              </Text>
+            </View>
+            <Text className="text-2xl">✨</Text>
+          </View>
+        </Pressable>
+      )}
+
       <Pressable
-        onPress={() => selectCarrier('instant')}
+        onPress={() => { setMode('on_demand'); selectCarrier('instant'); }}
         className="bg-primary-light rounded-xl p-4 mb-4 border-2 border-primary"
       >
         <View className="flex-row items-center justify-between">

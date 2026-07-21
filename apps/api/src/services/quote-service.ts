@@ -15,8 +15,9 @@ import {
   assembleCompositeQuote,
 } from '../lib/fee-engine';
 
-/** Drizzle client type — inferred from the singleton export. */
-export type DrizzleDB = typeof defaultDb;
+/** Drizzle client type — accepts both the db connection and a transaction object. */
+type TxClient = Parameters<Parameters<typeof defaultDb.transaction>[0]>[0];
+export type DrizzleDB = typeof defaultDb | TxClient;
 
 const QUOTE_EXPIRY_MINUTES = 15;
 
@@ -47,9 +48,10 @@ export async function createAuthoritativeQuotesForDelivery(
   settings: FeeSettings,
   vehicleTypeRates: VehicleTypeRates,
   carriers?: Map<string, { basePrice: number; name: string }>,
+  expiresAt?: Date,
 ): Promise<CompositeQuote> {
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + QUOTE_EXPIRY_MINUTES * 60 * 1000);
+  const resolvedExpiresAt = expiresAt ?? new Date(now.getTime() + QUOTE_EXPIRY_MINUTES * 60 * 1000);
 
   const legQuotes: { legType: LegType; legLabel: string; quote: LegQuote }[] = [];
 
@@ -88,7 +90,7 @@ export async function createAuthoritativeQuotesForDelivery(
       totalKobo: quote.totalKobo,
       distanceKm: distanceKm ?? null,
       packageWeightKg: leg.actorType === 'driver' ? packageWeight : null,
-      expiresAt,
+      expiresAt: resolvedExpiresAt,
     });
 
     // Build the label for composite assembly

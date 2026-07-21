@@ -54,6 +54,7 @@ export default function ReviewScreen() {
   const recipientDetails = useBookingStore((s) => s.recipientDetails);
   const selectedCarrier = useBookingStore((s) => s.selectedCarrier);
   const vehicleType = useBookingStore((s) => s.vehicleType);
+  const mode = useBookingStore((s) => s.mode);
   const storedDeliveryId = useBookingStore((s) => s.deliveryId);
   const quoteExpiresAt = useBookingStore((s) => s.quoteExpiresAt);
   const setDeliveryId = useBookingStore((s) => s.setDeliveryId);
@@ -112,14 +113,15 @@ export default function ReviewScreen() {
   /**
    * Builds the legs array for delivery creation based on the selected carrier
    * and vehicle type from the booking store.
+   * Returns null for surewaka_way (no legs needed — server routes automatically).
    */
-  function buildLegs() {
+  function buildLegs(): unknown[] | null {
+    if (mode === 'surewaka_way') return null;
+
     if (!selectedCarrier || selectedCarrier === 'instant') {
-      // On-demand delivery — single first_mile leg
       return [{ legType: 'first_mile' as const, vehicleType }];
     }
 
-    // Carrier-based delivery with on-demand first/last mile
     return [
       { legType: 'first_mile' as const, vehicleType },
       { legType: 'intercity' as const, carrierId: selectedCarrier },
@@ -177,8 +179,9 @@ export default function ReviewScreen() {
     const client = createAuthClient((await getToken())!);
 
     const legs = buildLegs();
+    const isSurewakaWay = mode === 'surewaka_way';
 
-    const { data, error } = await client.post<DeliveryResponse>('/api/v1/deliveries', {
+    const body: Record<string, unknown> = {
       pickup: {
         address: pickup.address ?? '',
         city: pickup.city ?? '',
@@ -203,12 +206,26 @@ export default function ReviewScreen() {
         recipientPhone: recipientDetails.recipientPhone ?? '',
         deliveryNotes: recipientDetails.deliveryNotes,
       },
-      legs,
-    });
+    };
+    if (isSurewakaWay) {
+      body.mode = 'surewaka_way';
+    } else if (legs) {
+      body.legs = legs;
+    }
+
+    const { data, error } = await client.post<DeliveryResponse & { deliveryId?: string }>('/api/v1/deliveries', body);
 
     if (error || !data) {
       setSubmitting(false);
       Alert.alert('Booking Failed', error?.message ?? 'Something went wrong');
+      return;
+    }
+
+    // 202: surewaka_way — delivery is pending routing, navigate to routing-pending screen
+    if (isSurewakaWay && data.deliveryId) {
+      setDeliveryId(data.deliveryId);
+      setSubmitting(false);
+      router.push({ pathname: '/booking/routing-pending', params: { deliveryId: data.deliveryId } });
       return;
     }
 

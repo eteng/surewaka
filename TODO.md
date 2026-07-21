@@ -15,7 +15,15 @@
 
 - [x] DONE: Withdrawal fee (2026-07-16) — flat ₦100 fee per payout request. `withdrawal_fee_kobo` added to fee_settings (default 10000, admin-configurable via Fee Settings page). Deducted from wallet on payout request alongside transfer amount; refunded in full if transfer exhausts retries. Admin payout list shows fee as sub-line under Amount.
 
-- [] Intercity routing / path optimization — "SureWaka way" end-to-end auto-routing, cheapest path across carrier network, may chain multiple intercity legs. Needs delivery_legs.leg_number cap lifted first (see .kiro/specs/pricing-transparency out-of-scope)
+- [x] DONE: Intercity routing / path optimization spec written (2026-07-21) — see .kiro/specs/routing-worker/. carrier_parks + carrier_routes + carrier_route_schedules schema, Dijkstra routing engine, BullMQ routing worker, surewaka_way delivery mode.
+
+- [] Compensation voucher / credit system — when SureWaka cannot find an on-demand driver by the scheduled pick-up time, the customer cancels free and receives a compensation voucher. Voucher/credit system does not yet exist. Record the obligation as a ledger event for now; build redemption flow as a dedicated spec.
+- [] No-show detection — customer fails to be at pickup within 15 min of scheduled time triggers a cancellation fee (= full leg price). Needs a cron/timer job that marks the delivery and charges the fee; driver matching system must be in place first.
+- [] Admin UI for carrier parks / routes / schedules — CRUD screens in the admin dashboard for managing carrier parks, routes, and departure slots. API endpoints exist (routing-worker spec); UI is a separate spec.
+- [] CSV / bulk import of carrier parks and routes — operator tooling for seeding the carrier network at scale; manual API calls are the interim solution.
+- [] First/last-mile cost factored into route selection — routing engine currently optimises intercity cost only; first/last-mile is additive after the path is chosen. True end-to-end cost optimisation requires knowing distance from customer to each candidate origin park before Dijkstra runs.
+- [] Carrier direct: self-drop-off flow — customer physically delivers to the origin park themselves (no first_mile leg). Carrier staff register the delivery in SureWaka for tracking. Needs a distinct booking path and carrier-side registration UI.
+- [] Carrier slot reservation — when a surewaka_way route is confirmed, notify/reserve the carrier's departure slot so capacity is tracked; not modelled in the routing-worker spec.
 - [] Carrier settlement/payout — no carrierWalletId exists anywhere, escrow_holds only pays drivers (see ADR-009)
 - [] Real carrier rate-card integration — replace static carriers.basePrice with live per-shipment carrier rates/API
 - [] Package category/dimension discrepancy correction at pickup — pricing spec only covers weight correction (Req 12), not category/size mismatches

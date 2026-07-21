@@ -18,6 +18,9 @@ export * from './role-audit-log';
 
 // Carriers & drivers
 export * from './carriers';
+export * from './carrier-parks';
+export * from './carrier-routes';
+export * from './carrier-route-schedules';
 export * from './carrier-rate-history';
 export * from './carrier-vetting';
 export * from './drivers';

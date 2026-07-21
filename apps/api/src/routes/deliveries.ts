@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, and, isNull, inArray } from 'drizzle-orm';
-import { db, deliveries, deliveryLegs, users, carriers, feeSettings, vehicleTypeRates, quotes } from '@surewaka/db';
+import { db, deliveries, deliveryLegs, users, carriers, feeSettings, vehicleTypeRates, quotes, carrierParks } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { requireRole } from '../middleware/role';
 import { createDeliverySchema, weightCorrectionRequestSchema, weightCorrectionRespondSchema } from '@surewaka/shared';
@@ -10,6 +10,7 @@ import { calculateSystemEta, haversineKm } from '../lib/eta-calculator';
 import { createAuthoritativeQuotesForDelivery, supersedeLeg } from '../services/quote-service';
 import { computeOnDemandQuote, computeCarrierQuote } from '../lib/fee-engine';
 import { respondToCorrection, reportDiscrepancy } from '../services/weight-correction-service';
+import { enqueueRouteDelivery } from '../lib/routing-queue';
 
 type DeliveriesEnv = {
   Variables: {
@@ -44,9 +45,72 @@ deliveryRoutes.post('/', async (c) => {
     return c.json({ data: null, error: { code: 'VALIDATION_ERROR', message: parsed.error.message }, meta: null }, 400);
   }
 
+  // Task 29: Normalise city slugs — applies to all delivery modes
+  parsed.data.pickup.city = parsed.data.pickup.city.trim().toLowerCase();
+  parsed.data.dropoff.city = parsed.data.dropoff.city.trim().toLowerCase();
+
+  // Task 30: surewaka_way branch — validate cities have parks, insert with pending_routing, enqueue job
+  if (parsed.data.mode === 'surewaka_way') {
+    if (parsed.data.pickup.city === parsed.data.dropoff.city) {
+      return c.json({ error: { code: 'SAME_CITY', message: 'surewaka_way requires different pickup and dropoff cities' } }, 422);
+    }
+
+    const pickupParks = await db.select({ id: carrierParks.id })
+      .from(carrierParks)
+      .where(and(eq(carrierParks.city, parsed.data.pickup.city), eq(carrierParks.isActive, true)))
+      .limit(1);
+    if (pickupParks.length === 0) {
+      return c.json({ error: { code: 'NO_PARKS_IN_CITY', message: `No active carrier parks in pickup city: ${parsed.data.pickup.city}` } }, 422);
+    }
+
+    const dropoffParks = await db.select({ id: carrierParks.id })
+      .from(carrierParks)
+      .where(and(eq(carrierParks.city, parsed.data.dropoff.city), eq(carrierParks.isActive, true)))
+      .limit(1);
+    if (dropoffParks.length === 0) {
+      return c.json({ error: { code: 'NO_PARKS_IN_CITY', message: `No active carrier parks in dropoff city: ${parsed.data.dropoff.city}` } }, 422);
+    }
+
+    // Pre-fetch sender phone for senderPhone field
+    const [senderRow] = await db
+      .select({ phone: users.phone })
+      .from(users)
+      .where(eq(users.id, user.id));
+
+    const [delivery] = await db.insert(deliveries).values({
+      customerId:         user.id,
+      status:             'pending_routing',
+      deliveryMode:       'surewaka_way',
+      pickupAddress:      parsed.data.pickup.address,
+      pickupCity:         parsed.data.pickup.city,
+      pickupLat:          parsed.data.pickup.lat,
+      pickupLng:          parsed.data.pickup.lng,
+      dropoffAddress:     parsed.data.dropoff.address,
+      dropoffCity:        parsed.data.dropoff.city,
+      dropoffLat:         parsed.data.dropoff.lat,
+      dropoffLng:         parsed.data.dropoff.lng,
+      packageDescription: parsed.data.packageDetails.description,
+      packageWeight:      parsed.data.packageDetails.weight,
+      packageCategory:    parsed.data.packageDetails.category,
+      recipientName:      parsed.data.recipientDetails.recipientName,
+      recipientPhone:     parsed.data.recipientDetails.recipientPhone,
+      deliveryNotes:      parsed.data.recipientDetails.deliveryNotes ?? null,
+      senderPhone:        senderRow?.phone ?? null,
+    }).returning({ id: deliveries.id });
+
+    await enqueueRouteDelivery({
+      deliveryId: delivery.id,
+      bookingTime: new Date().toISOString(),
+      vehicleType: 'motorcycle',
+    });
+
+    return c.json({ data: { deliveryId: delivery.id, status: 'pending_routing' } }, 202);
+  }
+
   const { pickup, dropoff, packageDetails, recipientDetails, legs } = parsed.data;
 
   try {
+    // ── Pre-fetch reads outside the transaction ────────────────────────────────
     const [userRow] = await db
       .select({ phone: users.phone })
       .from(users)
@@ -60,65 +124,64 @@ deliveryRoutes.post('/', async (c) => {
       'motorcycle', // default — driver vehicle type applied when driver is assigned
     );
 
-    // Create the delivery
-    const [delivery] = await db
-      .insert(deliveries)
-      .values({
-        customerId:         user.id,
-        status:             'draft',
-        pickupAddress:      pickup.address,
-        pickupCity:         pickup.city,
-        pickupLat:          pickup.lat,
-        pickupLng:          pickup.lng,
-        dropoffAddress:     dropoff.address,
-        dropoffCity:        dropoff.city,
-        dropoffLat:         dropoff.lat,
-        dropoffLng:         dropoff.lng,
-        packageDescription: packageDetails.description,
-        packageWeight:      packageDetails.weight,
-        packageCategory:    packageDetails.category,
-        recipientName:      recipientDetails.recipientName,
-        recipientPhone:     recipientDetails.recipientPhone,
-        deliveryNotes:      recipientDetails.deliveryNotes ?? null,
-        senderPhone:        userRow?.phone ?? null,
-        systemEtaAt:        systemEtaAt,
-      })
-      .returning();
-
-    // If no legs provided, return delivery without quotes (backwards-compatible)
+    // No legs — create delivery only (backwards-compatible path, no quotes)
     if (!legs || legs.length === 0) {
+      const [delivery] = await db
+        .insert(deliveries)
+        .values({
+          customerId:         user.id,
+          status:             'draft',
+          pickupAddress:      pickup.address,
+          pickupCity:         pickup.city,
+          pickupLat:          pickup.lat,
+          pickupLng:          pickup.lng,
+          dropoffAddress:     dropoff.address,
+          dropoffCity:        dropoff.city,
+          dropoffLat:         dropoff.lat,
+          dropoffLng:         dropoff.lng,
+          packageDescription: packageDetails.description,
+          packageWeight:      packageDetails.weight,
+          packageCategory:    packageDetails.category,
+          recipientName:      recipientDetails.recipientName,
+          recipientPhone:     recipientDetails.recipientPhone,
+          deliveryNotes:      recipientDetails.deliveryNotes ?? null,
+          senderPhone:        userRow?.phone ?? null,
+          systemEtaAt,
+        })
+        .returning();
+
       return c.json({ data: delivery, error: null, meta: null }, 201);
     }
 
-    // Load fee_settings and vehicle_type_rates
+    // ── Legs provided — load config data before entering the transaction ───────
+
     const [settingsRow] = await db.select().from(feeSettings).limit(1);
     if (!settingsRow) {
       return c.json({ data: null, error: { code: 'CONFIG_ERROR', message: 'Fee settings not configured' }, meta: null }, 500);
     }
 
     const settings: FeeSettings = {
-      baseRateKobo: settingsRow.baseRateKobo,
-      perKgRateKobo: settingsRow.perKgRateKobo,
-      perKmRateKobo: settingsRow.perKmRateKobo,
-      carrierCommissionRatePct: Number(settingsRow.carrierCommissionRatePct),
-      taxRatePct: Number(settingsRow.taxRatePct),
-      minPriceKobo: settingsRow.minPriceKobo,
+      baseRateKobo:                      settingsRow.baseRateKobo,
+      perKgRateKobo:                     settingsRow.perKgRateKobo,
+      perKmRateKobo:                     settingsRow.perKmRateKobo,
+      carrierCommissionRatePct:          Number(settingsRow.carrierCommissionRatePct),
+      taxRatePct:                        Number(settingsRow.taxRatePct),
+      minPriceKobo:                      settingsRow.minPriceKobo,
+      withdrawalFeeKobo:                 settingsRow.withdrawalFeeKobo,
       weightCorrectionApprovalWindowMin: settingsRow.weightCorrectionApprovalWindowMin,
     };
 
     const rateRows = await db.select().from(vehicleTypeRates);
     const vTypeRates: VehicleTypeRates = {
       motorcycle: { multiplier: 1.0 },
-      car: { multiplier: 1.3 },
-      van: { multiplier: 1.6 },
-      truck: { multiplier: 2.0 },
+      car:        { multiplier: 1.3 },
+      van:        { multiplier: 1.6 },
+      truck:      { multiplier: 2.0 },
     };
     for (const row of rateRows) {
-      const vt = row.vehicleType as VehicleType;
-      vTypeRates[vt] = { multiplier: Number(row.multiplier) };
+      vTypeRates[row.vehicleType as VehicleType] = { multiplier: Number(row.multiplier) };
     }
 
-    // Load carrier data for any intercity legs
     const carrierIds = legs
       .filter((l): l is { legType: 'intercity'; carrierId: string } => l.legType === 'intercity')
       .map((l) => l.carrierId);
@@ -135,83 +198,115 @@ deliveryRoutes.post('/', async (c) => {
       }
     }
 
-    // Create delivery_legs rows
+    // ── Atomic: delivery + legs + quotes in a single transaction ──────────────
+    //
+    // If any step fails, the whole transaction rolls back — no orphaned delivery
+    // records and no partially-written legs or quotes.
+
     const NIL_UUID = '00000000-0000-0000-0000-000000000000';
-    const legInsertValues = legs.map((leg, index) => {
-      const legNumber = index + 1;
-      if (leg.legType === 'intercity') {
+
+    const { delivery, compositeQuote } = await db.transaction(async (tx) => {
+      // 1. Insert delivery
+      const [delivery] = await tx
+        .insert(deliveries)
+        .values({
+          customerId:         user.id,
+          status:             'draft',
+          pickupAddress:      pickup.address,
+          pickupCity:         pickup.city,
+          pickupLat:          pickup.lat,
+          pickupLng:          pickup.lng,
+          dropoffAddress:     dropoff.address,
+          dropoffCity:        dropoff.city,
+          dropoffLat:         dropoff.lat,
+          dropoffLng:         dropoff.lng,
+          packageDescription: packageDetails.description,
+          packageWeight:      packageDetails.weight,
+          packageCategory:    packageDetails.category,
+          recipientName:      recipientDetails.recipientName,
+          recipientPhone:     recipientDetails.recipientPhone,
+          deliveryNotes:      recipientDetails.deliveryNotes ?? null,
+          senderPhone:        userRow?.phone ?? null,
+          systemEtaAt,
+        })
+        .returning();
+
+      // 2. Insert delivery_legs
+      const legInsertValues = legs.map((leg, index) => {
+        if (leg.legType === 'intercity') {
+          return {
+            deliveryId:     delivery.id,
+            legNumber:      index + 1,
+            legType:        leg.legType,
+            actorType:      'carrier' as const,
+            actorId:        leg.carrierId,
+            pickupAddress:  pickup.address,
+            pickupLat:      pickup.lat,
+            pickupLng:      pickup.lng,
+            dropoffAddress: dropoff.address,
+            dropoffLat:     dropoff.lat,
+            dropoffLng:     dropoff.lng,
+            status:         'pending' as const,
+          };
+        }
         return {
-          deliveryId: delivery.id,
-          legNumber,
-          legType: leg.legType,
-          actorType: 'carrier' as const,
-          actorId: leg.carrierId,
-          pickupAddress: pickup.address,
-          pickupLat: pickup.lat,
-          pickupLng: pickup.lng,
+          deliveryId:     delivery.id,
+          legNumber:      index + 1,
+          legType:        leg.legType,
+          actorType:      'driver' as const,
+          actorId:        NIL_UUID, // placeholder until driver matching assigns a real driver
+          pickupAddress:  pickup.address,
+          pickupLat:      pickup.lat,
+          pickupLng:      pickup.lng,
           dropoffAddress: dropoff.address,
-          dropoffLat: dropoff.lat,
-          dropoffLng: dropoff.lng,
-          status: 'pending' as const,
+          dropoffLat:     dropoff.lat,
+          dropoffLng:     dropoff.lng,
+          status:         'pending' as const,
         };
-      }
-      // On-demand leg (first_mile or last_mile)
-      return {
-        deliveryId: delivery.id,
-        legNumber,
-        legType: leg.legType,
-        actorType: 'driver' as const,
-        actorId: NIL_UUID, // placeholder until driver matching assigns a real driver
-        pickupAddress: pickup.address,
-        pickupLat: pickup.lat,
-        pickupLng: pickup.lng,
-        dropoffAddress: dropoff.address,
-        dropoffLat: dropoff.lat,
-        dropoffLng: dropoff.lng,
-        status: 'pending' as const,
-      };
+      });
+
+      const insertedLegs = await tx
+        .insert(deliveryLegs)
+        .values(legInsertValues)
+        .returning();
+
+      // 3. Build quote inputs from inserted legs
+      const quoteLegs = insertedLegs.map((dbLeg, index) => {
+        const inputLeg = legs[index];
+        return {
+          id:          dbLeg.id,
+          legType:     dbLeg.legType,
+          actorType:   dbLeg.actorType as 'driver' | 'carrier',
+          actorId:     dbLeg.actorType === 'carrier' ? dbLeg.actorId : undefined,
+          vehicleType: inputLeg.legType !== 'intercity'
+            ? (inputLeg as { vehicleType: VehicleType }).vehicleType
+            : undefined,
+          distanceKm:  dbLeg.actorType === 'driver'
+            ? haversineKm(dbLeg.pickupLat, dbLeg.pickupLng, dbLeg.dropoffLat, dbLeg.dropoffLng)
+            : undefined,
+        };
+      });
+
+      // 4. Compute and persist authoritative quotes (tx — atomic with delivery + legs)
+      const compositeQuote = await createAuthoritativeQuotesForDelivery(
+        tx,
+        delivery.id,
+        quoteLegs,
+        packageDetails.weight,
+        settings,
+        vTypeRates,
+        carriersMap,
+      );
+
+      // 5. Stamp the composite total back onto the delivery row
+      await tx
+        .update(deliveries)
+        .set({ priceKobo: compositeQuote.compositeTotalKobo })
+        .where(eq(deliveries.id, delivery.id));
+
+      return { delivery, compositeQuote };
     });
 
-    const insertedLegs = await db
-      .insert(deliveryLegs)
-      .values(legInsertValues)
-      .returning();
-
-    // Build the legs array for the quote service
-    const quoteLegs = insertedLegs.map((dbLeg, index) => {
-      const inputLeg = legs[index];
-      const distanceKm = dbLeg.actorType === 'driver'
-        ? haversineKm(dbLeg.pickupLat, dbLeg.pickupLng, dbLeg.dropoffLat, dbLeg.dropoffLng)
-        : undefined;
-
-      return {
-        id: dbLeg.id,
-        legType: dbLeg.legType,
-        actorType: dbLeg.actorType as 'driver' | 'carrier',
-        actorId: dbLeg.actorType === 'carrier' ? dbLeg.actorId : undefined,
-        vehicleType: inputLeg.legType !== 'intercity' ? (inputLeg as { vehicleType: VehicleType }).vehicleType : undefined,
-        distanceKm,
-      };
-    });
-
-    // Create authoritative quotes for all legs
-    const compositeQuote = await createAuthoritativeQuotesForDelivery(
-      db,
-      delivery.id,
-      quoteLegs,
-      packageDetails.weight,
-      settings,
-      vTypeRates,
-      carriersMap,
-    );
-
-    // Update delivery with the composite total as priceKobo
-    await db
-      .update(deliveries)
-      .set({ priceKobo: compositeQuote.compositeTotalKobo })
-      .where(eq(deliveries.id, delivery.id));
-
-    // Compute expiresAt matching what was persisted (15 minutes from creation)
     const quoteExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
     return c.json({
@@ -220,13 +315,13 @@ deliveryRoutes.post('/', async (c) => {
         priceKobo: compositeQuote.compositeTotalKobo,
         quote: {
           legs: compositeQuote.legs.map((l) => ({
-            legType: l.legType,
-            legLabel: l.legLabel,
-            lineItems: l.quote.lineItems,
-            totalKobo: l.quote.totalKobo,
+            legType:    l.legType,
+            legLabel:   l.legLabel,
+            lineItems:  l.quote.lineItems,
+            totalKobo:  l.quote.totalKobo,
           })),
           compositeTotalKobo: compositeQuote.compositeTotalKobo,
-          expiresAt: quoteExpiresAt,
+          expiresAt:          quoteExpiresAt,
         },
       },
       error: null,
@@ -306,6 +401,7 @@ deliveryRoutes.post('/:id/requote', async (c) => {
       carrierCommissionRatePct: Number(settingsRow.carrierCommissionRatePct),
       taxRatePct: Number(settingsRow.taxRatePct),
       minPriceKobo: settingsRow.minPriceKobo,
+      withdrawalFeeKobo: settingsRow.withdrawalFeeKobo,
       weightCorrectionApprovalWindowMin: settingsRow.weightCorrectionApprovalWindowMin,
     };
 
@@ -491,6 +587,87 @@ deliveryRoutes.get('/:id', async (c) => {
       return c.json({ data: null, error: { code: 'NOT_FOUND', message: 'Delivery not found' }, meta: null }, 404);
     }
 
+    // For surewaka_way draft deliveries, additionally join and return the active composite quote.
+    // This lets the mobile app display the computed route + price while the customer reviews.
+    if (delivery.status === 'draft' && delivery.deliveryMode === 'surewaka_way') {
+      const now = new Date();
+
+      // Fetch active legs
+      const activeLegs = await db
+        .select({ id: deliveryLegs.id, legType: deliveryLegs.legType })
+        .from(deliveryLegs)
+        .where(and(eq(deliveryLegs.deliveryId, id), eq(deliveryLegs.isActive, true)));
+
+      if (activeLegs.length > 0) {
+        const legIds = activeLegs.map((l) => l.id);
+
+        // Fetch active (non-superseded, non-confirmed) quotes for these legs
+        const activeQuoteRows = await db
+          .select({
+            deliveryLegId: quotes.deliveryLegId,
+            lineItems: quotes.lineItems,
+            totalKobo: quotes.totalKobo,
+            expiresAt: quotes.expiresAt,
+          })
+          .from(quotes)
+          .where(
+            and(
+              eq(quotes.deliveryId, id),
+              inArray(quotes.deliveryLegId, legIds),
+              isNull(quotes.supersededAt),
+              isNull(quotes.confirmedAt),
+            ),
+          );
+
+        // Filter out expired quotes — all must be valid for the composite to be valid
+        const validQuotes = activeQuoteRows.filter((q) => q.expiresAt > now);
+
+        if (validQuotes.length > 0) {
+          const legTypeMap = new Map(activeLegs.map((l) => [l.id, l.legType]));
+          const legOrder: Record<string, number> = {
+            first_mile: 0,
+            intercity: 1,
+            transfer: 2,
+            last_mile: 3,
+          };
+
+          // Build per-leg breakdown from lineItems, sorted by leg order
+          const quoteLegs = validQuotes
+            .map((q) => {
+              const legType = legTypeMap.get(q.deliveryLegId) ?? q.deliveryLegId;
+              const lineItemsArr = q.lineItems as Array<{ label: string; amountKobo: number }>;
+              const commissionItem = lineItemsArr.find((item) => item.label === 'SureWaka service fee');
+              const commissionKobo = commissionItem?.amountKobo ?? 0;
+              const basePriceKobo = q.totalKobo - commissionKobo;
+              return { legType, basePriceKobo, commissionKobo, totalKobo: q.totalKobo, expiresAt: q.expiresAt };
+            })
+            .sort((a, b) => (legOrder[a.legType] ?? 99) - (legOrder[b.legType] ?? 99));
+
+          const compositeTotalKobo = quoteLegs.reduce((sum, q) => sum + q.totalKobo, 0);
+          // Use the earliest expiry so the client knows when it must confirm by
+          const minExpiresAt = quoteLegs.reduce(
+            (min, q) => (q.expiresAt < min ? q.expiresAt : min),
+            quoteLegs[0].expiresAt,
+          );
+
+          const quote = {
+            legs: quoteLegs.map(({ legType, basePriceKobo, commissionKobo, totalKobo }) => ({
+              legType,
+              basePriceKobo,
+              commissionKobo,
+              totalKobo,
+            })),
+            compositeTotalKobo,
+            expiresAt: minExpiresAt.toISOString(),
+            estimatedDeliveryAt: delivery.systemEtaAt?.toISOString() ?? null,
+          };
+
+          return c.json({ data: { ...delivery, quote }, error: null, meta: null });
+        }
+      }
+      // No active/valid quotes — fall through and return the delivery without quote field
+    }
+
     return c.json({ data: delivery, error: null, meta: null });
   } catch {
     return c.json({ data: null, error: { code: 'INTERNAL_ERROR', message: 'Failed to get delivery' }, meta: null }, 500);
@@ -588,6 +765,7 @@ deliveryRoutes.post(
         carrierCommissionRatePct: Number(settingsRow.carrierCommissionRatePct),
         taxRatePct: Number(settingsRow.taxRatePct),
         minPriceKobo: settingsRow.minPriceKobo,
+        withdrawalFeeKobo: settingsRow.withdrawalFeeKobo,
         weightCorrectionApprovalWindowMin: settingsRow.weightCorrectionApprovalWindowMin,
       };
 

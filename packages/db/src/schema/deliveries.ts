@@ -54,6 +54,8 @@ export const deliveries = pgTable(
     amountPaid: bigint('amount_paid', { mode: 'number' }),
     systemEtaAt: timestamp('system_eta_at', { withTimezone: true }),
     driverEtaAt: timestamp('driver_eta_at', { withTimezone: true }),
+    deliveryMode: text('delivery_mode'),
+    cancellationDeadlineAt: timestamp('cancellation_deadline_at', { withTimezone: true }),
   },
   (table) => [
     index('idx_deliveries_payment_status').using('btree', table.paymentStatus),
@@ -77,6 +79,10 @@ export const deliveries = pgTable(
     check(
       'deliveries_payment_status_check',
       sql`payment_status = ANY (ARRAY['unpaid'::text, 'escrowed'::text, 'released'::text, 'refunded'::text])`,
+    ),
+    check(
+      'deliveries_delivery_mode_check',
+      sql`delivery_mode IS NULL OR delivery_mode = ANY (ARRAY['on_demand'::text, 'carrier_direct'::text, 'surewaka_way'::text])`,
     ),
   ],
 );

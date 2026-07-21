@@ -45,6 +45,18 @@ export default function BookingLayout() {
         options={{ title: `Step 6 of ${steps.length}: Review` }}
       />
       <Stack.Screen
+        name="routing-pending"
+        options={{
+          title: 'Finding Route',
+          headerLeft: () => null,
+          gestureEnabled: false,
+        }}
+      />
+      <Stack.Screen
+        name="confirm"
+        options={{ title: 'Confirm Booking' }}
+      />
+      <Stack.Screen
         name="confirmed"
         options={{
           title: 'Booking Confirmed',
