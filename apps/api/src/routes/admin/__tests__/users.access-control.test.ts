@@ -45,12 +45,13 @@ function createTestApp(userRoles: UserRole[]) {
   const mockAuth = createMiddleware(async (c, next) => {
     const mockUser: AuthUser = {
       id: 'mock-user-id',
+      clerkId: 'user_mockaccessctl',
       email: 'test@example.com',
-      user_metadata: { name: 'Test User' },
-      app_metadata: { roles: userRoles },
+      name: 'Test User',
+      roles: userRoles,
     };
-    c.set('user', mockUser);
-    c.set('accessToken', 'mock-token');
+    c.set('user' as never, mockUser);
+    c.set('accessToken' as never, 'mock-token');
     await next();
   });
 
@@ -113,9 +114,9 @@ describe('User Management Routes — Access Control Property Tests', () => {
             expect(res.status).toBe(403);
 
             // Must return FORBIDDEN error code
-            const body = await res.json();
+            const body = await res.json() as { error: { code: string } | null; data: unknown };
             expect(body.error).not.toBeNull();
-            expect(body.error.code).toBe('FORBIDDEN');
+            expect(body.error!.code).toBe('FORBIDDEN');
             expect(body.data).toBeNull();
           },
         ),
@@ -142,7 +143,7 @@ describe('User Management Routes — Access Control Property Tests', () => {
 
             expect(res.status).toBe(403);
 
-            const body = await res.json();
+            const body = await res.json() as { error: { code: string } };
             expect(body.error.code).toBe('FORBIDDEN');
           }
         }),
@@ -168,7 +169,7 @@ describe('User Management Routes — Access Control Property Tests', () => {
         // Empty roles defaults to ['customer'] in the middleware, which is not surewaka_admin
         expect(res.status).toBe(403);
 
-        const body = await res.json();
+        const body = await res.json() as { error: { code: string } };
         expect(body.error.code).toBe('FORBIDDEN');
       }
     });

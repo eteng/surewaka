@@ -11,7 +11,6 @@ import type { AuthUser } from '@surewaka/auth';
 // ─── Mock DB ─────────────────────────────────────────────────────────────────
 
 // Mock the @surewaka/db module to control carrier_members query results
-const mockSelect = vi.fn();
 const mockFrom = vi.fn();
 const mockWhere = vi.fn();
 const mockLimit = vi.fn();
@@ -57,22 +56,16 @@ const nonAdminRolesArb = fc
   .map((arr) => arr as UserRole[]);
 
 /**
- * Create a mock AuthUser with the given roles and optional carrier_id.
+ * Create a mock AuthUser with the given roles and optional carrierId.
  */
-function createMockUser(
-  id: string,
-  roles: UserRole[],
-  carrierId?: string
-): AuthUser {
+function createMockUser(id: string, roles: UserRole[], carrierId?: string): AuthUser {
   return {
     id,
+    clerkId: `user_${id.slice(0, 8)}`,
     email: 'test@surewaka.com',
-    user_metadata: { name: 'Test User' },
-    app_metadata: {
-      roles,
-      primary_role: roles[0],
-      carrier_id: carrierId,
-    },
+    name: 'Test User',
+    roles,
+    carrierId,
   };
 }
 
@@ -150,7 +143,7 @@ describe('Carrier Scope Middleware — Property Tests', () => {
 
             // Should be denied access (403)
             expect(res.status).toBe(403);
-            const body: { error: { code: string } } = await res.json();
+            const body = await res.json() as { error: { code: string } };
             expect(body.error.code).toBe('FORBIDDEN');
           }
         ),
@@ -186,7 +179,7 @@ describe('Carrier Scope Middleware — Property Tests', () => {
 
             // Should be granted access (200)
             expect(res.status).toBe(200);
-            const body: { data: string } = await res.json();
+            const body = await res.json() as { data: string };
             expect(body.data).toBe('ok');
           }
         ),
@@ -210,7 +203,7 @@ describe('Carrier Scope Middleware — Property Tests', () => {
 
             // surewaka_admin always gets through
             expect(res.status).toBe(200);
-            const body: { data: string } = await res.json();
+            const body = await res.json() as { data: string };
             expect(body.data).toBe('ok');
 
             // Verify DB was never queried (bypass means no DB call)
@@ -238,7 +231,7 @@ describe('Carrier Scope Middleware — Property Tests', () => {
 
             // Should be denied
             expect(res.status).toBe(403);
-            const body: { error: { code: string; message: string } } = await res.json();
+            const body = await res.json() as { error: { code: string; message: string } };
             expect(body.error.code).toBe('FORBIDDEN');
             expect(body.error.message).toBe('Not a member of this carrier');
           }
@@ -293,7 +286,7 @@ describe('Carrier Scope Middleware — Property Tests', () => {
             const res = await app.request('/no-carrier/test');
 
             expect(res.status).toBe(400);
-            const body: { error: { code: string } } = await res.json();
+            const body = await res.json() as { error: { code: string } };
             expect(body.error.code).toBe('BAD_REQUEST');
           }
         ),

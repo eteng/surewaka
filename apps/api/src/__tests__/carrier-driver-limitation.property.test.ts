@@ -43,19 +43,14 @@ const distinctCarrierIdsArb = fc
 /**
  * Create a mock AuthUser with carrier_driver role and a specific carrier membership.
  */
-function createCarrierDriverUser(
-  id: string,
-  carrierId: string
-): AuthUser {
+function createCarrierDriverUser(id: string, carrierId: string): AuthUser {
   return {
     id,
+    clerkId: `user_${id.slice(0, 8)}`,
     email: 'driver@surewaka.com',
-    user_metadata: { name: 'Carrier Driver' },
-    app_metadata: {
-      roles: ['carrier_driver'] as UserRole[],
-      primary_role: 'carrier_driver' as UserRole,
-      carrier_id: carrierId,
-    },
+    name: 'Carrier Driver',
+    roles: ['carrier_driver'] as UserRole[],
+    carrierId,
   };
 }
 
@@ -128,7 +123,7 @@ describe('Carrier Driver Limitation — Property Tests', () => {
 
             // Must be denied with 403 FORBIDDEN
             expect(res.status).toBe(403);
-            const body = await res.json();
+            const body = await res.json() as { error: { code: string; message: string } };
             expect(body.error.code).toBe('FORBIDDEN');
             expect(body.error.message).toBe('Not a member of this carrier');
           }
@@ -168,7 +163,7 @@ describe('Carrier Driver Limitation — Property Tests', () => {
 
             // Must be allowed (200)
             expect(res.status).toBe(200);
-            const body = await res.json();
+            const body = await res.json() as { data: string };
             expect(body.data).toBe('job_accepted');
           }
         ),
@@ -199,7 +194,7 @@ describe('Carrier Driver Limitation — Property Tests', () => {
 
               // Always denied
               expect(res.status).toBe(403);
-              const body = await res.json();
+              const body = await res.json() as { error: { code: string } };
               expect(body.error.code).toBe('FORBIDDEN');
             }
           }

@@ -26,17 +26,16 @@ const nonAdminRolesArb = fc
   .map((arr) => arr as UserRole[]);
 
 /**
- * Create a mock AuthUser with the given roles in app_metadata.
+ * Create a mock AuthUser with the given roles on the Clerk-based AuthUser shape.
+ * Accepts undefined for testing the "no roles → default to customer" code path.
  */
 function createMockUser(roles: UserRole[] | undefined): AuthUser {
   return {
     id: '00000000-0000-4000-8000-000000000001',
+    clerkId: 'user_testproperty01',
     email: 'test@surewaka.com',
-    user_metadata: { name: 'Test User' },
-    app_metadata: {
-      roles,
-      primary_role: roles?.[0],
-    },
+    name: 'Test User',
+    roles: roles ?? [],
   };
 }
 
@@ -49,7 +48,7 @@ function createTestApp(requiredRoles: UserRole[], user: AuthUser) {
 
   // Simulate requireAuth — sets user on context
   app.use('*', async (c, next) => {
-    c.set('user', user);
+    c.set('user' as never, user);
     await next();
   });
 
@@ -77,7 +76,7 @@ describe('Role Middleware — Property Tests', () => {
 
           // surewaka_admin always gets 200, never 403
           expect(res.status).toBe(200);
-          const body = await res.json();
+          const body = await res.json() as { data: string };
           expect(body.data).toBe('ok');
         }),
         { numRuns: 100 },
@@ -139,7 +138,7 @@ describe('Role Middleware — Property Tests', () => {
             const res = await app.request('/test');
 
             expect(res.status).toBe(403);
-            const body = await res.json();
+            const body = await res.json() as { error: { code: string } };
             expect(body.error.code).toBe('FORBIDDEN');
           },
         ),
@@ -187,7 +186,7 @@ describe('Role Middleware — Property Tests', () => {
 
             // Since required roles don't include 'customer', user should get 403
             expect(res.status).toBe(403);
-            const body = await res.json();
+            const body = await res.json() as { error: { code: string } };
             expect(body.error.code).toBe('FORBIDDEN');
           },
         ),

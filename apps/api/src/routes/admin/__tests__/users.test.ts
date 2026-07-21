@@ -521,12 +521,13 @@ describe('User Management Routes — Integration Tests', () => {
       const mockAuth = createMiddleware(async (c, next) => {
         const mockUser: AuthUser = {
           id: 'mock-user-id',
+          clerkId: 'user_mockuserstest',
           email: 'admin@example.com',
-          user_metadata: { name: 'Admin User' },
-          app_metadata: { roles: userRoles },
+          name: 'Admin User',
+          roles: userRoles,
         };
-        c.set('user', mockUser);
-        c.set('accessToken', 'mock-token');
+        c.set('user' as never, mockUser);
+        c.set('accessToken' as never, 'mock-token');
         await next();
       });
 
@@ -562,9 +563,9 @@ describe('User Management Routes — Integration Tests', () => {
 
         expect(res.status).toBe(401);
 
-        const body = await res.json();
+        const body = await res.json() as { error: { code: string } | null; data: unknown };
         expect(body.error).not.toBeNull();
-        expect(body.error.code).toBe('UNAUTHORIZED');
+        expect(body.error!.code).toBe('UNAUTHORIZED');
         expect(body.data).toBeNull();
       }
     });
@@ -586,9 +587,9 @@ describe('User Management Routes — Integration Tests', () => {
 
         expect(res.status).toBe(403);
 
-        const body = await res.json();
+        const body = await res.json() as { error: { code: string } | null; data: unknown };
         expect(body.error).not.toBeNull();
-        expect(body.error.code).toBe('FORBIDDEN');
+        expect(body.error!.code).toBe('FORBIDDEN');
         expect(body.data).toBeNull();
       }
     });
@@ -601,7 +602,7 @@ describe('User Management Routes — Integration Tests', () => {
 
       expect(res.status).toBe(200);
 
-      const body = await res.json();
+      const body = await res.json() as { data: unknown; error?: unknown };
       expect(body.data).not.toBeNull();
       expect(body.error).toBeUndefined();
     });
@@ -619,7 +620,7 @@ describe('User Management Routes — Integration Tests', () => {
 
       expect(res.status).toBe(401);
 
-      const body = await res.json();
+      const body = await res.json() as { error: { code: string } };
       expect(body.error.code).toBe('UNAUTHORIZED');
     });
 
@@ -636,7 +637,7 @@ describe('User Management Routes — Integration Tests', () => {
 
       expect(res.status).toBe(401);
 
-      const body = await res.json();
+      const body = await res.json() as { error: { code: string } };
       expect(body.error.code).toBe('UNAUTHORIZED');
     });
 
@@ -665,7 +666,7 @@ describe('User Management Routes — Integration Tests', () => {
 
       expect(res.status).toBe(403);
 
-      const body = await res.json();
+      const body = await res.json() as { error: { code: string } };
       expect(body.error.code).toBe('FORBIDDEN');
     });
   });

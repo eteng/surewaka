@@ -10,12 +10,13 @@ import { requireRole } from '../middleware/role';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function createMockUser(appMetadata: AuthUser['app_metadata']): AuthUser {
+function createMockUser(roles: UserRole[] = []): AuthUser {
   return {
     id: '00000000-0000-4000-8000-000000000001',
+    clerkId: 'user_testmock001',
     email: 'test@surewaka.com',
-    user_metadata: { name: 'Test User' },
-    app_metadata: appMetadata,
+    name: 'Test User',
+    roles,
   };
 }
 
@@ -24,7 +25,7 @@ function createTestApp(requiredRoles: UserRole[], user: AuthUser) {
 
   // Simulate requireAuth — sets user on context
   app.use('*', async (c, next) => {
-    c.set('user', user);
+    c.set('user' as never, user);
     await next();
   });
 
@@ -33,7 +34,7 @@ function createTestApp(requiredRoles: UserRole[], user: AuthUser) {
 
   // Test handler that returns userRoles from context
   app.get('/test', (c) => {
-    const userRoles = c.get('userRoles');
+    const userRoles = c.get('userRoles' as never);
     return c.json({ data: 'ok', error: null, meta: null, userRoles });
   });
 
@@ -43,31 +44,31 @@ function createTestApp(requiredRoles: UserRole[], user: AuthUser) {
 // ─── Unit Tests ──────────────────────────────────────────────────────────────
 
 describe('Role Middleware — Edge Cases', () => {
-  describe('Missing roles in JWT defaults to [customer]', () => {
-    it('user with no roles field in app_metadata defaults to customer', async () => {
-      const user = createMockUser({});
+  describe('Missing roles defaults to [customer]', () => {
+    it('user with no roles (empty array) defaults to customer', async () => {
+      const user = createMockUser([]);
       const app = createTestApp(['customer'], user);
 
       const res = await app.request('/test');
 
       expect(res.status).toBe(200);
-      const body = await res.json();
+      const body = await res.json() as { userRoles: string[] };
       expect(body.userRoles).toEqual(['customer']);
     });
 
-    it('user with undefined roles in app_metadata defaults to customer', async () => {
-      const user = createMockUser({ roles: undefined });
+    it('user with empty roles array defaults to customer', async () => {
+      const user = createMockUser([]);
       const app = createTestApp(['customer'], user);
 
       const res = await app.request('/test');
 
       expect(res.status).toBe(200);
-      const body = await res.json();
+      const body = await res.json() as { userRoles: string[] };
       expect(body.userRoles).toEqual(['customer']);
     });
 
-    it('user with no app_metadata.roles gets 403 for non-customer routes', async () => {
-      const user = createMockUser({});
+    it('user with no roles gets 403 for non-customer routes', async () => {
+      const user = createMockUser([]);
       const app = createTestApp(['driver'], user);
 
       const res = await app.request('/test');
@@ -78,31 +79,31 @@ describe('Role Middleware — Edge Cases', () => {
 
   describe('Empty roles array defaults to [customer]', () => {
     it('user with empty roles array defaults to customer', async () => {
-      const user = createMockUser({ roles: [] });
+      const user = createMockUser([]);
       const app = createTestApp(['customer'], user);
 
       const res = await app.request('/test');
 
       expect(res.status).toBe(200);
-      const body = await res.json();
+      const body = await res.json() as { userRoles: string[] };
       expect(body.userRoles).toEqual(['customer']);
     });
 
     it('user with empty roles array gets 403 for non-customer routes', async () => {
-      const user = createMockUser({ roles: [] });
+      const user = createMockUser([]);
       const app = createTestApp(['carrier_admin'], user);
 
       const res = await app.request('/test');
 
       expect(res.status).toBe(403);
-      const body = await res.json();
+      const body = await res.json() as { error: { code: string } };
       expect(body.error.code).toBe('FORBIDDEN');
     });
   });
 
   describe('Multiple required roles (OR logic)', () => {
     it('user with first of multiple required roles gets access', async () => {
-      const user = createMockUser({ roles: ['driver'] });
+      const user = createMockUser(['driver']);
       const app = createTestApp(['driver', 'carrier_admin'], user);
 
       const res = await app.request('/test');
@@ -111,7 +112,7 @@ describe('Role Middleware — Edge Cases', () => {
     });
 
     it('user with second of multiple required roles gets access', async () => {
-      const user = createMockUser({ roles: ['carrier_admin'] });
+      const user = createMockUser(['carrier_admin']);
       const app = createTestApp(['driver', 'carrier_admin'], user);
 
       const res = await app.request('/test');
@@ -120,18 +121,18 @@ describe('Role Middleware — Edge Cases', () => {
     });
 
     it('user with none of the multiple required roles gets 403', async () => {
-      const user = createMockUser({ roles: ['customer'] });
+      const user = createMockUser(['customer']);
       const app = createTestApp(['driver', 'carrier_admin'], user);
 
       const res = await app.request('/test');
 
       expect(res.status).toBe(403);
-      const body = await res.json();
+      const body = await res.json() as { error: { code: string } };
       expect(body.error.code).toBe('FORBIDDEN');
     });
 
     it('user with one matching role among many required roles gets access (OR not AND)', async () => {
-      const user = createMockUser({ roles: ['support_agent'] });
+      const user = createMockUser(['support_agent']);
       const app = createTestApp(['driver', 'carrier_admin', 'support_agent'], user);
 
       const res = await app.request('/test');
@@ -142,13 +143,13 @@ describe('Role Middleware — Edge Cases', () => {
 
   describe('Middleware ordering enforcement', () => {
     it('middleware sets userRoles on context for downstream handlers', async () => {
-      const user = createMockUser({ roles: ['driver', 'customer'] });
+      const user = createMockUser(['driver', 'customer']);
       const app = createTestApp(['driver'], user);
 
       const res = await app.request('/test');
 
       expect(res.status).toBe(200);
-      const body = await res.json();
+      const body = await res.json() as { userRoles: string[] };
       expect(body.userRoles).toEqual(['driver', 'customer']);
     });
 
@@ -161,18 +162,18 @@ describe('Role Middleware — Edge Cases', () => {
 
       const res = await app.request('/test');
 
-      // Without user set, accessing user.app_metadata will throw
+      // Without user set, accessing user.roles will throw
       expect(res.status).toBe(500);
     });
 
     it('userRoles defaults to [customer] even when middleware allows access', async () => {
-      const user = createMockUser({ roles: undefined });
+      const user = createMockUser([]);
       const app = createTestApp(['customer'], user);
 
       const res = await app.request('/test');
 
       expect(res.status).toBe(200);
-      const body = await res.json();
+      const body = await res.json() as { userRoles: string[] };
       // Downstream handler can read the defaulted roles
       expect(body.userRoles).toEqual(['customer']);
     });
@@ -180,7 +181,7 @@ describe('Role Middleware — Edge Cases', () => {
 
   describe('403 response shape', () => {
     it('returns correct error shape { data: null, error: { code: FORBIDDEN }, meta: null }', async () => {
-      const user = createMockUser({ roles: ['customer'] });
+      const user = createMockUser(['customer']);
       const app = createTestApp(['surewaka_admin'], user);
 
       const res = await app.request('/test');
@@ -198,13 +199,13 @@ describe('Role Middleware — Edge Cases', () => {
     });
 
     it('error message lists the required roles', async () => {
-      const user = createMockUser({ roles: ['customer'] });
+      const user = createMockUser(['customer']);
       const app = createTestApp(['driver', 'carrier_admin'], user);
 
       const res = await app.request('/test');
 
       expect(res.status).toBe(403);
-      const body = await res.json();
+      const body = await res.json() as { error: { message: string } };
       expect(body.error.message).toContain('driver');
       expect(body.error.message).toContain('carrier_admin');
     });
