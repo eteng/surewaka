@@ -280,9 +280,9 @@ export type NameChangeReview = z.infer<typeof nameChangeReviewSchema>;
 // ─── Payment validators ───────────────────────────────────────────────────────
 
 export const deliveryStatusSchema = z.enum([
-  'draft', 'pending', 'accepted', 'en_route_pickup', 'arrived_pickup',
-  'picked_up', 'en_route_dropoff', 'arrived_dropoff', 'delivered',
-  'cancelled', 'failed', 'returned',
+  'pending_routing', 'routing_failed', 'draft', 'pending', 'accepted',
+  'en_route_pickup', 'arrived_pickup', 'picked_up', 'en_route_dropoff',
+  'arrived_dropoff', 'delivered', 'cancelled', 'failed', 'returned',
 ]);
 export type DeliveryStatus = z.infer<typeof deliveryStatusSchema>;
 
