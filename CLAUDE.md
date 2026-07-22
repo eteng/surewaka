@@ -181,7 +181,7 @@ For active spec progress, check `.kiro/specs/*/tasks.md` directly — those are 
 
 - `packages/shared` test files have pre-existing type errors (missing RBAC validator exports) — source files are clean, only tests affected
 - `packages/mobile-shared/src/maps/locationiq.ts` — `API_KEY` uses `?? ''` fallback; throws at runtime if env var is not set
-- **MVP1 decision: carrier prices are not shown on the carrier selection screen.** Only Instant Match (on-demand) shows a live quote (accurate — uses real pickup→dropoff haversine). Registered carrier cards show "Price at checkout" — we don't have hub locations so first/last-mile distance can't be estimated, making side-by-side price comparison misleading. Revisit when hub locations are in the DB. `review.tsx` uses the server-computed `compositeTotalKobo` — no hardcoded values remain.
+- `booking/carriers.tsx`'s "Instant Match" on-demand option still shows a hardcoded `₦3,000` and `review.tsx` has a hardcoded `350000` kobo total — these were placeholders pending the fee engine (now implemented via `.kiro/specs/pricing-transparency/`), but the mobile UI wiring to the live quote API has not been verified end-to-end on device
 - Mobile app requires an EAS development build — `@rnmapbox/maps` has native modules, Expo Go won't work
 - Finance ledger: any future admin-initiated cancellation or refund route that bypasses the existing cancel (`booking-payment.ts`) and payment-worker refund flows must wire `writeLedgerEvent` for `commission_reversal` if escrow was already released. The current cancel endpoint is safe (delivered deliveries are non-cancellable, so commission can't have been earned yet), but this constraint must be preserved when admin override cancellation is built.
 
