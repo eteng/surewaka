@@ -169,7 +169,7 @@ Check before writing — never duplicate existing entries.
 [x] Payment integration (Paystack flow) — wallet-first + escrow, see ADR-006
 [x] Push notifications — spec complete (17/17); extend push-triggers.ts per-feature as new notification types are needed
 [x] Alert system (ops monitoring engine) — 7 rules live in workers/alert-engine (spec 39/47, core loop functional)
-[ ] Multi-leg pricing / fee engine — spec drafted (.kiro/specs/pricing-transparency/, 0/68 tasks), not yet implemented
+[x] Multi-leg pricing / fee engine — spec complete (68/68 tasks); fee engine, quote lifecycle, vehicle-type multipliers, weight correction, admin rate maintenance all implemented
 [ ] Intercity routing / path optimization — not yet specced; prerequisite for "SureWaka way" auto-routed multi-hop delivery
 [ ] Production launch in Lagos
 [ ] Seed funding closed
@@ -181,7 +181,7 @@ For active spec progress, check `.kiro/specs/*/tasks.md` directly — those are 
 
 - `packages/shared` test files have pre-existing type errors (missing RBAC validator exports) — source files are clean, only tests affected
 - `packages/mobile-shared/src/maps/locationiq.ts` — `API_KEY` uses `?? ''` fallback; throws at runtime if env var is not set
-- `booking/carriers.tsx`'s "Instant Match" on-demand option still shows a hardcoded `₦3,000` (registered-carrier prices are real, fetched from `GET /api/v1/carriers` since commit `721ffdc`) — same class of placeholder as `review.tsx`'s hardcoded `350000` kobo total; both are fixed by `.kiro/specs/pricing-transparency/`, not yet implemented
+- `booking/carriers.tsx`'s "Instant Match" on-demand option still shows a hardcoded `₦3,000` and `review.tsx` has a hardcoded `350000` kobo total — these were placeholders pending the fee engine (now implemented via `.kiro/specs/pricing-transparency/`), but the mobile UI wiring to the live quote API has not been verified end-to-end on device
 - Mobile app requires an EAS development build — `@rnmapbox/maps` has native modules, Expo Go won't work
 - Finance ledger: any future admin-initiated cancellation or refund route that bypasses the existing cancel (`booking-payment.ts`) and payment-worker refund flows must wire `writeLedgerEvent` for `commission_reversal` if escrow was already released. The current cancel endpoint is safe (delivered deliveries are non-cancellable, so commission can't have been earned yet), but this constraint must be preserved when admin override cancellation is built.
 
