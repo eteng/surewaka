@@ -26,6 +26,7 @@
 - [] Carrier slot reservation — when a surewaka_way route is confirmed, notify/reserve the carrier's departure slot so capacity is tracked; not modelled in the routing-worker spec.
 - [] Carrier settlement/payout — no carrierWalletId exists anywhere, escrow_holds only pays drivers (see ADR-009)
 - [] Real carrier rate-card integration — replace static carriers.basePrice with live per-shipment carrier rates/API
+- [] Replace haversine with a real road-distance API for leg distance calculations — haversineKm is used in booking-quote.ts, deliveries.ts, and the routing worker (router.ts, route-delivery.ts) for all first/last-mile and intercity distance estimates; straight-line distance underestimates real road distance in Lagos. Candidate: Mapbox Directions API (token already in env) or OSRM.
 - [] Package category/dimension discrepancy correction at pickup — pricing spec only covers weight correction (Req 12), not category/size mismatches
 - [] Zone-based delivery surcharges — wire dynamic-zones data into the fee engine once that spec ships
 - [] Dispute Resolution & Refund SLA spec — not yet written (see docs/superpowers/specs/2026-07-08-operational-excellence-strategy.md)
