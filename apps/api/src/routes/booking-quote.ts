@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { eq } from 'drizzle-orm';
-import { db, feeSettings, vehicleTypeRates, carriers } from '@surewaka/db';
+import { eq, and } from 'drizzle-orm';
+import { db, feeSettings, vehicleTypeRates, carriers, carrierParks } from '@surewaka/db';
 import { quoteRequestSchema, FEE_ENGINE_ERRORS } from '@surewaka/shared';
 import type { FeeSettings, VehicleType, VehicleTypeRates } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
@@ -62,6 +62,7 @@ bookingQuoteRoutes.post('/booking/quote', async (c) => {
       taxRatePct: Number(settings.taxRatePct),
       minPriceKobo: settings.minPriceKobo,
       weightCorrectionApprovalWindowMin: settings.weightCorrectionApprovalWindowMin,
+      withdrawalFeeKobo: settings.withdrawalFeeKobo,
     };
 
     // Build VehicleTypeRates lookup from DB rows
@@ -70,6 +71,28 @@ bookingQuoteRoutes.post('/booking/quote', async (c) => {
       vehicleTypeRatesObj[row.vehicleType as VehicleType] = {
         multiplier: Number(row.multiplier),
       };
+    }
+
+    // If this is a carrier comparison quote (has an intercity leg), pre-load that carrier's
+    // parks so first/last-mile legs use the nearest hub instead of a zero-distance estimate.
+    const intercityInput = legs.find((l) => l.legType === 'intercity');
+    type ParkCoord = { lat: number; lng: number };
+    let hubParks: ParkCoord[] = [];
+    if (intercityInput) {
+      hubParks = await db
+        .select({ lat: carrierParks.lat, lng: carrierParks.lng })
+        .from(carrierParks)
+        .where(and(eq(carrierParks.carrierId, intercityInput.carrierId), eq(carrierParks.isActive, true)));
+    }
+
+    function nearestHub(point: { lat: number; lng: number }): ParkCoord | null {
+      if (hubParks.length === 0) return null;
+      return hubParks.reduce((best, park) => {
+        return haversineKm(point.lat, point.lng, park.lat, park.lng) <
+          haversineKm(point.lat, point.lng, best.lat, best.lng)
+          ? park
+          : best;
+      });
     }
 
     // Process each leg
@@ -92,13 +115,22 @@ bookingQuoteRoutes.post('/booking/quote', async (c) => {
           );
         }
 
-        // Compute haversine distance between pickup and dropoff
-        const distanceKm = haversineKm(
-          leg.pickup.lat,
-          leg.pickup.lng,
-          leg.dropoff.lat,
-          leg.dropoff.lng,
-        );
+        // For carrier comparison quotes, measure from customer location to/from the nearest
+        // hub park rather than using the explicit dropoff/pickup (which the client passes as
+        // the same point, producing zero distance). For standalone on-demand quotes, use the
+        // explicit leg coords directly.
+        let distanceKm: number;
+        if (leg.legType === 'first_mile') {
+          const hub = nearestHub(leg.pickup);
+          distanceKm = hub
+            ? haversineKm(leg.pickup.lat, leg.pickup.lng, hub.lat, hub.lng)
+            : haversineKm(leg.pickup.lat, leg.pickup.lng, leg.dropoff.lat, leg.dropoff.lng);
+        } else {
+          const hub = nearestHub(leg.dropoff);
+          distanceKm = hub
+            ? haversineKm(hub.lat, hub.lng, leg.dropoff.lat, leg.dropoff.lng)
+            : haversineKm(leg.pickup.lat, leg.pickup.lng, leg.dropoff.lat, leg.dropoff.lng);
+        }
 
         const quote = computeOnDemandQuote(
           { packageWeight, distanceKm: Math.round(distanceKm * 10) / 10, vehicleType: leg.vehicleType },

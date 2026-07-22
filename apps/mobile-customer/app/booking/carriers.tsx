@@ -72,7 +72,7 @@ export default function CarriersScreen() {
             legType: 'first_mile',
             vehicleType,
             pickup: { lat: pickup.lat, lng: pickup.lng },
-            dropoff: { lat: pickup.lat, lng: pickup.lng }, // same point estimate for first-mile
+            dropoff: { lat: pickup.lat, lng: pickup.lng }, // API uses nearest park; fallback only
           });
           legs.push({
             legType: 'intercity',
@@ -82,7 +82,7 @@ export default function CarriersScreen() {
             legType: 'last_mile',
             vehicleType,
             pickup: { lat: dropoff.lat, lng: dropoff.lng },
-            dropoff: { lat: dropoff.lat, lng: dropoff.lng }, // same point estimate for last-mile
+            dropoff: { lat: dropoff.lat, lng: dropoff.lng }, // API uses nearest park; fallback only
           });
         } else {
           // Instant match: single on-demand leg from pickup to dropoff
