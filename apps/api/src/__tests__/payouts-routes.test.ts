@@ -47,6 +47,7 @@ vi.mock('@surewaka/db', () => ({
   payoutRequests: 'payout_requests',
   wallets: 'wallets',
   users: { clerkId: 'clerk_id', id: 'id' },
+  feeSettings: { withdrawalFeeKobo: 'withdrawal_fee_kobo' },
   eq: vi.fn(),
   desc: vi.fn(),
 }));

@@ -200,7 +200,7 @@ export function RoleAssignmentPanel({
         role: revokeDialogRole.role,
         scopeType: revokeDialogRole.scopeType,
         scopeId: revokeDialogRole.scopeId,
-        reason: revokeReason.trim() || undefined,
+        reason: revokeReason.trim(),
       });
 
       setRevokeSuccess(`${formatRoleLabel(revokeDialogRole.role)} revoked successfully`);
@@ -408,7 +408,7 @@ export function RoleAssignmentPanel({
 
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="revoke-reason">Reason (optional)</Label>
+              <Label htmlFor="revoke-reason">Reason (required, min 3 chars)</Label>
               <Input
                 id="revoke-reason"
                 placeholder="e.g., Role no longer needed, transferred to another team"
@@ -436,7 +436,7 @@ export function RoleAssignmentPanel({
             <Button
               variant="destructive"
               onClick={handleConfirmRevoke}
-              disabled={revokeLoading}
+              disabled={revokeLoading || revokeReason.trim().length < 3}
             >
               {revokeLoading && <Loader2 className="mr-1 size-4 animate-spin" />}
               {revokeLoading ? 'Revoking...' : 'Revoke Role'}

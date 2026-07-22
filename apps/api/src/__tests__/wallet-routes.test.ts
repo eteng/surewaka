@@ -1,18 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 
-const mockGetUser = vi.fn();
+const mockVerifyToken = vi.fn();
 vi.mock('@surewaka/auth', () => ({
-  createServerClient: () => ({ auth: { getUser: mockGetUser } }),
+  verifyToken: (...a: unknown[]) => mockVerifyToken(...a),
 }));
 
 const mockGetWalletByUserId = vi.fn();
+const mockGetOrCreateWallet = vi.fn();
 const mockCheckBalance = vi.fn();
 const mockInitializeTransaction = vi.fn();
 const mockVerifyTransaction = vi.fn();
 
 vi.mock('../lib/wallet-service', () => ({
   getWalletByUserId: (...a: unknown[]) => mockGetWalletByUserId(...a),
+  getOrCreateWallet: (...a: unknown[]) => mockGetOrCreateWallet(...a),
   checkBalance: (...a: unknown[]) => mockCheckBalance(...a),
   creditWallet: vi.fn(),
 }));
@@ -24,10 +26,22 @@ vi.mock('../lib/paystack', () => ({
   createDedicatedVirtualAccount: vi.fn(),
 }));
 
-vi.mock('@surewaka/db', () => ({ db: {}, wallets: 'wallets', walletTransactions: 'walletTransactions' }));
+const mockDbSelect = {
+  from: vi.fn().mockReturnThis(),
+  where: vi.fn().mockReturnThis(),
+  limit: vi.fn().mockResolvedValue([{ id: 'user-123' }]),
+};
 
-function authUser() {
-  return { id: 'user-123', email: 'test@example.com', user_metadata: { name: 'Test User' }, app_metadata: {} };
+vi.mock('@surewaka/db', () => ({
+  db: { select: vi.fn(() => mockDbSelect) },
+  wallets: 'wallets',
+  walletTransactions: 'walletTransactions',
+  users: 'users',
+  eq: vi.fn(),
+}));
+
+function clerkUser() {
+  return { clerkId: 'user_clerk123', email: 'test@example.com', roles: ['customer'] as string[] };
 }
 
 async function createTestApp() {
@@ -42,11 +56,12 @@ describe('Wallet routes', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockDbSelect.limit.mockResolvedValue([{ id: 'user-123' }]);
     app = await createTestApp();
   });
 
   it('GET /balance returns 401 without auth', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    mockVerifyToken.mockResolvedValue(null);
     const res = await app.request('/api/v1/wallet/balance', {
       headers: { Authorization: 'Bearer bad-token' },
     });
@@ -54,7 +69,7 @@ describe('Wallet routes', () => {
   });
 
   it('GET /balance returns balance for authenticated user', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: authUser() }, error: null });
+    mockVerifyToken.mockResolvedValue(clerkUser());
     mockGetWalletByUserId.mockResolvedValue({ id: 'wallet-1', balance: 350000, currency: 'NGN', status: 'active' });
     const res = await app.request('/api/v1/wallet/balance', {
       headers: { Authorization: 'Bearer valid-token' },
@@ -66,8 +81,8 @@ describe('Wallet routes', () => {
   });
 
   it('POST /check returns sufficient=false with shortfall', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: authUser() }, error: null });
-    mockGetWalletByUserId.mockResolvedValue({ id: 'wallet-1', balance: 100000 });
+    mockVerifyToken.mockResolvedValue(clerkUser());
+    mockGetOrCreateWallet.mockResolvedValue({ id: 'wallet-1', balance: 100000 });
     mockCheckBalance.mockResolvedValue({ sufficient: false, balance: 100000, shortfall: 250000 });
     const res = await app.request('/api/v1/wallet/check', {
       method: 'POST',
@@ -81,7 +96,7 @@ describe('Wallet routes', () => {
   });
 
   it('POST /fund returns reference and authorization_url', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: authUser() }, error: null });
+    mockVerifyToken.mockResolvedValue(clerkUser());
     mockGetWalletByUserId.mockResolvedValue({ id: 'wallet-1', balance: 0 });
     mockInitializeTransaction.mockResolvedValue({
       reference: 'ref_abc',
@@ -98,7 +113,7 @@ describe('Wallet routes', () => {
   });
 
   it('POST /fund returns 400 for amount below minimum', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: authUser() }, error: null });
+    mockVerifyToken.mockResolvedValue(clerkUser());
     mockGetWalletByUserId.mockResolvedValue({ id: 'wallet-1', balance: 0 });
     const res = await app.request('/api/v1/wallet/fund', {
       method: 'POST',

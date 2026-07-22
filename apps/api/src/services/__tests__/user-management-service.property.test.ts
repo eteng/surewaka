@@ -204,15 +204,12 @@ vi.mock('@surewaka/db', () => {
 });
 
 vi.mock('@surewaka/auth', () => ({
-  createServiceClient: () => ({
-    auth: {
-      admin: {
-        inviteUserByEmail: (email: string, options?: unknown) => {
-          return Promise.resolve(supabaseInviteResult);
-        },
-        updateUserById: (userId: string, data?: unknown) => {
-          return Promise.resolve(supabaseUpdateUserResult);
-        },
+  getClerkClient: () => ({
+    invitations: {
+      createInvitation: async (_data?: unknown) => {
+        if (supabaseInviteResult.error) {
+          throw new Error((supabaseInviteResult.error as { message: string }).message);
+        }
       },
     },
   }),
@@ -223,6 +220,7 @@ vi.mock('../role-service', () => ({
     assignRoleCalls.push(params);
     return Promise.resolve(assignRoleResult);
   },
+  syncRolesToAuth: (_userId: string) => Promise.resolve(),
 }));
 
 // ─── Import after mocks ───────────────────────────────────────────────────────
@@ -316,103 +314,51 @@ describe('User Management Service — Property Tests', () => {
   describe('Property 1: Invitation creates correct user and role records', () => {
     // **Validates: Requirements 1.1, 1.2, 1.3**
 
-    it('for any valid non-org-scoped invitation, the created user has correct email, name, verified=false, and one active role', async () => {
+    it('for any valid non-org-scoped invitation, the invite succeeds and creates no DB user record (Clerk flow)', async () => {
       await fc.assert(
         fc.asyncProperty(validNonOrgInviteParamsArb, async (params) => {
           // Reset state
           dbSelectResult = []; // No existing user
           assignRoleCalls = [];
           transactionCalled = false;
-          assignRoleResult = {
-            data: { id: crypto.randomUUID(), role: params.role, isActive: true },
-            error: null,
-            meta: null,
-          };
-          rolesSelectResult = [{
-            role: params.role,
-            scopeType: null,
-            scopeId: null,
-          }];
           supabaseInviteResult = { error: null };
 
           const result = await inviteEmployee(params as InviteEmployeeParams);
 
-          // Must succeed
+          // Must succeed with no data (Clerk invite flow — no DB user record at invite time)
           expect(result.error).toBeNull();
-          expect(result.data).not.toBeNull();
+          expect(result.data).toBeNull();
 
-          // Verify user data
-          expect(result.data!.email).toBe(params.email);
-          expect(result.data!.name).toBe(params.fullName);
-          expect(result.data!.verified).toBe(false);
+          // No DB transaction: user record is provisioned on first login
+          expect(transactionCalled).toBe(false);
 
-          // Verify exactly one active role matching the requested role
-          expect(result.data!.roles).toHaveLength(1);
-          expect(result.data!.roles[0].role).toBe(params.role);
-          expect(result.data!.roles[0].scopeType).toBeNull();
-          expect(result.data!.roles[0].scopeId).toBeNull();
-
-          // Verify transaction was used
-          expect(transactionCalled).toBe(true);
-
-          // Verify assignRole was called with correct params
-          expect(assignRoleCalls).toHaveLength(1);
-          const roleCall = assignRoleCalls[0] as Record<string, unknown>;
-          expect(roleCall.role).toBe(params.role);
+          // No role assignment at invite time (stored in Clerk publicMetadata)
+          expect(assignRoleCalls).toHaveLength(0);
         }),
         { numRuns: 100 },
       );
     });
 
-    it('for any valid org-scoped invitation, the created user has correct email, name, verified=false, and one active role with correct scope', async () => {
+    it('for any valid org-scoped invitation, the invite succeeds and creates no DB user record (Clerk flow)', async () => {
       await fc.assert(
         fc.asyncProperty(validOrgInviteParamsArb, async (params) => {
           // Reset state
           dbSelectResult = []; // No existing user
           assignRoleCalls = [];
           transactionCalled = false;
-          assignRoleResult = {
-            data: { id: crypto.randomUUID(), role: params.role, isActive: true },
-            error: null,
-            meta: null,
-          };
-          rolesSelectResult = [{
-            role: params.role,
-            scopeType: 'carrier',
-            scopeId: params.scopeId,
-          }];
-          carriersSelectResult = [{
-            id: params.scopeId,
-            name: 'Test Carrier',
-          }];
           supabaseInviteResult = { error: null };
 
           const result = await inviteEmployee(params as InviteEmployeeParams);
 
-          // Must succeed
+          // Must succeed with no data (Clerk invite flow — no DB user record at invite time)
           expect(result.error).toBeNull();
-          expect(result.data).not.toBeNull();
+          expect(result.data).toBeNull();
 
-          // Verify user data
-          expect(result.data!.email).toBe(params.email);
-          expect(result.data!.name).toBe(params.fullName);
-          expect(result.data!.verified).toBe(false);
+          // No DB transaction: user record is provisioned on first login
+          expect(transactionCalled).toBe(false);
 
-          // Verify exactly one active role matching the requested role with scope
-          expect(result.data!.roles).toHaveLength(1);
-          expect(result.data!.roles[0].role).toBe(params.role);
-          expect(result.data!.roles[0].scopeType).toBe('carrier');
-          expect(result.data!.roles[0].scopeId).toBe(params.scopeId);
-
-          // Verify transaction was used
-          expect(transactionCalled).toBe(true);
-
-          // Verify assignRole was called with correct scope
-          expect(assignRoleCalls).toHaveLength(1);
-          const roleCall = assignRoleCalls[0] as Record<string, unknown>;
-          expect(roleCall.role).toBe(params.role);
-          expect(roleCall.scopeType).toBe('carrier');
-          expect(roleCall.scopeId).toBe(params.scopeId);
+          // No role assignment at invite time (stored in Clerk publicMetadata)
+          expect(assignRoleCalls).toHaveLength(0);
         }),
         { numRuns: 100 },
       );
@@ -448,10 +394,10 @@ describe('User Management Service — Property Tests', () => {
     });
   });
 
-  describe('Property 4: Failed Supabase invitation creates no records', () => {
+  describe('Property 4: Failed Clerk invitation creates no records', () => {
     // **Validates: Requirements 1.7**
 
-    it('for any valid input, if Supabase Auth fails, no user record or role assignment is created', async () => {
+    it('for any valid input, if Clerk invitation throws, no user record or role assignment is created', async () => {
       await fc.assert(
         fc.asyncProperty(
           validInviteParamsArb,

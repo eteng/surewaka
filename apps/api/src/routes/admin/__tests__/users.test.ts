@@ -185,26 +185,22 @@ vi.mock('@surewaka/db', () => {
   };
 });
 
+const mockVerifyToken = vi.fn().mockResolvedValue(null);
+
 vi.mock('@surewaka/auth', () => ({
-  createServiceClient: () => ({
-    auth: {
-      admin: {
-        inviteUserByEmail: (_email: string, _options?: unknown) => {
-          return Promise.resolve(supabaseInviteResult);
-        },
-        updateUserById: (_userId: string, _data?: unknown) => {
-          return Promise.resolve(supabaseUpdateUserResult);
-        },
+  verifyToken: (...a: unknown[]) => mockVerifyToken(...a),
+  getClerkClient: () => ({
+    invitations: {
+      createInvitation: async (_data?: unknown) => {
+        if (supabaseInviteResult.error) {
+          throw new Error(supabaseInviteResult.error.message);
+        }
       },
     },
-  }),
-  createServerClient: (_token: string) => ({
-    auth: {
-      getUser: () =>
-        Promise.resolve({
-          data: { user: null },
-          error: { message: 'Invalid token' },
-        }),
+    users: {
+      updateUserMetadata: (_userId: string, _data?: unknown) => {
+        return Promise.resolve(supabaseUpdateUserResult);
+      },
     },
   }),
 }));
@@ -255,54 +251,36 @@ beforeEach(() => {
 
 describe('User Management Routes — Integration Tests', () => {
   describe('Transaction Atomicity: Invitation (Requirements 1.7, 1.8)', () => {
-    it('when assignRole fails inside the invitation transaction, no user record is persisted', async () => {
-      // Setup: email does not exist, Supabase invite succeeds
-      dbSelectResult = []; // No existing user
+    it('when email already exists, returns CONFLICT without sending invitation', async () => {
+      // Setup: email already exists in DB
+      dbSelectResult = [{ id: 'existing-user-id' }];
       supabaseInviteResult = { error: null };
 
-      // Force assignRole to fail mid-transaction — the service throws inside
-      // the transaction callback, which causes the transaction to roll back
-      assignRoleResult = {
-        data: null,
-        error: { code: 'INTERNAL_ERROR', message: 'Role assignment failed' },
-        meta: null,
-      };
+      const result = await inviteEmployee({
+        email: 'existing@example.com',
+        fullName: 'Test User',
+        role: 'support_agent' as UserRole,
+        scopeType: null,
+        scopeId: null,
+        invitedBy: 'admin-id',
+        invitedByRoles: ['surewaka_admin'] as UserRole[],
+      });
 
-      // The service throws when assignRole fails inside the transaction
-      let thrownError: Error | null = null;
-      try {
-        await inviteEmployee({
-          email: 'new@example.com',
-          fullName: 'Test User',
-          role: 'support_agent' as UserRole,
-          scopeType: null,
-          scopeId: null,
-          invitedBy: 'admin-id',
-          invitedByRoles: ['surewaka_admin'] as UserRole[],
-        });
-      } catch (e) {
-        thrownError = e as Error;
-      }
+      // No transaction, no invitation sent
+      expect(transactionCalled).toBe(false);
+      expect(txInsertCalls).toHaveLength(0);
 
-      // Transaction should have been called
-      expect(transactionCalled).toBe(true);
-
-      // Transaction should have rolled back (thrown error caught by tx wrapper)
-      expect(transactionRolledBack).toBe(true);
-
-      // No user record should be persisted after rollback
-      expect(userRecordCreated).toBe(false);
-
-      // The error should have propagated (transaction atomicity guarantee)
-      expect(thrownError).not.toBeNull();
-      expect(thrownError!.message).toContain('Role assignment failed');
+      // Error should be CONFLICT
+      expect(result.error).not.toBeNull();
+      expect(result.error!.code).toBe('CONFLICT');
+      expect(result.data).toBeNull();
     });
 
-    it('when Supabase invitation fails, no DB transaction is started', async () => {
+    it('when Clerk invitation throws, returns INVITATION_FAILED without creating DB records', async () => {
       // Setup: email does not exist
       dbSelectResult = [];
 
-      // Force Supabase invite to fail
+      // Force Clerk invite to throw
       supabaseInviteResult = { error: { message: 'Email service unavailable' } };
 
       const result = await inviteEmployee({
@@ -315,10 +293,8 @@ describe('User Management Routes — Integration Tests', () => {
         invitedByRoles: ['surewaka_admin'] as UserRole[],
       });
 
-      // Transaction should NOT have been called (fail-fast before DB)
+      // No DB transaction started — invitation is sent first
       expect(transactionCalled).toBe(false);
-
-      // No records should exist
       expect(userRecordCreated).toBe(false);
       expect(txInsertCalls).toHaveLength(0);
 
@@ -328,18 +304,10 @@ describe('User Management Routes — Integration Tests', () => {
       expect(result.data).toBeNull();
     });
 
-    it('successful invitation creates user record and assigns role atomically', async () => {
-      // Setup: email does not exist, Supabase invite succeeds, role assignment succeeds
+    it('successful invitation sends Clerk invite and returns success (no DB user record created at invite time)', async () => {
+      // Setup: email does not exist, Clerk invite succeeds
       dbSelectResult = [];
       supabaseInviteResult = { error: null };
-      assignRoleResult = {
-        data: { id: 'role-1', role: 'support_agent', isActive: true },
-        error: null,
-        meta: null,
-      };
-      rolesSelectResult = [
-        { role: 'support_agent', scopeType: null, scopeId: null },
-      ];
 
       const result = await inviteEmployee({
         email: 'new@example.com',
@@ -351,16 +319,12 @@ describe('User Management Routes — Integration Tests', () => {
         invitedByRoles: ['surewaka_admin'] as UserRole[],
       });
 
-      // Transaction should have been called and NOT rolled back
-      expect(transactionCalled).toBe(true);
-      expect(transactionRolledBack).toBe(false);
-
-      // User record should be created
-      expect(txInsertCalls.length).toBeGreaterThan(0);
+      // No DB transaction — user record is created on first login
+      expect(transactionCalled).toBe(false);
+      expect(userRecordCreated).toBe(false);
 
       // Result should be successful
       expect(result.error).toBeNull();
-      expect(result.data).not.toBeNull();
     });
   });
 

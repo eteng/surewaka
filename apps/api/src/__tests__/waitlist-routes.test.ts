@@ -7,15 +7,22 @@ import { Hono } from 'hono';
 
 // ─── Mock Setup ──────────────────────────────────────────────────────────────
 
-// Mock createServerClient from @surewaka/supabase
-const mockGetUser = vi.fn();
+const mockVerifyToken = vi.fn();
 
 vi.mock('@surewaka/auth', () => ({
-  createServerClient: () => ({
-    auth: {
-      getUser: mockGetUser,
-    },
-  }),
+  verifyToken: (...a: unknown[]) => mockVerifyToken(...a),
+}));
+
+const mockDbSelect = {
+  from: vi.fn().mockReturnThis(),
+  where: vi.fn().mockReturnThis(),
+  limit: vi.fn().mockResolvedValue([{ id: 'admin-user-id' }]),
+};
+
+vi.mock('@surewaka/db', () => ({
+  db: { select: vi.fn(() => mockDbSelect) },
+  users: 'users',
+  eq: vi.fn(),
 }));
 
 // Mock the waitlist service to avoid DB calls
@@ -30,8 +37,6 @@ vi.mock('../services/waitlist-service', () => ({
 // ─── Test App Setup ──────────────────────────────────────────────────────────
 
 async function createTestApp() {
-  const { requireAuth } = await import('../middleware/auth');
-  const { requireRole } = await import('../middleware/role');
   const waitlistModule = await import('../routes/admin/waitlist');
   const waitlistRoutes = waitlistModule.default;
 
@@ -44,28 +49,25 @@ async function createTestApp() {
 
 function adminUser() {
   return {
-    id: 'admin-user-id',
+    clerkId: 'admin_clerk_123',
     email: 'admin@surewaka.com',
-    user_metadata: { name: 'Admin User' },
-    app_metadata: { roles: ['surewaka_admin'] },
+    roles: ['surewaka_admin'] as string[],
   };
 }
 
 function customerUser() {
   return {
-    id: 'customer-user-id',
+    clerkId: 'customer_clerk_123',
     email: 'customer@example.com',
-    user_metadata: { name: 'Customer' },
-    app_metadata: { roles: ['customer'] },
+    roles: ['customer'] as string[],
   };
 }
 
 function driverUser() {
   return {
-    id: 'driver-user-id',
+    clerkId: 'driver_clerk_123',
     email: 'driver@example.com',
-    user_metadata: { name: 'Driver' },
-    app_metadata: { roles: ['driver'] },
+    roles: ['driver'] as string[],
   };
 }
 
@@ -76,6 +78,9 @@ describe('Waitlist Admin Routes — Auth & Validation', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockDbSelect.from.mockReturnThis();
+    mockDbSelect.where.mockReturnThis();
+    mockDbSelect.limit.mockResolvedValue([{ id: 'admin-user-id' }]);
     app = await createTestApp();
   });
 
@@ -99,10 +104,7 @@ describe('Waitlist Admin Routes — Auth & Validation', () => {
     });
 
     it('returns 401 when token is invalid/expired', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: { message: 'Token expired' },
-      });
+      mockVerifyToken.mockResolvedValue(null);
 
       const res = await app.request('/api/v1/admin/waitlist', {
         headers: { Authorization: 'Bearer expired-token' },
@@ -113,11 +115,8 @@ describe('Waitlist Admin Routes — Auth & Validation', () => {
       expect(body.error.code).toBe('UNAUTHORIZED');
     });
 
-    it('returns 401 when getUser returns no user and no error', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: null },
-        error: null,
-      });
+    it('returns 401 when verifyToken returns null (no user)', async () => {
+      mockVerifyToken.mockResolvedValue(null);
 
       const res = await app.request('/api/v1/admin/waitlist', {
         headers: { Authorization: 'Bearer invalid-token' },
@@ -131,10 +130,7 @@ describe('Waitlist Admin Routes — Auth & Validation', () => {
 
   describe('Authorization (403)', () => {
     it('returns 403 for a user with customer role', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: customerUser() },
-        error: null,
-      });
+      mockVerifyToken.mockResolvedValue(customerUser());
 
       const res = await app.request('/api/v1/admin/waitlist', {
         headers: { Authorization: 'Bearer valid-customer-token' },
@@ -146,10 +142,7 @@ describe('Waitlist Admin Routes — Auth & Validation', () => {
     });
 
     it('returns 403 for a user with driver role', async () => {
-      mockGetUser.mockResolvedValue({
-        data: { user: driverUser() },
-        error: null,
-      });
+      mockVerifyToken.mockResolvedValue(driverUser());
 
       const res = await app.request('/api/v1/admin/waitlist', {
         headers: { Authorization: 'Bearer valid-driver-token' },
@@ -160,17 +153,11 @@ describe('Waitlist Admin Routes — Auth & Validation', () => {
       expect(body.error.code).toBe('FORBIDDEN');
     });
 
-    it('returns 403 for a user with no roles in app_metadata', async () => {
-      mockGetUser.mockResolvedValue({
-        data: {
-          user: {
-            id: 'no-role-user',
-            email: 'norole@example.com',
-            user_metadata: {},
-            app_metadata: {},
-          },
-        },
-        error: null,
+    it('returns 403 for a user with no roles', async () => {
+      mockVerifyToken.mockResolvedValue({
+        clerkId: 'no-role_clerk_123',
+        email: 'norole@example.com',
+        roles: [] as string[],
       });
 
       const res = await app.request('/api/v1/admin/waitlist', {
@@ -185,10 +172,7 @@ describe('Waitlist Admin Routes — Auth & Validation', () => {
 
   describe('Validation (400)', () => {
     beforeEach(() => {
-      mockGetUser.mockResolvedValue({
-        data: { user: adminUser() },
-        error: null,
-      });
+      mockVerifyToken.mockResolvedValue(adminUser());
     });
 
     it('returns 400 for invalid userType query param', async () => {
@@ -265,10 +249,7 @@ describe('Waitlist Admin Routes — Auth & Validation', () => {
 
   describe('Default values (200)', () => {
     beforeEach(() => {
-      mockGetUser.mockResolvedValue({
-        data: { user: adminUser() },
-        error: null,
-      });
+      mockVerifyToken.mockResolvedValue(adminUser());
 
       mockListWaitlistSignups.mockResolvedValue({
         data: [],

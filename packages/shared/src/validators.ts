@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PACKAGE_CATEGORIES, PUSH_NOTIFICATION_TYPES, PUSH_TARGET_APPS, VEHICLE_TYPES } from './constants';
+import { NOTIFICATION_TYPES, PACKAGE_CATEGORIES, PUSH_NOTIFICATION_TYPES, PUSH_TARGET_APPS, VEHICLE_TYPES } from './constants';
 
 export const locationSchema = z.object({
   address: z.string().min(5),
@@ -135,19 +135,30 @@ export type OnboardCarrierDriver = z.infer<typeof onboardCarrierDriverSchema>;
 
 // ─── RBAC ────────────────────────────────────────────────────────────────────
 
+const ORG_SCOPED_ROLES = ['carrier_admin', 'carrier_driver'] as const;
+
 export const assignRoleSchema = z.object({
   userId: z.string().uuid(),
   role: z.enum(['customer', 'driver', 'surewaka_admin', 'carrier_driver', 'carrier_admin', 'support_agent']),
-  scopeType: z.enum(['carrier']).optional(),
-  scopeId: z.string().uuid().optional(),
+  scopeType: z.enum(['carrier']).nullish(),
+  scopeId: z.string().uuid().nullish(),
   reason: z.string().max(500).optional(),
+}).superRefine((data, ctx) => {
+  if ((ORG_SCOPED_ROLES as readonly string[]).includes(data.role)) {
+    if (!data.scopeType) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'scopeType is required for org-scoped roles', path: ['scopeType'] });
+    }
+    if (!data.scopeId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'scopeId is required for org-scoped roles', path: ['scopeId'] });
+    }
+  }
 });
 
 export const revokeRoleSchema = z.object({
   userId: z.string().uuid(),
   role: z.enum(['customer', 'driver', 'surewaka_admin', 'carrier_driver', 'carrier_admin', 'support_agent']),
   scopeId: z.string().uuid().optional(),
-  reason: z.string().max(500).optional(),
+  reason: z.string().min(3).max(500),
 });
 
 export type AssignRole = z.infer<typeof assignRoleSchema>;
@@ -163,11 +174,11 @@ export const notificationQuerySchema = z.object({
 });
 
 export const createNotificationSchema = z.object({
-  userId: z.string().uuid(),
-  type: z.enum(['new_user_signup', 'delivery_issue', 'carrier_verification_request', 'carrier_verified', 'dispute_opened', 'driver_verification_request', 'system_alert']),
+  userId: z.union([z.string().uuid(), z.literal('all_admins')]),
+  type: z.enum(NOTIFICATION_TYPES),
   title: z.string().min(1).max(200),
-  message: z.string().min(1).max(1000),
-  resourceLink: z.string().url().optional(),
+  message: z.string().min(1).max(500),
+  resourceLink: z.string().startsWith('/').max(500).optional(),
 });
 
 export type NotificationQuery = z.infer<typeof notificationQuerySchema>;
@@ -178,7 +189,7 @@ export type CreateNotificationInput = z.infer<typeof createNotificationSchema>;
 export const waitlistQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().optional(),
+  search: z.string().max(200).default(''),
   userType: z.enum(['sender', 'business', 'driver']).optional(),
   source: z.string().optional(),
   sortBy: z.enum(['createdAt', 'fullName', 'email', 'userType']).default('createdAt'),

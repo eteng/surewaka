@@ -4,10 +4,12 @@ import type { Context } from 'hono';
 
 vi.mock('@surewaka/db', () => ({
   db: {
-    execute: vi.fn().mockResolvedValue([
-      { active_deliveries: '5', drivers_on_duty: '8', drivers_available: '3',
-        at_risk_deliveries: '2', open_disputes: '1', on_time_rate_today: '87.50' },
-    ]),
+    execute: vi.fn().mockResolvedValue({
+      rows: [
+        { active_deliveries: '5', drivers_on_duty: '8', drivers_available: '3',
+          at_risk_deliveries: '2', open_disputes: '1', on_time_rate_today: '87.50' },
+      ],
+    }),
     update: vi.fn(),
   },
   deliveries: {},

@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 
 vi.mock('@surewaka/db', () => ({
-  db: { execute: vi.fn().mockResolvedValue([]) },
+  db: { execute: vi.fn().mockResolvedValue({ rows: [] }) },
 }));
 vi.mock('../middleware/auth', () => ({
   requireAuth: vi.fn(async (c: Context, next: () => Promise<void>) => { c.set('user', { id: 'u1' }); await next(); }),

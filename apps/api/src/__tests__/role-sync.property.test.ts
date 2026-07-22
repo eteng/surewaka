@@ -10,7 +10,7 @@ import { USER_ROLES } from '@surewaka/shared';
 // ─── Mock Setup ──────────────────────────────────────────────────────────────
 
 let mockActiveRoles: Array<{ role: string; scopeId: string | null }> = [];
-let lastUpdateCall: { userId: string; app_metadata: unknown } | null = null;
+let lastUpdateCall: { userId: string; publicMetadata: unknown } | null = null;
 
 vi.mock('drizzle-orm', () => ({
   eq: (col: unknown, val: unknown) => ({ col, val, op: 'eq' }),
@@ -34,13 +34,10 @@ vi.mock('@surewaka/db', () => ({
 }));
 
 vi.mock('@surewaka/auth', () => ({
-  createServiceClient: () => ({
-    auth: {
-      admin: {
-        updateUserById: (userId: string, data: { app_metadata: unknown }) => {
-          lastUpdateCall = { userId, app_metadata: data.app_metadata };
-          return Promise.resolve({ error: null });
-        },
+  getClerkClient: () => ({
+    users: {
+      updateUserMetadata: async (userId: string, data: { publicMetadata: unknown }) => {
+        lastUpdateCall = { userId, publicMetadata: data.publicMetadata };
       },
     },
   }),
@@ -92,7 +89,7 @@ describe('Role Sync — Property Tests', () => {
 
             expect(lastUpdateCall).not.toBeNull();
 
-            const metadata = lastUpdateCall!.app_metadata as {
+            const metadata = lastUpdateCall!.publicMetadata as {
               roles: UserRole[];
               primary_role: UserRole;
               carrier_id?: string;
@@ -128,7 +125,7 @@ describe('Role Sync — Property Tests', () => {
 
             expect(lastUpdateCall).not.toBeNull();
 
-            const metadata = lastUpdateCall!.app_metadata as {
+            const metadata = lastUpdateCall!.publicMetadata as {
               roles: UserRole[];
               primary_role: UserRole;
               carrier_id?: string;
@@ -157,7 +154,7 @@ describe('Role Sync — Property Tests', () => {
 
             expect(lastUpdateCall).not.toBeNull();
 
-            const metadata = lastUpdateCall!.app_metadata as {
+            const metadata = lastUpdateCall!.publicMetadata as {
               roles: UserRole[];
               primary_role: UserRole;
               carrier_id?: string;
@@ -180,7 +177,7 @@ describe('Role Sync — Property Tests', () => {
 
           expect(lastUpdateCall).not.toBeNull();
 
-          const metadata = lastUpdateCall!.app_metadata as {
+          const metadata = lastUpdateCall!.publicMetadata as {
             roles: UserRole[];
             primary_role: UserRole;
           };

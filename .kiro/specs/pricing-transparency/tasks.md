@@ -194,7 +194,7 @@ Implements server-side fee calculation, quote lifecycle, and price-lock for Sure
     - Verify vehicle type multiplier is correctly applied during recomputation
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6_
 
-- [ ] 6. Checkpoint — Services tests pass
+- [x] 6. Checkpoint — Services tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 7. API routes — quote, delivery, confirm, re-quote, weight correction

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 
-const mockGetUser = vi.fn();
+const mockVerifyToken = vi.fn();
 vi.mock('@surewaka/auth', () => ({
-  createServerClient: () => ({ auth: { getUser: mockGetUser } }),
+  verifyToken: (...a: unknown[]) => mockVerifyToken(...a),
 }));
 
 const mockDebitWallet = vi.fn();
@@ -21,6 +21,7 @@ const mockDbInsert = { values: vi.fn().mockReturnThis(), returning: vi.fn().mock
 const mockDbSelect = {
   from: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
+  limit: vi.fn().mockResolvedValue([{ id: 'user-123' }]),
   for: vi.fn().mockResolvedValue([{ id: 'delivery-1', status: 'draft', customerId: 'user-123', amountPaid: 350000, escrowHoldId: null }]),
 };
 
@@ -43,11 +44,12 @@ vi.mock('@surewaka/db', () => ({
   deliveries: 'deliveries',
   escrowHolds: 'escrow_holds',
   walletTransactions: 'wallet_transactions',
+  users: 'users',
   eq: vi.fn(),
 }));
 
-function authUser() {
-  return { id: 'user-123', email: 'user@example.com', user_metadata: {}, app_metadata: {} };
+function clerkUser() {
+  return { clerkId: 'user_clerk123', email: 'user@example.com', roles: ['customer'] as string[] };
 }
 
 async function createTestApp() {
@@ -62,11 +64,13 @@ describe('Booking payment routes', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    // Default: auth user lookup returns the user row
+    mockDbSelect.limit.mockResolvedValue([{ id: 'user-123' }]);
     app = await createTestApp();
   });
 
   it('POST /booking/confirm returns 401 without auth', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    mockVerifyToken.mockResolvedValue(null);
     const res = await app.request('/api/v1/booking/confirm', {
       method: 'POST',
       headers: { Authorization: 'Bearer bad', 'Content-Type': 'application/json' },
@@ -76,7 +80,7 @@ describe('Booking payment routes', () => {
   });
 
   it('POST /booking/confirm returns 400 for invalid body', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: authUser() }, error: null });
+    mockVerifyToken.mockResolvedValue(clerkUser());
     mockGetWalletByUserId.mockResolvedValue({ id: 'wallet-1' });
     const res = await app.request('/api/v1/booking/confirm', {
       method: 'POST',
@@ -87,7 +91,7 @@ describe('Booking payment routes', () => {
   });
 
   it('POST /deliveries/:id/cancel returns 422 for non-cancellable status', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: authUser() }, error: null });
+    mockVerifyToken.mockResolvedValue(clerkUser());
     mockGetWalletByUserId.mockResolvedValue({ id: 'wallet-1' });
     // The locked select resolves at .for('update') — override for this test
     mockDbSelect.for.mockResolvedValueOnce([{ id: 'del-1', status: 'delivered', customerId: 'user-123', amountPaid: 350000, escrowHoldId: null }]);
