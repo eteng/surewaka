@@ -5,11 +5,11 @@ Implementation order: schema → validators → API → mobile client → screen
 ---
 
 - [x] 1. **DB migration** — create `user_saved_addresses` and `recent_locations` tables with RLS policies in a single migration
-  - Run `supabase migration new add_address_lookup_tables`
+  - Run `pnpm db:generate new add_address_lookup_tables`
   - `user_saved_addresses`: id, user_id, label, address_text, city, state, lat, lng, created_at (no is_default)
   - `recent_locations`: id, user_id, address_text, city, state, lat, lng, used_at
   - RLS on both tables: users manage own rows
-  - Run `supabase migration fetch --yes` to apply
+  - Run `pnpm db:generate fetch --yes` to apply
 
 - [x] 2. **Drizzle schema** — add `userSavedAddresses` and `recentLocations` table definitions to `packages/db/src/schema.ts`
 

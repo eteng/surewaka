@@ -7,9 +7,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { createElement } from 'react';
 
-// Mock server-side dependencies that aren't needed for rendering
-vi.mock('~/lib/supabase.server', () => ({
-  getSupabaseAdmin: vi.fn(),
+// Mock server-side DB dependency not needed for rendering
+vi.mock('@surewaka/db', () => ({
+  db: { insert: vi.fn(() => ({ values: vi.fn().mockResolvedValue([]) })) },
+  waitlistSignups: 'waitlist_signups',
 }));
 
 // Mock react-router hooks used by components

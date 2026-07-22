@@ -2,7 +2,7 @@
 
 ## Overview
 
-This plan implements the admin user management feature for the SureWaka admin portal. It adds employee invitation (via Supabase Auth), listing with search/filter/pagination, profile editing, account deactivation/reactivation, role assignment/revocation (delegating to existing RoleService), and audit history viewing.
+This plan implements the admin user management feature for the SureWaka admin portal. It adds employee invitation (via Clerk), listing with search/filter/pagination, profile editing, account deactivation/reactivation, role assignment/revocation (delegating to existing RoleService), and audit history viewing.
 
 The implementation follows existing patterns: Hono routes with `requireAuth` + `requireRole('surewaka_admin')` middleware, Drizzle ORM queries, Zod validators in `@surewaka/shared`, and React Router v7 SPA pages in `apps/admin`.
 
@@ -33,7 +33,7 @@ The implementation follows existing patterns: Hono routes with `requireAuth` + `
     - Define types: `InviteEmployeeParams`, `ListEmployeesParams`, `UpdateEmployeeParams`, `DeactivateEmployeeParams`, `ReactivateEmployeeParams`, `EmployeeListItem`, `EmployeeDetail`, `AuditLogEntry`, `ServiceResult<T>`
     - Implement `inviteEmployee(params)`:
       - Check email uniqueness in users table (return CONFLICT 409 if exists)
-      - Call Supabase Auth `inviteUserByEmail` (return INVITATION_FAILED 502 on failure, no DB records created)
+      - Call Clerk `inviteUserByEmail` (return INVITATION_FAILED 502 on failure, no DB records created)
       - Begin DB transaction: insert user record (email, name, verified=false), call RoleService `assignRole` with role/scope
       - Commit transaction and return created employee detail
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.7, 1.8_
@@ -45,8 +45,8 @@ The implementation follows existing patterns: Hono routes with `requireAuth` + `
     - **Property 2: Duplicate email invitation is rejected**
     - For any email that already exists, inviting with that email SHALL return CONFLICT and SHALL NOT create any new records
     - **Validates: Requirements 1.4**
-    - **Property 4: Failed Supabase invitation creates no records**
-    - For any valid input, if Supabase Auth fails, no user record or role assignment SHALL be created
+    - **Property 4: Failed Clerk invitation creates no records**
+    - For any valid input, if Clerk fails, no user record or role assignment SHALL be created
     - **Validates: Requirements 1.7**
 
   - [x] 2.3 Implement `listEmployees` function in user-management-service
@@ -101,7 +101,7 @@ The implementation follows existing patterns: Hono routes with `requireAuth` + `
     - `deactivateEmployee`:
       - Check performedBy !== userId (return SELF_DEACTIVATION_NOT_ALLOWED 400 if same)
       - Begin transaction: set verified=false on user, set isActive=false on all active user_roles, create audit log entry for each revoked role with reason 'Account deactivated by admin'
-      - Update Supabase Auth app_metadata to remove all roles (set roles to empty)
+      - Update Clerk app_metadata to remove all roles (set roles to empty)
       - Commit transaction
     - `reactivateEmployee`:
       - Set verified=true on user record
@@ -283,5 +283,5 @@ The implementation follows existing patterns: Hono routes with `requireAuth` + `
 - Property tests validate the 16 universal correctness properties from the design document
 - No new database tables or migrations needed — uses existing users, user_roles, role_audit_log, carriers tables
 - Role assignment/revocation delegates to existing RoleService (no reimplementation)
-- Supabase Auth `inviteUserByEmail` is called before the DB transaction (fail-fast pattern)
+- Clerk `inviteUserByEmail` is called before the DB transaction (fail-fast pattern)
 - Auth metadata sync is fire-and-forget (non-throwing) per existing RoleService behavior

@@ -6,13 +6,13 @@
 
 **Architecture:** Five new DB tables (`delivery_legs`, `delivery_events`, `driver_locations`, `delivery_ratings`, `carrier_sla_overrides`) are created in a single migration with full RLS. A DB trigger auto-writes `delivery_events` on every leg status change. The shared package gains new types, validators, and constants. A zone classifier in the API server-side reverse-geocodes Lagos coordinates using LocationIQ into canonical zone labels stored on legs at creation. Seed data populates realistic multi-leg deliveries across Lagos zones for admin visual inspection.
 
-**Tech Stack:** Supabase Postgres migrations, Drizzle ORM (schema generated — never hand-edited), Zod v3, Hono, TypeScript strict, LocationIQ reverse-geocode API, `pnpm --filter` workspace commands
+**Tech Stack:** NeonDB migrations, Drizzle ORM (schema generated — never hand-edited), Zod v3, Hono, TypeScript strict, LocationIQ reverse-geocode API, `pnpm --filter` workspace commands
 
 ## Global Constraints
 
-- Never manually edit `packages/db/src/schema.ts` — run `pnpm --filter @surewaka/db db:pull` after every migration
+- Never manually edit `packages/db/src/schema.ts` — run `pnpm --filter @surewaka/db db:generate + db:migrate` after every migration
 - Every migration that creates a table must include RLS enable + service_role bypass + authenticated grants in the same file
-- Reference RLS pattern: `supabase/migrations/20260603045850_fix_rls_and_grants_all_tables.sql`
+- Reference RLS pattern: `drizzle/migrations/20260603045850_fix_rls_and_grants_all_tables.sql`
 - Never use `drizzle-kit push/generate/migrate`
 - All cross-package types via `@surewaka/shared`
 - TypeScript: strict mode, `type` over `interface`, `unknown` not `any`
@@ -25,7 +25,7 @@
 ### Task 1: DB Migration — all new tables + triggers + RLS
 
 **Files:**
-- Create: `supabase/migrations/20260703000001_delivery_model_redesign.sql`
+- Create: `drizzle/migrations/20260703000001_delivery_model_redesign.sql`
 
 **Interfaces:**
 - Produces: `delivery_legs`, `delivery_events`, `driver_locations`, `delivery_ratings`, `carrier_sla_overrides` tables; `log_leg_status_change()` trigger function
@@ -33,7 +33,7 @@
 - [ ] **Step 1: Create the migration file**
 
 ```bash
-supabase migration new delivery_model_redesign
+pnpm db:generate new delivery_model_redesign
 ```
 
 Rename the generated file to match `20260703000001_delivery_model_redesign.sql`.
@@ -257,7 +257,7 @@ GRANT SELECT ON carrier_sla_overrides TO authenticated;
 - [ ] **Step 3: Apply the migration locally**
 
 ```bash
-supabase db push
+pnpm --filter @surewaka/db db:push
 ```
 
 Expected: migration applies without errors. If the `deliveries` table doesn't have `id` as uuid, check the existing schema first.
@@ -265,7 +265,7 @@ Expected: migration applies without errors. If the `deliveries` table doesn't ha
 - [ ] **Step 4: Regenerate the Drizzle schema**
 
 ```bash
-pnpm --filter @surewaka/db db:pull
+pnpm --filter @surewaka/db db:generate + db:migrate
 ```
 
 Expected: `packages/db/src/schema.ts` updated with the five new tables. Never edit this file manually.
@@ -273,7 +273,7 @@ Expected: `packages/db/src/schema.ts` updated with the five new tables. Never ed
 - [ ] **Step 5: Verify new tables exist**
 
 ```bash
-supabase db diff --schema public | grep -E "delivery_legs|delivery_events|driver_locations|delivery_ratings|carrier_sla_overrides"
+pnpm --filter @surewaka/db db:generate (check diff) --schema public | grep -E "delivery_legs|delivery_events|driver_locations|delivery_ratings|carrier_sla_overrides"
 ```
 
 Expected: no diff (all tables applied). If tables appear in diff, the migration didn't apply cleanly — re-run Step 3.
@@ -281,7 +281,7 @@ Expected: no diff (all tables applied). If tables appear in diff, the migration 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add supabase/migrations/20260703000001_delivery_model_redesign.sql packages/db/src/schema.ts
+git add drizzle/migrations/20260703000001_delivery_model_redesign.sql packages/db/src/schema.ts
 git commit -m "feat(db): add delivery_legs, delivery_events, driver_locations, delivery_ratings, carrier_sla_overrides"
 ```
 

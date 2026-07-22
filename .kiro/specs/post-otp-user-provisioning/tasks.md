@@ -6,13 +6,12 @@ Bottom-up: schema → shared types → API → store → mobile UI.
 
 ## Schema & shared types
 
-- [x] 1. Create migration `supabase migration new make_users_email_nullable` and write:
+- [x] 1. Create migration `pnpm --filter @surewaka/db db:generate` (name: `make_users_email_nullable`) and write:
   ```sql
   ALTER TABLE public.users ALTER COLUMN email DROP NOT NULL;
   ```
 
-- [ ] 2. After applying migration to DB: run `pnpm --filter @surewaka/db db:pull` to regenerate
-  `packages/db/src/schema.ts` (do not edit manually)
+- [ ] 2. After editing the schema in `packages/db/src/schema/users.ts`: run `pnpm --filter @surewaka/db db:generate` then `pnpm --filter @surewaka/db db:migrate` to apply the migration
 
 - [x] 3. Add `otpRegisterSchema` and `OtpRegister` type to `packages/shared/src/validators.ts`:
   ```typescript
@@ -49,7 +48,7 @@ Bottom-up: schema → shared types → API → store → mobile UI.
 
 - [x] 7. Extend `initialize()` in the auth store:
   - After `getSession()`, if session exists: query
-    `supabase.from('users').select('id').eq('id', session.user.id).single()`
+    `db.query('users').select('id').eq('id', session.user.id).single()`
     and `set({ profileExists: !!data })`
   - If no session: `set({ profileExists: null })`
 

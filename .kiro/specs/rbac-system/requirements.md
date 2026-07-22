@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The RBAC (Role-Based Access Control) system provides fine-grained authorization for SureWaka's multi-app logistics platform. It manages six distinct roles across web, admin, carrier, and mobile applications using a dual-storage strategy (Postgres `user_roles` table + Supabase `app_metadata`) to enable fast JWT-based middleware checks while maintaining queryable, auditable role data.
+The RBAC (Role-Based Access Control) system provides fine-grained authorization for SureWaka's multi-app logistics platform. It manages six distinct roles across web, admin, carrier, and mobile applications using a dual-storage strategy (Postgres `user_roles` table + Clerk `publicMetadata`) to enable fast JWT-based middleware checks while maintaining queryable, auditable role data.
 
 ## Glossary
 
@@ -10,12 +10,12 @@ The RBAC (Role-Based Access Control) system provides fine-grained authorization 
 - **Role_Middleware**: The `requireRole` Hono middleware that guards API routes by checking user roles from JWT claims
 - **Scope_Middleware**: The `requireCarrierScope` Hono middleware that verifies org membership for carrier-scoped routes
 - **Role_Service**: The server-side service handling role assignment, revocation, upgrade, querying, and sync operations
-- **Role_Sync**: The process of updating Supabase `app_metadata` to match the canonical `user_roles` table
+- **Role_Sync**: The process of updating Clerk `publicMetadata` to match the canonical `user_roles` table
 - **Frontend_Role_Context**: The `useRoles` hook and `RoleGate` component providing client-side role awareness
 - **Audit_Logger**: The append-only `role_audit_log` table recording all role mutations
 - **Carrier_Scope**: The organizational boundary limiting `carrier_admin` and `carrier_driver` permissions to their carrier
 - **User_Roles_Table**: The canonical Postgres table storing all active and historical role assignments
-- **App_Metadata**: The Supabase Auth `app_metadata` field containing derived role claims embedded in JWTs
+- **App_Metadata**: The Clerk `app_metadata` field containing derived role claims embedded in JWTs
 
 ## Requirements
 
@@ -27,7 +27,7 @@ The RBAC (Role-Based Access Control) system provides fine-grained authorization 
 
 1. THE RBAC_System SHALL define exactly six roles: `customer`, `driver`, `carrier_driver`, `carrier_admin`, `support_agent`, and `surewaka_admin`
 2. THE RBAC_System SHALL store role assignments in the `user_roles` Postgres table as the single source of truth
-3. THE RBAC_System SHALL mirror active roles to Supabase `app_metadata` as a derived cache
+3. THE RBAC_System SHALL mirror active roles to Clerk `publicMetadata` as a derived cache
 4. WHEN a user has no active role records in the User_Roles_Table, THEN THE RBAC_System SHALL default to `['customer']` in App_Metadata
 5. THE RBAC_System SHALL support multiple simultaneous roles per user
 6. THE User_Roles_Table SHALL enforce a unique constraint on `(user_id, role, scope_id)` for active records
@@ -87,9 +87,9 @@ The RBAC (Role-Based Access Control) system provides fine-grained authorization 
 5. THE Role_Service SHALL validate onboarding requests against the `onboardCarrierDriverSchema` Zod validator requiring a valid Nigerian phone number and full name
 6. WHEN the onboarding operation completes, THEN THE Role_Service SHALL execute all database writes within a single transaction
 
-### Requirement 6: Role Sync to Supabase Auth
+### Requirement 6: Role Sync to Clerk
 
-**User Story:** As a platform architect, I want roles synced to Supabase app_metadata after every mutation, so that JWT claims reflect current permissions without requiring a database lookup on every request.
+**User Story:** As a platform architect, I want roles synced to Clerk publicMetadata after every mutation, so that JWT claims reflect current permissions without requiring a database lookup on every request.
 
 #### Acceptance Criteria
 
@@ -97,7 +97,7 @@ The RBAC (Role-Based Access Control) system provides fine-grained authorization 
 2. WHEN syncing roles, THEN THE Role_Sync SHALL set `app_metadata.primary_role` to the first role in the active roles list
 3. WHEN the user has an org-scoped role, THEN THE Role_Sync SHALL set `app_metadata.carrier_id` to the corresponding `scope_id`
 4. WHEN no active roles exist for a user, THEN THE Role_Sync SHALL set `app_metadata.roles` to `['customer']`
-5. IF the Supabase Auth update fails after a successful database write, THEN THE Role_Service SHALL return success and queue a retry for reconciliation
+5. IF the Clerk update fails after a successful database write, THEN THE Role_Service SHALL return success and queue a retry for reconciliation
 6. THE RBAC_System SHALL use a background cron job to reconcile any drift between the User_Roles_Table and App_Metadata
 
 ### Requirement 7: Audit Logging

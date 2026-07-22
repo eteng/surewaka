@@ -6,7 +6,7 @@ This feature adds profile management capabilities to the SureWaka admin portal (
 
 The implementation extends the existing `public.users` table with profile columns (`avatar_url`, `notification_email`, `notification_sms`), introduces a new `name_change_requests` table for the approval workflow, adds API endpoints under `/api/v1/profile` and `/api/v1/admin/name-change-requests`, and creates a `/settings/profile` page in the admin portal.
 
-The design follows existing patterns: Hono routes with `requireAuth` middleware, Drizzle ORM for database access, Zod validators in `@surewaka/shared`, and Supabase Storage for file uploads. Auth metadata sync is limited to `avatar_url` only (name changes go through the approval workflow and are synced upon approval).
+The design follows existing patterns: Hono routes with `requireAuth` middleware, Drizzle ORM for database access, Zod validators in `@surewaka/shared`, and Cloudinary/R2 for file uploads. Auth metadata sync is limited to `avatar_url` only (name changes go through the approval workflow and are synced upon approval).
 
 ## Architecture
 
@@ -24,18 +24,18 @@ graph TD
         DA --> EA[Name Change Service]
         E --> F[Drizzle ORM]
         EA --> F
-        E --> G[Supabase Storage]
-        E --> H[Supabase Auth Admin]
+        E --> G[Cloudinary/R2]
+        E --> H[Clerk Admin]
         EA --> H
     end
 
     subgraph "packages"
         I[shared/validators.ts<br>Profile Zod Schemas]
         J[db/schema.ts<br>Users + Name Change Requests]
-        K[supabase/client.ts<br>Server Client]
+        K[db/client.ts<br>Server Client]
     end
 
-    subgraph "Supabase"
+    subgraph "NeonDB"
         L[(Postgres<br>public.users)]
         LA[(Postgres<br>public.name_change_requests)]
         M[Storage<br>avatars bucket]
@@ -62,7 +62,7 @@ graph TD
 4. Route handler extracts `user.id` from context (never from request body)
 5. Request body validated against Zod schema from `@surewaka/shared`
 6. Service performs DB operations via Drizzle ORM
-7. For avatar uploads: file validated → uploaded to Supabase Storage → URL stored in DB → auth metadata synced (avatar_url only)
+7. For avatar uploads: file validated → uploaded to Cloudinary/R2 → URL stored in DB → auth metadata synced (avatar_url only)
 8. For name change approvals: admin updates request status → `name` column updated → auth metadata synced
 9. Response returned in standard `{ data, error, meta }` shape
 
@@ -244,13 +244,13 @@ function generateAvatarPath(userId: string, extension: string): string {
 
 ### Auth Metadata Sync
 
-After successful avatar updates (upload or removal), the service syncs `avatar_url` to Supabase Auth `user_metadata`. Name is NOT synced here — it is synced only when an admin approves a name change request.
+After successful avatar updates (upload or removal), the service syncs `avatar_url` to Clerk `user_metadata`. Name is NOT synced here — it is synced only when an admin approves a name change request.
 
 ```typescript
 async function syncAvatarMetadata(userId: string, avatarUrl: string | null) {
   try {
-    const supabase = createServiceClient();
-    await supabase.auth.admin.updateUserById(userId, {
+    const clerkClient = getClerkClient();
+    await clerk.admin.updateUserById(userId, {
       user_metadata: { avatar_url: avatarUrl },
     });
   } catch (error) {
@@ -261,8 +261,8 @@ async function syncAvatarMetadata(userId: string, avatarUrl: string | null) {
 
 async function syncNameMetadata(userId: string, name: string) {
   try {
-    const supabase = createServiceClient();
-    await supabase.auth.admin.updateUserById(userId, {
+    const clerkClient = getClerkClient();
+    await clerk.admin.updateUserById(userId, {
       user_metadata: { name },
     });
   } catch (error) {
@@ -344,7 +344,7 @@ export const nameChangeRequests = pgTable('name_change_requests', {
 });
 ```
 
-### Supabase Storage Bucket
+### Cloudinary/R2 Bucket
 
 - Bucket name: `avatars`
 - Public access: Yes (public URLs for avatar display)
@@ -512,14 +512,14 @@ Each test is tagged with: `Feature: user-profile-management, Property {N}: {titl
 - Validator schemas: specific examples and edge cases (empty string, exactly 2 chars, exactly 100 chars, unicode names, whitespace variations)
 - Profile service: mock DB and storage, test specific flows (update preferences, upload avatar, remove avatar, submit name change request)
 - Name change service: mock DB, test approval and rejection flows
-- Auth metadata sync: mock Supabase Auth, test success and failure paths
+- Auth metadata sync: mock Clerk, test success and failure paths
 - Error handling: verify correct HTTP status codes and error shapes
 - Conflict detection: verify 409 when a pending name change request already exists
 
 ### Integration Tests
 
 - Full API endpoint tests with test database
-- Avatar upload/download with Supabase Storage (test bucket)
+- Avatar upload/download with Cloudinary/R2 (test bucket)
 - Name change request lifecycle: submit → list pending → approve/reject → verify name updated
 - Auth middleware rejection for unauthenticated requests
 - Admin role enforcement on admin endpoints

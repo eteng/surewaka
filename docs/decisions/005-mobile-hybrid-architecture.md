@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+**Superseded** — The hybrid Supabase+API model was replaced when Supabase was removed. Mobile apps now use Clerk (via `@clerk/expo`) for auth and go through `apps/api` for all business logic. Realtime uses Ably. Storage uses Cloudinary. Historical context below is preserved for reference.
 
 ## Context
 

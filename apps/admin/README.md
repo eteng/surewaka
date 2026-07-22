@@ -8,7 +8,7 @@ Internal operations dashboard for the SureWaka team. Built with React Router v7 
 |-------|-----------|
 | Framework | React Router v7 (SPA mode) |
 | UI | shadcn/ui (New York style) + Tailwind CSS v4 |
-| Auth | Supabase Auth (email/password + TOTP MFA) |
+| Auth | Clerk (email/password + TOTP MFA) |
 | API | Calls `apps/api` at `/api/v1` |
 | Build | Vite 6 |
 | Deployment | Vercel |
@@ -19,15 +19,14 @@ Internal operations dashboard for the SureWaka team. Built with React Router v7 
 
 - Node.js >= 20
 - pnpm 9.x
-- Supabase project with MFA (TOTP) enabled
+- Clerk account with MFA (TOTP) enabled
 
 ### Environment Variables
 
 Create `apps/admin/.env`:
 
 ```env
-VITE_SUPABASE_URL=https://<project-ref>.supabase.co
-VITE_SUPABASE_ANON_KEY=<your-anon-key>
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 ```
 
 ### Run
@@ -79,7 +78,7 @@ The `AuthGuard` component wraps all protected routes (in `routes/layout.tsx`). I
 
 ## MFA Enrollment: "Resume-or-Create" Pattern
 
-The MFA enrollment handles the known Supabase limitation where `mfa.unenroll()` requires AAL2 but enrollment happens at AAL1.
+The MFA enrollment handles the known Clerk limitation where `mfa.unenroll()` requires AAL2 but enrollment happens at AAL1.
 
 ### The Problem
 
@@ -148,7 +147,7 @@ apps/admin/
 │   │   ├── use-mfa-enrollment.ts  # MFA enrollment state machine
 │   │   └── use-mobile.ts          # Mobile breakpoint detection
 │   ├── lib/
-│   │   ├── supabase.ts            # Browser Supabase client
+│   │   ├── clerk.ts               # Clerk auth helpers
 │   │   └── utils.ts               # cn() utility
 │   └── routes/
 │       ├── layout.tsx             # Sidebar + header + AuthGuard

@@ -2,7 +2,7 @@
 
 ## Background
 
-Phone OTP users authenticate via Supabase Auth (`auth.users`) but no corresponding row is ever
+Phone OTP users authenticate via Clerk (`auth.users`) but no corresponding row is ever
 written to `public.users`. Every route that references `deliveries.customer_id → users.id`
 fails immediately with a FK violation, blocking delivery creation for all mobile customers.
 

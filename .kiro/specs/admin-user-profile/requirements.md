@@ -8,10 +8,10 @@ The User Profile Management feature enables SureWaka internal users (ops team, s
 
 - **Profile_Service**: The API service layer handling profile retrieval, avatar management, notification preferences, and name change requests
 - **Profile_Page**: The React Router v7 route in `apps/admin` where users view and manage their profile
-- **Avatar_Storage**: The Supabase Storage bucket (`avatars`) used to store user profile images
+- **Avatar_Storage**: The Cloudinary/R2 bucket (`avatars`) used to store user profile images
 - **Users_Table**: The existing `public.users` Postgres table, extended with profile columns (`avatar_url`, `notification_email`, `notification_sms`)
 - **Profile_Validator**: The Zod schemas in `@surewaka/shared` that validate profile update requests
-- **Auth_Metadata_Sync**: The process of updating Supabase Auth `user_metadata` (avatar_url) after profile changes
+- **Auth_Metadata_Sync**: The process of updating Clerk `user_metadata` (avatar_url) after profile changes
 - **Name_Change_Request**: A request submitted by a user to change their display name, requiring admin approval before taking effect
 
 ## Requirements
@@ -51,7 +51,7 @@ The User Profile Management feature enables SureWaka internal users (ops team, s
 2. WHEN a customer uploads an avatar, THEN THE Profile_Validator SHALL reject files larger than 2 MB
 3. WHEN a valid avatar file is uploaded, THEN THE Avatar_Storage SHALL store the file in the `avatars` bucket with the path `{user_id}/{timestamp}.{extension}`
 4. WHEN a new avatar is stored, THEN THE Profile_Service SHALL update the `avatar_url` column in the Users_Table with the public URL of the uploaded file
-5. WHEN a new avatar is stored, THEN THE Auth_Metadata_Sync SHALL update Supabase Auth `user_metadata.avatar_url` to match the new URL
+5. WHEN a new avatar is stored, THEN THE Auth_Metadata_Sync SHALL update Clerk `user_metadata.avatar_url` to match the new URL
 6. WHEN a customer uploads a new avatar and a previous avatar exists, THEN THE Avatar_Storage SHALL delete the previous avatar file from the bucket
 7. WHEN a customer removes their avatar without uploading a replacement, THEN THE Profile_Service SHALL set `avatar_url` to null in the Users_Table and clear `user_metadata.avatar_url`
 8. IF the file upload to Avatar_Storage fails, THEN THE Profile_Service SHALL return HTTP 500 with a descriptive error message and not update the database

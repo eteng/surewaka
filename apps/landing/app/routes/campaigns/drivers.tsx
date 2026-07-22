@@ -2,7 +2,7 @@ import { Clock, Truck, TrendingUp, Wallet } from 'lucide-react';
 import { data } from 'react-router';
 import type { Route } from './+types/drivers';
 import { WaitlistForm } from '~/components/waitlist-form';
-import { getSupabaseAdmin } from '~/lib/supabase.server';
+import { db, waitlistSignups } from '@surewaka/db';
 import { isHoneypotFilled, isRateLimited } from '~/lib/anti-spam.server';
 import { waitlistSignupSchema } from '@surewaka/shared';
 
@@ -51,38 +51,28 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   try {
-    const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from('waitlist_signups').insert({
-      full_name: result.data.fullName,
+    await db.insert(waitlistSignups).values({
+      fullName: result.data.fullName,
       email: result.data.email,
-      user_type: result.data.userType,
+      userType: result.data.userType as 'sender' | 'business' | 'driver',
       source: result.data.source,
     });
-
-    if (error) {
-      if (error.code === '23505') {
-        return data<ActionData>(
-          {
-            success: false,
-            errors: { email: ['This email is already on the waitlist'] },
-            message: 'This email is already on the waitlist',
-          },
-          { status: 409 },
-        );
-      }
-
-      console.error('Supabase insert error:', error);
-      return data<ActionData>(
-        { success: false, message: 'Something went wrong. Please try again.' },
-        { status: 500 },
-      );
-    }
-
     return data<ActionData>({
       success: true,
       message: "You're on the list! We'll reach out when we start onboarding drivers.",
     });
   } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    if (message.includes('unique') || message.includes('duplicate')) {
+      return data<ActionData>(
+        {
+          success: false,
+          errors: { email: ['This email is already on the waitlist'] },
+          message: 'This email is already on the waitlist',
+        },
+        { status: 409 },
+      );
+    }
     console.error('Waitlist signup failed:', err);
     return data<ActionData>(
       { success: false, message: 'Something went wrong. Please try again.' },

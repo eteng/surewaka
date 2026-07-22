@@ -10,7 +10,7 @@ The system follows a polling-based architecture (30s intervals with tab visibili
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Delivery mechanism | Polling (30s) | Simpler than Supabase Realtime; notifications are not latency-critical; reduces infrastructure complexity |
+| Delivery mechanism | Polling (30s) | Simpler than Ably; notifications are not latency-critical; reduces infrastructure complexity |
 | Storage | Postgres table with Drizzle ORM | Consistent with existing data layer; supports efficient queries with indexes |
 | Notification targeting | Per-user rows + "all_admins" broadcast | Simple model; avoids pub/sub complexity; each user has independent read state |
 | Cleanup | Daily cron job | Prevents unbounded table growth; 90-day retention is sufficient for ops context |
@@ -40,7 +40,7 @@ graph TB
         Routes --> Service
     end
 
-    subgraph "Database (Supabase Postgres)"
+    subgraph "Database (NeonDB)"
         Table[(notifications table)]
         Enum[notification_type enum]
     end
@@ -218,12 +218,12 @@ import {
   createNotificationSchema,
   notificationQuerySchema,
 } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { ClerkUser } from '@surewaka/db';
 import * as notificationService from '../services/notification-service';
 
 type NotificationRoutesEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: ClerkUser;
     accessToken: string;
   };
 };
@@ -652,7 +652,7 @@ When the admin team grows or polling load becomes a concern, the unread count ca
 
 ### Cleanup Cron Job
 
-Located in `workers/cron/` (or as a Supabase Edge Function / pg_cron):
+Located in `workers/cron/` (or as a Fly.io cron worker):
 
 ```typescript
 async function cleanupNotifications(): Promise<void> {

@@ -354,8 +354,8 @@ REDIS_URL              — BullMQ connection (payment worker, Fly.io)
 
 | New file | Purpose |
 |---|---|
-| `supabase/migrations/*_add_wallet_payment_system.sql` | wallets, wallet_transactions, escrow_holds, payout_requests, triggers, RLS |
-| `supabase/migrations/*_add_delivery_payment_columns.sql` | payment_status, escrow_hold_id, amount_paid on deliveries; en_route_to_pickup enum value |
+| `drizzle/migrations/*_add_wallet_payment_system.sql` | wallets, wallet_transactions, escrow_holds, payout_requests, triggers, RLS |
+| `drizzle/migrations/*_add_delivery_payment_columns.sql` | payment_status, escrow_hold_id, amount_paid on deliveries; en_route_to_pickup enum value |
 | `apps/api/src/routes/wallet.ts` | Wallet endpoints |
 | `apps/api/src/routes/booking-payment.ts` | POST /booking/confirm |
 | `apps/api/src/routes/webhook.ts` | Paystack webhook |
@@ -384,4 +384,4 @@ REDIS_URL              — BullMQ connection (payment worker, Fly.io)
 - USSD payment channel
 - Dispute resolution flow
 - Multi-currency support (schema supports it via `UNIQUE(user_id, currency)`)
-- Real-time balance updates via Supabase Realtime (currently: poll on focus)
+- Real-time balance updates via Ably (currently: poll on focus)

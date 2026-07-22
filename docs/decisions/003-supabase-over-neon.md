@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+**Superseded** — Migrated away from Supabase in mid-2026. Auth → Clerk, DB → NeonDB (Drizzle ORM), Storage → Cloudinary (avatars) + Cloudflare R2 (private docs), Realtime → Ably. Historical context below is preserved for reference.
 
 ## Context
 

@@ -2,13 +2,13 @@
 
 ## Introduction
 
-This feature adds avatar image functionality to the SureWaka mobile customer app. Users can pick an image from their device library or capture a photo using the camera, upload it to Supabase Storage, and have it displayed as their profile avatar across the app (edit profile screen and profile tab).
+This feature adds avatar image functionality to the SureWaka mobile customer app. Users can pick an image from their device library or capture a photo using the camera, upload it to Cloudinary/R2, and have it displayed as their profile avatar across the app (edit profile screen and profile tab).
 
 ## Glossary
 
 - **Avatar_Upload_Service**: The client-side logic responsible for selecting, compressing, uploading, and persisting avatar images
 - **Image_Picker**: The expo-image-picker module that presents the device media library or camera interface
-- **Storage_Bucket**: The Supabase Storage bucket (`avatars`) that stores uploaded avatar image files
+- **Storage_Bucket**: The Cloudinary/R2 bucket (`avatars`) that stores uploaded avatar image files
 - **Profile_Hook**: The `useCustomerProfile` hook that manages profile state and mutations
 - **Edit_Profile_Screen**: The screen at `apps/mobile-customer/app/profile/edit.tsx` where users edit their profile
 - **Profile_Tab**: The tab screen at `apps/mobile-customer/app/(tabs)/profile.tsx` showing the user's profile overview
@@ -61,7 +61,7 @@ This feature adds avatar image functionality to the SureWaka mobile customer app
 
 #### Acceptance Criteria
 
-1. THE Storage_Bucket SHALL be created via a Supabase migration with the name `avatars` and configured as a public bucket (publicly readable)
+1. THE Storage_Bucket SHALL be created via a Drizzle migration with the name `avatars` and configured as a public bucket (publicly readable)
 2. THE Storage_Bucket SHALL enforce Row Level Security policies that allow authenticated users to upload only to their own path (`{user_id}/*`)
 3. THE Storage_Bucket SHALL allow unauthenticated public read access to all avatar files so that avatars can be rendered via public URLs without requiring authentication tokens (avatars are not sensitive data)
 4. THE Storage_Bucket SHALL restrict file uploads to image MIME types (`image/jpeg`, `image/png`, `image/webp`)

@@ -10,8 +10,7 @@
     "paths": {
       "~/*": ["./app/*"],
       "@surewaka/shared": ["../../packages/shared/src"],
-      "@surewaka/supabase": ["../../packages/supabase/src"],
-      "@surewaka/ui": ["../../packages/ui/src"]
+"@surewaka/ui": ["../../packages/ui/src"]
     }
   },
   "include": [

@@ -7,7 +7,7 @@ SureWaka has two distinct user populations that require managed access:
 1. **Internal SureWaka staff** — backoffice ops team managed via `apps/admin`
 2. **Carrier organisations** — fleet companies and their drivers managed via `apps/carrier` (new, PWA)
 
-This document covers the full user management picture across both portals: role architecture, data model, carrier vetting pipeline, carrier portal user management, and invitation flows. It supersedes and extends the earlier `admin-user-management` and `rbac-system` specs, which were written against Supabase Auth. The system now runs on Clerk.
+This document covers the full user management picture across both portals: role architecture, data model, carrier vetting pipeline, carrier portal user management, and invitation flows. It supersedes and extends the earlier `admin-user-management` and `rbac-system` specs, which were written against Clerk. The system now runs on Clerk.
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Problem statement
 
-`auth.users` is populated by Supabase on OTP verification. `public.users` is never written.
+`auth.users` is populated by Clerk on OTP verification. `public.users` is never written.
 All FK references from `deliveries.customer_id → users.id` use the `public.users.id`, which
 must equal `auth.users.id` — because `requireAuth` extracts `user.id` from the JWT and all
 services query `public.users` via that same ID.
@@ -26,8 +26,8 @@ when a new session starts (covering the verify-OTP path). Root `_layout.tsx` rea
 `profileExists` from the store and redirects to `/(auth)/register` when `user && profileExists === false`.
 `verify.tsx` removes its own `router.replace('/(tabs)')` — routing is delegated to the store.
 
-**Profile existence check: Supabase direct query** — The auth store already holds the
-Supabase client. Checking `supabase.from('users').select('id').eq('id', userId).single()`
+**Profile existence check: API call (GET /api/v1/profile)** — The auth store already holds the
+Drizzle client. Checking `db.query('users').select('id').eq('id', userId).single()`
 avoids a dependency on the API URL in `packages/mobile-shared` and saves a network hop.
 
 **Upsert over strict insert** — `POST /api/v1/auth/register` uses `INSERT ... ON CONFLICT (id) DO NOTHING`
@@ -40,7 +40,7 @@ and returns the existing row on conflict. Retry-safe; no 409 surface for the cli
 ```
 sign-in.tsx  →  verifyOtp()  →  onAuthStateChange fires
                                  ↓
-                           Supabase query: public.users WHERE id = authUserId
+                           API query: public.users WHERE id = authUserId
                                  ↓ no row
                            set { profileExists: false }
                                  ↓
@@ -64,7 +64,7 @@ app launch  →  initialize()
                 ↓
           getSession() → session found
                 ↓
-          Supabase query: public.users WHERE id = authUserId
+          API query: public.users WHERE id = authUserId
                 ↓ row exists
           set { user, session, profileExists: true }
                 ↓

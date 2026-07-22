@@ -136,7 +136,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-xl font-semibold text-foreground">7. Data Storage and Security</h2>
           <p className="mt-3">
-            Your data is stored on secure servers provided by Supabase (hosted in the EU). We
+            Your data is stored on secure servers provided by NeonDB (hosted in the EU, London region). We
             implement appropriate technical and organizational measures to protect your personal data
             against unauthorized access, alteration, disclosure, or destruction. These measures
             include encryption in transit (TLS), access controls, and regular security reviews.

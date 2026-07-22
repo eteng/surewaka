@@ -2,7 +2,7 @@
 
 ## Overview
 
-Build the SureWaka marketing landing page inside `apps/landing` using React Router v7 (SSR), Tailwind CSS v4, and Supabase for waitlist signups. Implementation follows a bottom-up approach: shared schemas and data layer first, then middleware, then layout/routing, then page sections, and finally campaign pages.
+Build the SureWaka marketing landing page inside `apps/landing` using React Router v7 (SSR), Tailwind CSS v4, and NeonDB (Drizzle) for waitlist signups. Implementation follows a bottom-up approach: shared schemas and data layer first, then middleware, then layout/routing, then page sections, and finally campaign pages.
 
 ## Tasks
 
@@ -87,9 +87,9 @@ Build the SureWaka marketing landing page inside `apps/landing` using React Rout
     - Use `useNavigation()` for loading/submitting state on the button
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-  - [x] 5.4 Create `apps/landing/app/lib/supabase.server.ts`
-    - Import `createServiceClient` from `@surewaka/supabase`
-    - Export `getSupabaseAdmin()` helper function
+  - [x] 5.4 Create `apps/landing/app/lib/db.server.ts`
+    - Import `getClerkClient` from `@surewaka/db`
+    - Export `db (from @surewaka/db)` helper function
     - _Requirements: 5.6_
 
 - [x] 6. Implement home page sections
@@ -128,14 +128,14 @@ Build the SureWaka marketing landing page inside `apps/landing` using React Rout
 
   - [x] 6.6 Add Waitlist section with form action
     - Render `<WaitlistSection>` containing `<WaitlistForm source="home" />`
-    - Implement `action` function in home route: parse form data with `waitlistSignupSchema`, insert into Supabase `waitlist_signups` table, return success/error `ActionData`
+    - Implement `action` function in home route: parse form data with `waitlistSignupSchema`, insert into NeonDB `waitlist_signups` table, return success/error `ActionData`
     - Handle duplicate email (unique constraint) with user-friendly error message
-    - Handle Supabase connection failures with generic error + server-side logging
+    - Handle DB connection failures with generic error + server-side logging
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6_
 
   - [x] 6.7 Write property test for waitlist form action (Property 1)
     - **Property 1: Waitlist signup data persistence round-trip**
-    - Generate valid signups (fullName 2–100 chars, valid emails, random userType). Mock Supabase insert. Verify stored record matches submitted data.
+    - Generate valid signups (fullName 2–100 chars, valid emails, random userType). Mock db.insert call. Verify stored record matches submitted data.
     - **Validates: Requirements 5.3, 5.6**
 
 - [x] 7. Checkpoint - Verify home page renders correctly

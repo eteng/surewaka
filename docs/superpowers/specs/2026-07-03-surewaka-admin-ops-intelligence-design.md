@@ -162,7 +162,7 @@ The live nerve center. Replaces the current 4-stat-card dashboard. Answers: *"Wh
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  LIVE KPI BAR  (5 cards, Supabase Realtime, 30s refresh) │
+│  LIVE KPI BAR  (5 cards, Ably, 30s refresh) │
 ├──────────────────────────────┬──────────────────────────┤
 │                              │                          │
 │   LIVE DELIVERY MAP          │   ALERT FEED             │
@@ -221,7 +221,7 @@ Not a full delivery table — only surfaces legs/deliveries that need action.
 
 ### Alert Feed
 
-Right panel. Chronological, most recent on top. Updates via Supabase Realtime on `alerts` table inserts.
+Right panel. Chronological, most recent on top. Updates via Ably on `alerts` table inserts.
 
 | Severity | Visual | Routing |
 |---|---|---|
@@ -406,7 +406,7 @@ Worker: workers/alert-engine — 60s polling loop
   → escalates in place when threshold crosses from warning → critical
   → sets resolved_at when condition clears
 
-Realtime: Supabase broadcasts alerts table changes → Ops Hub feed
+Realtime: Ably broadcasts alerts table changes → Ops Hub feed
 Push: send-push worker (built in Spec 3)
 Pumble: outbound HTTP POST to webhook per Critical alert row
 ```

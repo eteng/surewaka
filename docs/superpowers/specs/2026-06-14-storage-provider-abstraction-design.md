@@ -6,7 +6,7 @@
 
 ## Context
 
-SureWaka currently calls Supabase Storage directly in two places — `apps/api/src/lib/storage.ts` (stub, never wired) and `apps/api/src/services/profile-service.ts` (live avatar upload). The goal is to reduce Supabase lock-in by moving storage to purpose-fit providers while keeping the codebase decoupled from any specific vendor.
+SureWaka currently calls Cloudinary/R2 directly in two places — `apps/api/src/lib/storage.ts` (stub, never wired) and `apps/api/src/services/profile-service.ts` (live avatar upload). The goal is to move storage to purpose-fit providers by moving storage to purpose-fit providers while keeping the codebase decoupled from any specific vendor.
 
 ## Decision
 
@@ -84,7 +84,7 @@ Callers import the singleton — never import Cloudinary or AWS SDK directly.
 
 ### profile-service.ts changes
 
-`generateAvatarPath()` is removed. The Supabase URL-parsing block (`split('/storage/v1/object/public/avatars/')`) is removed.
+`generateAvatarPath()` is removed. The URL-parsing block (`split('/storage/v1/object/public/avatars/')`) is removed.
 
 Upload flow becomes:
 ```typescript
@@ -100,7 +100,7 @@ Delete flow becomes:
 await avatarStorage.delete(`avatars/${userId}`)
 ```
 
-`createServiceClient()` import is retained — still needed for `syncAvatarMetadata` (Supabase Auth, not storage).
+`getClerkClient()` import is retained — still needed for `syncAvatarMetadata` (Clerk, not storage).
 
 ## Error Handling
 
@@ -138,5 +138,5 @@ R2_BUCKET=surewaka-private
 
 - KYC document upload routes (not yet built — R2 provider is ready, routes come later)
 - Delivery photo upload routes (same)
-- Migrating existing Supabase-stored avatars (users re-upload naturally; old URLs stay valid until Supabase bucket is decommissioned)
-- Moving auth off Supabase (separate decision)
+- Migrating existing Supabase-stored avatars (users re-upload naturally; old URLs stay valid while CDN cache exists)
+- Auth migration to Clerk is complete

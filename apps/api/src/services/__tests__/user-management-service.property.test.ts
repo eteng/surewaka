@@ -1,7 +1,7 @@
 // Feature: admin-user-management
 // Property 1: Invitation creates correct user and role records
 // Property 2: Duplicate email invitation is rejected
-// Property 4: Failed Supabase invitation creates no records
+// Property 4: Failed Clerk invitation creates no records
 // Property 9: Update preserves unmodified fields and sets updated_at
 // Property 10: Update validation rejects invalid inputs
 // Property 11: Update rejects duplicate email or phone
@@ -25,7 +25,7 @@ let transactionCalled = false;
 let transactionCallback: ((tx: unknown) => Promise<unknown>) | null = null;
 let assignRoleCalls: unknown[] = [];
 let assignRoleResult: unknown = { data: null, error: null, meta: null };
-let supabaseInviteResult: { error: unknown } = { error: null };
+let clerkInviteResult: { error: unknown } = { error: null };
 let rolesSelectResult: unknown[] = [];
 let carriersSelectResult: unknown[] = [];
 let listEmployeesResult: unknown[] = [];
@@ -43,7 +43,7 @@ let selectSequenceIndex = 0;
 let txUpdateCalls: { table: unknown; setData: unknown; whereArgs: unknown }[] = [];
 let txInsertCalls: { table: unknown; values: unknown }[] = [];
 let deactivateActiveRoles: unknown[] = [];
-let supabaseUpdateUserResult: { error: unknown } = { error: null };
+let clerkUpdateUserResult: { error: unknown } = { error: null };
 
 // Audit log-specific mock state
 let auditLogSelectResult: unknown[] = [];
@@ -207,8 +207,8 @@ vi.mock('@surewaka/auth', () => ({
   getClerkClient: () => ({
     invitations: {
       createInvitation: async (_data?: unknown) => {
-        if (supabaseInviteResult.error) {
-          throw new Error((supabaseInviteResult.error as { message: string }).message);
+        if (clerkInviteResult.error) {
+          throw new Error((clerkInviteResult.error as { message: string }).message);
         }
       },
     },
@@ -292,7 +292,7 @@ describe('User Management Service — Property Tests', () => {
     transactionCallback = null;
     assignRoleCalls = [];
     assignRoleResult = { data: { id: crypto.randomUUID(), isActive: true }, error: null, meta: null };
-    supabaseInviteResult = { error: null };
+    clerkInviteResult = { error: null };
     rolesSelectResult = [];
     carriersSelectResult = [];
     listEmployeesResult = [];
@@ -306,7 +306,7 @@ describe('User Management Service — Property Tests', () => {
     txUpdateCalls = [];
     txInsertCalls = [];
     deactivateActiveRoles = [];
-    supabaseUpdateUserResult = { error: null };
+    clerkUpdateUserResult = { error: null };
     auditLogSelectResult = [];
     auditLogCountResult = [{ total: 0 }];
   });
@@ -321,7 +321,7 @@ describe('User Management Service — Property Tests', () => {
           dbSelectResult = []; // No existing user
           assignRoleCalls = [];
           transactionCalled = false;
-          supabaseInviteResult = { error: null };
+          clerkInviteResult = { error: null };
 
           const result = await inviteEmployee(params as InviteEmployeeParams);
 
@@ -346,7 +346,7 @@ describe('User Management Service — Property Tests', () => {
           dbSelectResult = []; // No existing user
           assignRoleCalls = [];
           transactionCalled = false;
-          supabaseInviteResult = { error: null };
+          clerkInviteResult = { error: null };
 
           const result = await inviteEmployee(params as InviteEmployeeParams);
 
@@ -408,8 +408,8 @@ describe('User Management Service — Property Tests', () => {
             assignRoleCalls = [];
             transactionCalled = false;
 
-            // Supabase invitation fails
-            supabaseInviteResult = {
+            // Clerk invitation fails
+            clerkInviteResult = {
               error: { message: errorMessage, status: 500 },
             };
 

@@ -5,8 +5,8 @@ Implementation order: schema → validators → store → screen → layout wiri
 ---
 
 - [x] 1. **DB migration** — alter `deliveries` table: add `recipient_name` (text not null default ''), `recipient_phone` (text not null default ''), `delivery_notes` (text nullable), `sender_phone` (text nullable); then drop the defaults from `recipient_name` and `recipient_phone`
-  - Run `supabase migration new add_delivery_contact_fields`
-  - Run `supabase migration fetch --yes` to apply
+  - Run `pnpm db:generate new add_delivery_contact_fields`
+  - Run `pnpm db:generate fetch --yes` to apply
 
 - [x] 2. **Drizzle schema** — add `recipientName`, `recipientPhone`, `deliveryNotes`, `senderPhone` fields to the `deliveries` table definition in `packages/db/src/schema.ts`
 

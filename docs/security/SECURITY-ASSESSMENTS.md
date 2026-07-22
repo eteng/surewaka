@@ -18,7 +18,7 @@ Tracking document for all security reviews, vulnerability assessments, and remed
 |----|----------|---------|--------|-------------|
 | SA-001-1 | **High** | API did not enforce AAL2 (MFA) — admin endpoints accessible with password-only token | ✅ Fixed | Added `requireMfa` middleware to `apps/api/src/middleware/auth.ts`. Apply to admin routes: `app.use('/api/v1/admin/*', requireAuth, requireMfa)` |
 | SA-001-2 | **Medium** | Orphaned unverified MFA factors accumulate in `auth.mfa_factors` | ⚠️ Open | Implement pg_cron job to delete unverified factors older than 24h. SQL: `DELETE FROM auth.mfa_factors WHERE status = 'unverified' AND created_at < NOW() - INTERVAL '24 hours'` |
-| SA-001-3 | **Medium** | No client-side rate limiting on TOTP code entry | ⚠️ Open | Add lockout after 5 consecutive failed verification attempts (disable input for 60s). Supabase server-side rate limiting provides baseline protection. |
+| SA-001-3 | **Medium** | No client-side rate limiting on TOTP code entry | ⚠️ Open | Add lockout after 5 consecutive failed verification attempts (disable input for 60s). Clerk server-side rate limiting provides baseline protection. |
 | SA-001-4 | **Low** | Auth guard is client-side only (SPA) | ✅ Acceptable | By design — SPA routes are empty shells. All data access goes through API which enforces auth server-side. No sensitive data in the client bundle. |
 | SA-001-5 | **Low** | TOTP secret stored in sessionStorage during enrollment | ✅ Acceptable | Tab-scoped, cleared on tab close, cleared after successful verification. If attacker has XSS, session token is already compromised (worse impact). |
 | SA-001-6 | **Info** | No `friendlyName` on MFA factors | ✅ Acceptable | Avoids `mfa_factor_name_conflict` errors. No security impact — factor is still cryptographically bound to user account. |
@@ -26,8 +26,8 @@ Tracking document for all security reviews, vulnerability assessments, and remed
 #### Architecture Notes
 
 - MFA enrollment uses "Resume-or-Create" pattern to handle abandoned enrollments
-- `mfa.unenroll()` requires AAL2 — cannot clean up stale factors at AAL1 (Supabase design constraint)
-- Supabase Auth has built-in rate limiting: ~30 sign-in attempts/hour per IP
+- `mfa.unenroll()` requires AAL2 — cannot clean up stale factors at AAL1 (Clerk design constraint)
+- Clerk has built-in rate limiting: ~30 sign-in attempts/hour per IP
 
 ---
 
@@ -47,8 +47,8 @@ Tracking document for all security reviews, vulnerability assessments, and remed
 
 | Review Type | Frequency | Last Run | Next Due |
 |-------------|-----------|----------|----------|
-| Supabase Security Advisors (`get_advisors`) | After every DDL change | — | — |
-| RLS Policy Audit | Monthly | — | — |
+| NeonDB / Drizzle Schema Review | After every DDL change | — | — |
+| API Authorization Audit (replaces RLS) | Monthly | — | — |
 | Dependency Vulnerability Scan | Weekly (Dependabot) | — | — |
 | Auth Flow Penetration Test | Quarterly | — | — |
 | API Endpoint Authorization Review | Per feature release | 2026-05-14 | — |

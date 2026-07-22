@@ -16,7 +16,7 @@ Customer-facing mobile app for SureWaka. Built with Expo and React Native.
 - **State**: Zustand (auth store, booking store)
 - **Forms**: react-hook-form + Zod resolver
 - **Validation**: Zod schemas from `@surewaka/shared`
-- **Auth**: Supabase phone OTP
+- **Auth**: Clerk phone OTP (`@clerk/expo`)
 - **Theme**: ThemeProvider with light/dark mode support
 
 ## Development
@@ -79,9 +79,8 @@ app/
 ## Shared Code
 
 - **Theme**: `packages/mobile-shared/src/theme.tsx` — ThemeProvider, light/dark tokens
-- **Auth store**: `packages/mobile-shared/src/store/auth-store.ts` — Zustand + Supabase
+- **Auth store**: `packages/mobile-shared/src/store/auth-store.ts` — Zustand + Clerk
 - **Booking store**: `packages/mobile-shared/src/store/booking-store.ts` — Multi-step form state
-- **Supabase client**: `packages/mobile-shared/src/supabase.ts` — Mobile client with AsyncStorage
 - **Validators**: `packages/shared/src/validators.ts` — Zod schemas (phoneOtp, otpVerify, package, etc.)
 
 ## Related

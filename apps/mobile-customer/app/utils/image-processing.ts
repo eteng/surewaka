@@ -53,7 +53,7 @@ export async function processAvatarImage(uri: string): Promise<{
   image.release();
 
   // Fetch the processed image file and convert to ArrayBuffer
-  // (Supabase Storage on React Native doesn't handle Blob correctly)
+  // (Cloudinary upload requires ArrayBuffer, not Blob, on React Native)
   const response = await fetch(result.uri);
   const arrayBuffer = await response.arrayBuffer();
 

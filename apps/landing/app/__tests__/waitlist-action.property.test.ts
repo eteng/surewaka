@@ -4,13 +4,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as fc from 'fast-check';
 
-// Mock the supabase.server module before importing the action
-vi.mock('~/lib/supabase.server', () => ({
-  getSupabaseAdmin: vi.fn(),
+const mockDbInsert = vi.fn();
+
+vi.mock('@surewaka/db', () => ({
+  db: {
+    insert: (...args: unknown[]) => mockDbInsert(...args),
+  },
+  waitlistSignups: 'waitlist_signups',
 }));
 
 import { action } from '../routes/home';
-import { getSupabaseAdmin } from '~/lib/supabase.server';
 
 describe('Waitlist Form Action — Property Tests', () => {
   /**
@@ -36,26 +39,21 @@ describe('Waitlist Form Action — Property Tests', () => {
   }
 
   /**
-   * Helper: set up the Supabase mock and return a reference to capture insert data.
+   * Helper: set up the db mock and return a reference to capture insert values.
    */
-  function setupSupabaseMock() {
-    let capturedData: Record<string, unknown> | null = null;
+  function setupDbMock() {
+    let capturedValues: Record<string, unknown> | null = null;
 
-    const mockInsert = vi.fn().mockImplementation((data: Record<string, unknown>) => {
-      capturedData = data;
-      return Promise.resolve({ error: null });
+    const mockValues = vi.fn().mockImplementation((data: Record<string, unknown>) => {
+      capturedValues = data;
+      return Promise.resolve([]);
     });
 
-    const mockFrom = vi.fn().mockReturnValue({ insert: mockInsert });
-
-    vi.mocked(getSupabaseAdmin).mockReturnValue({
-      from: mockFrom,
-    } as unknown as ReturnType<typeof getSupabaseAdmin>);
+    mockDbInsert.mockReturnValue({ values: mockValues });
 
     return {
-      getCapturedData: () => capturedData,
-      mockFrom,
-      mockInsert,
+      getCapturedValues: () => capturedValues,
+      mockValues,
     };
   }
 
@@ -67,8 +65,6 @@ describe('Waitlist Form Action — Property Tests', () => {
     .filter((s) => s.trim().length >= 2);
 
   // Custom email generator that produces emails Zod's validator will accept.
-  // Zod rejects some RFC-valid emails (e.g., those with ! or leading dots in local part).
-  // We generate safe alphanumeric local parts with optional dots (not leading/trailing/consecutive).
   const emailArb = fc
     .tuple(
       fc.stringMatching(/^[a-z][a-z0-9]{0,15}(\.[a-z][a-z0-9]{0,7})?$/),
@@ -83,13 +79,13 @@ describe('Waitlist Form Action — Property Tests', () => {
   // Property 1: Waitlist signup data persistence round-trip
   // For any valid waitlist signup (fullName of 2–100 chars, well-formed email,
   // userType in {sender, business, driver}), submitting the form action SHALL
-  // successfully store the data in Supabase and the stored record SHALL contain
+  // successfully store the data in the database and the stored record SHALL contain
   // the same fullName, email, and userType that were submitted.
   /**
    * **Validates: Requirements 5.3, 5.6**
    */
   describe('Property 1: Waitlist signup data persistence round-trip', () => {
-    it('valid signup data is persisted correctly to Supabase', async () => {
+    it('valid signup data is persisted correctly to the database', async () => {
       await fc.assert(
         fc.asyncProperty(
           fullNameArb,
@@ -98,7 +94,7 @@ describe('Waitlist Form Action — Property Tests', () => {
           sourceArb,
           async (fullName, email, userType, source) => {
             // Set up fresh mock for each iteration
-            const { getCapturedData, mockFrom } = setupSupabaseMock();
+            const { getCapturedValues, mockValues } = setupDbMock();
 
             const request = createFormRequest({ fullName, email, userType, source });
 
@@ -114,16 +110,19 @@ describe('Waitlist Form Action — Property Tests', () => {
             // The action should succeed for valid data
             expect(actionResult.success).toBe(true);
 
-            // Verify Supabase was called with the correct table
-            expect(mockFrom).toHaveBeenCalledWith('waitlist_signups');
+            // Verify db.insert was called with the waitlist table
+            expect(mockDbInsert).toHaveBeenCalledWith('waitlist_signups');
 
-            // Verify the stored record matches submitted data (round-trip)
-            const capturedData = getCapturedData();
-            expect(capturedData).not.toBeNull();
-            expect(capturedData!.full_name).toBe(fullName);
-            expect(capturedData!.email).toBe(email);
-            expect(capturedData!.user_type).toBe(userType);
-            expect(capturedData!.source).toBe(source);
+            // Verify values were called once
+            expect(mockValues).toHaveBeenCalledOnce();
+
+            // Verify the stored record matches submitted data (round-trip, camelCase keys)
+            const capturedValues = getCapturedValues();
+            expect(capturedValues).not.toBeNull();
+            expect(capturedValues!.fullName).toBe(fullName);
+            expect(capturedValues!.email).toBe(email);
+            expect(capturedValues!.userType).toBe(userType);
+            expect(capturedValues!.source).toBe(source);
           },
         ),
         { numRuns: 100 },

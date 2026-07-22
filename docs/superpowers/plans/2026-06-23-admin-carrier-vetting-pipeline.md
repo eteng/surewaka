@@ -13,7 +13,7 @@
 ## File Map
 
 **New files:**
-- `supabase/migrations/20260623000001_carrier_vetting_pipeline.sql`
+- `drizzle/migrations/20260623000001_carrier_vetting_pipeline.sql`
 - `apps/api/src/routes/admin/carriers.ts`
 - `apps/api/src/routes/carrier-applications.ts` — public submission endpoint
 - `apps/api/src/services/carrier-vetting-service.ts`
@@ -41,12 +41,12 @@
 ## Task 1: Schema Migration
 
 **Files:**
-- Create: `supabase/migrations/20260623000001_carrier_vetting_pipeline.sql`
+- Create: `drizzle/migrations/20260623000001_carrier_vetting_pipeline.sql`
 
 - [ ] **Step 1.1: Write the migration file**
 
 ```sql
--- supabase/migrations/20260623000001_carrier_vetting_pipeline.sql
+-- drizzle/migrations/20260623000001_carrier_vetting_pipeline.sql
 
 -- ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ CREATE TYPE carrier_member_action AS ENUM (
 
 -- carrier_staff is added to the existing carrier_member_role enum.
 -- ALTER TYPE ... ADD VALUE cannot run inside a transaction block in PG < 12;
--- Supabase runs migrations outside a transaction, so this is safe.
+-- Drizzle migrations run outside a transaction, so this is safe.
 ALTER TYPE carrier_member_role ADD VALUE IF NOT EXISTS 'carrier_staff';
 
 -- ── carrier_applications ───────────────────────────────────────────────────────
@@ -175,7 +175,7 @@ ALTER TABLE carriers
 - [ ] **Step 1.2: Apply migration locally**
 
 ```bash
-npx supabase migration up
+npx pnpm db:generate up
 ```
 
 Expected: migration applies cleanly, no errors.
@@ -183,7 +183,7 @@ Expected: migration applies cleanly, no errors.
 - [ ] **Step 1.3: Regenerate schema**
 
 ```bash
-pnpm --filter @surewaka/db db:pull
+pnpm --filter @surewaka/db db:generate + db:migrate
 ```
 
 Expected: `packages/db/src/schema.ts` updates with new tables and enum values. Do not hand-edit this file.
@@ -199,7 +199,7 @@ Expected: both packages build with zero errors.
 - [ ] **Step 1.5: Commit**
 
 ```bash
-git add supabase/migrations/20260623000001_carrier_vetting_pipeline.sql packages/db/src/schema.ts
+git add drizzle/migrations/20260623000001_carrier_vetting_pipeline.sql packages/db/src/schema.ts
 git commit -m "feat(db): add carrier vetting pipeline tables and enums"
 ```
 

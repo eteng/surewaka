@@ -2,15 +2,15 @@
 
 ## Overview
 
-This feature adds client-side avatar upload and display to the SureWaka mobile customer app. Users select or capture an image via `expo-image-picker`, which is resized to 256×256 and compressed to JPEG 80% quality on-device. The processed image is uploaded directly from the client to Supabase Storage (bypassing the API server), and the resulting public URL is persisted in the `users.avatar_url` column. Avatar display uses `expo-image` with disk/memory caching and cache-busting via a timestamp query parameter.
+This feature adds client-side avatar upload and display to the SureWaka mobile customer app. Users select or capture an image via `expo-image-picker`, which is resized to 256×256 and compressed to JPEG 80% quality on-device. The processed image is uploaded directly from the client to Cloudinary/R2 (bypassing the API server), and the resulting public URL is persisted in the `users.avatar_url` column. Avatar display uses `expo-image` with disk/memory caching and cache-busting via a timestamp query parameter.
 
-The feature integrates into the existing `useCustomerProfile` hook by adding `avatarUrl` to `CustomerProfile` and exposing `updateAvatar` / `removeAvatar` mutation methods. A new Supabase migration creates the `avatars` storage bucket with public read access and user-scoped write RLS policies.
+The feature integrates into the existing `useCustomerProfile` hook by adding `avatarUrl` to `CustomerProfile` and exposing `updateAvatar` / `removeAvatar` mutation methods. A new Drizzle migration creates the `avatars` storage bucket with public read access and user-scoped write RLS policies.
 
 ### Design Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Upload path | Client → Supabase Storage directly | Avoids API round-trip for large binary payloads; RLS enforces security |
+| Upload path | Client → Cloudinary/R2 directly | Avoids API round-trip for large binary payloads; RLS enforces security |
 | Image processing | Client-side resize + compress | Reduces upload size and ensures consistent dimensions |
 | Storage path | `{user_id}/avatar.jpg` (overwrite) | Single file per user, upsert avoids orphan cleanup |
 | Cache invalidation | Timestamp query param (`?t=...`) | Simple, no CDN purge needed; `expo-image` treats distinct URLs as distinct cache entries |
@@ -27,7 +27,7 @@ flowchart TD
         B -->|Remove Photo| E[removeAvatar]
         C --> F[Resize & Compress]
         D --> F
-        F --> G[Upload to Supabase Storage]
+        F --> G[Upload to Cloudinary/R2]
         G --> H[Update users.avatar_url]
         H --> I[Update local state]
         E --> J[Delete from Storage]
@@ -35,7 +35,7 @@ flowchart TD
         K --> I
     end
 
-    subgraph Supabase
+    subgraph NeonDB
         L[(users table)]
         M[(avatars bucket)]
         G -->|PUT {uid}/avatar.jpg| M
@@ -56,7 +56,7 @@ flowchart TD
 1. User taps avatar → Action Sheet presented
 2. User selects source → `expo-image-picker` launches (library or camera)
 3. Picker returns local URI → client resizes to 256×256, compresses to JPEG 80%
-4. Client uploads blob to `supabase.storage.from('avatars').upload('{uid}/avatar.jpg', blob, { upsert: true })`
+4. Client uploads blob to `cloudinary.upload from('avatars').upload('{uid}/avatar.jpg', blob, { upsert: true })`
 5. On success → build public URL with `?t={timestamp}` → update `users.avatar_url`
 6. Local profile state updated optimistically → UI re-renders with new image
 
@@ -126,7 +126,7 @@ Handles:
 - Compress to JPEG 80% quality
 - Return as Blob ready for upload
 
-### 5. Supabase Storage migration
+### 5. Cloudinary/R2 migration
 
 New migration file creating the `avatars` bucket with:
 - Public bucket (readable without auth)
@@ -143,7 +143,7 @@ The `avatar_url` TEXT column already exists on the `users` table. No schema migr
 avatar_url TEXT | nullable | stores the public URL with cache-bust param
 ```
 
-Example value: `https://royfgnaiiexvpxapmcdh.supabase.co/storage/v1/object/public/avatars/{uid}/avatar.jpg?t=1719500000`
+Example value: `https://res.cloudinary.com/surewaka/image/upload/avatars/{uid}/avatar.jpg?t=1719500000`
 
 ### Storage bucket: `avatars`
 
@@ -237,12 +237,12 @@ export type CustomerProfile = {
 | Permission denied (camera/library) | Catch permission status, do not proceed | Toast with message directing to device Settings |
 | Image picker cancelled | Return early, no state change | None (silent) |
 | Image processing fails | Catch error, do not upload | Toast: "Failed to process image. Please try again." |
-| Upload network error | Catch Supabase storage error, do not update DB | Toast: "Upload failed. Check your connection and try again." |
-| DB update fails (after upload) | Catch Supabase DB error; file is in storage but URL not persisted | Toast: "Failed to save avatar. Please try again." (next upload will overwrite the orphaned file) |
+| Upload network error | Catch Cloudinary upload error, do not update DB | Toast: "Upload failed. Check your connection and try again." |
+| DB update fails (after upload) | Catch NeonDB error; file is in storage but URL not persisted | Toast: "Failed to save avatar. Please try again." (next upload will overwrite the orphaned file) |
 | Avatar deletion fails | Catch error, retain current state | Toast: "Failed to remove photo. Please try again." |
 | Image load fails (display) | expo-image `onError` callback | Show 👤 placeholder emoji fallback |
-| File too large (>5MB) | Supabase rejects upload, caught as storage error | Toast: "Image is too large. Please choose a smaller image." |
-| Invalid MIME type | Supabase rejects upload | Toast: "Unsupported image format." |
+| File too large (>5MB) | Cloudinary rejects upload | Toast: "Image is too large. Please choose a smaller image." |
+| Invalid MIME type | Cloudinary rejects upload | Toast: "Unsupported image format." |
 
 ### Error State Recovery
 
@@ -264,7 +264,7 @@ Properties to implement:
 1. Image processing dimension/format constraint
 2. Storage path construction
 3. State preservation on failure/cancel
-4. Upload-fetch round-trip (with mocked Supabase)
+4. Upload-fetch round-trip (with mocked Cloudinary)
 5. Cache-busting URL uniqueness
 6. Optimistic state update
 

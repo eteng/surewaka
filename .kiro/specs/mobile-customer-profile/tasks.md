@@ -15,9 +15,9 @@
     - No-op if no matching row in `public.users`
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-  - [ ] 1.3 Regenerate Drizzle schema  ← apply migrations then run `pnpm --filter @surewaka/db db:pull`
-    - Apply migrations to local/remote DB
-    - Run `pnpm --filter @surewaka/db db:pull` to regenerate `packages/db/src/schema.ts`
+  - [ ] 1.3 Regenerate Drizzle schema  ← edit schema file then generate + migrate
+    - Edit `packages/db/src/schema/users.ts` to add the column
+    - Run `pnpm --filter @surewaka/db db:generate` then `pnpm --filter @surewaka/db db:migrate`
     - _Requirements: 4.3_
 
 - [x] 2. Shared validators
@@ -30,19 +30,14 @@
 
 - [x] 3. Profile hook
   - [x] 3.1 Create `apps/mobile-customer/app/hooks/use-customer-profile.ts`
-    - Import `supabase` from `@surewaka/mobile-shared`
-    - On mount: fetch `public.users` row by `userId` from auth session
-    - On mount: call `supabase.auth.getUser()` to get `new_email` for pending state
-    - Implement `updateName(name)`:
-      - `supabase.from('users').update({ name, updated_at: new Date() }).eq('id', userId)`
-      - On success: `supabase.auth.updateUser({ data: { name } })`
-    - Implement `updateEmail(email)`:
-      - `supabase.auth.updateUser({ email })`
-      - Refresh pending state from `getUser()`
-    - Implement `updateGender(gender)`:
-      - `supabase.from('users').update({ gender, updated_at: new Date() }).eq('id', userId)`
+    - Use Clerk session (`useUser()` from `@clerk/expo`) for auth state
+    - On mount: fetch `public.users` row via `GET /api/v1/profile` using the Clerk session token
+    - On mount: get `new_email` for pending state from Clerk user object
+    - Implement `updateName(name)`: `PATCH /api/v1/profile` with `{ name }`
+    - Implement `updateEmail(email)`: `PATCH /api/v1/profile` with `{ email }` (triggers Clerk email verification)
+    - Implement `updateGender(gender)`: `PATCH /api/v1/profile` with `{ gender }`
     - Implement `updateNotifications({ notificationEmail?, notificationSms? })`:
-      - `supabase.from('users').update({ ...prefs, updated_at: new Date() }).eq('id', userId)`
+      - `PATCH /api/v1/profile` with notification prefs
       - Optimistic update with revert on error
     - _Requirements: 1.1, 2.1, 2.2, 3.1, 3.3, 4.3, 5.2_
 
@@ -77,8 +72,8 @@
 
 ## Notes
 
-- No API layer — all reads/writes use Supabase JS SDK with the user's JWT. See ADR-007.
-- Email sync to `public.users` is handled by the DB trigger, not client code. See ADR-008.
+- All reads/writes go through `apps/api` using the Clerk JWT. ADR-007 (Supabase SDK direct) is superseded.
+- Email sync to `public.users` is handled by Clerk webhooks, not a DB trigger. ADR-008 (Postgres trigger) is superseded.
 - Avatar upload is explicitly deferred — the "Change Photo" button in `edit.tsx` should be removed or shown as disabled/coming-soon.
 - Gender picker implementation: use a bottom sheet modal or `Picker` from `@react-native-picker/picker` — match the existing UI style of the app.
 - `updated_at` must be set manually on every `public.users` update (no DB-level auto-update trigger exists).

@@ -2,12 +2,12 @@
 
 ## Overview
 
-Implement avatar upload and display for the SureWaka mobile customer app. Users can select or capture an image, which is resized to 256×256 JPEG 80% quality, uploaded to Supabase Storage, and displayed on the profile screens using `expo-image` with caching. The implementation follows the existing patterns in `useCustomerProfile` and integrates into the Edit Profile and Profile Tab screens.
+Implement avatar upload and display for the SureWaka mobile customer app. Users can select or capture an image, which is resized to 256×256 JPEG 80% quality, uploaded to Cloudinary/R2, and displayed on the profile screens using `expo-image` with caching. The implementation follows the existing patterns in `useCustomerProfile` and integrates into the Edit Profile and Profile Tab screens.
 
 ## Tasks
 
-- [x] 1. Create Supabase migration for avatars storage bucket
-  - [x] 1.1 Create migration file with `supabase migration new create_avatars_bucket`
+- [x] 1. Create Drizzle migration for avatars storage bucket
+  - [x] 1.1 Create migration file with `pnpm db:generate new create_avatars_bucket`
     - Create the `avatars` storage bucket (public, 5MB limit, allowed MIME types: image/jpeg, image/png, image/webp)
     - Add RLS policies: public SELECT, user-scoped INSERT/UPDATE/DELETE using `auth.uid()::text = (storage.foldername(name))[1]`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
@@ -46,7 +46,7 @@ Implement avatar upload and display for the SureWaka mobile customer app. Users 
 
   - [x] 4.2 Implement `updateAvatar(localUri: string)` method
     - Call `processAvatarImage` to resize/compress
-    - Upload to Supabase Storage at `{user_id}/avatar.jpg` with `upsert: true`
+    - Upload to Cloudinary/R2 at `{user_id}/avatar.jpg` with `upsert: true`
     - On success, build public URL with `?t={Date.now()}` cache-bust param
     - Update `users.avatar_url` in the database
     - Update local profile state optimistically (no refetch needed)
@@ -68,7 +68,7 @@ Implement avatar upload and display for the SureWaka mobile customer app. Users 
 
   - [ ]* 4.5 Write property test: upload-then-fetch round-trip
     - **Property 4: Upload-then-fetch round-trip**
-    - Use `fast-check` with mocked Supabase to verify `avatarUrl` contains `{user_id}/avatar.jpg` after upload
+    - Use `fast-check` with mocked Cloudinary to verify `avatarUrl` contains `{user_id}/avatar.jpg` after upload
     - **Validates: Requirements 2.3, 6.5**
 
   - [ ]* 4.6 Write property test: cache-busting URL uniqueness
@@ -129,5 +129,5 @@ Implement avatar upload and display for the SureWaka mobile customer app. Users 
 - Checkpoints ensure incremental validation
 - Property tests use `fast-check` and validate universal correctness properties from the design
 - Unit tests validate specific examples and edge cases
-- The Supabase migration must be applied manually (or via CI) — the task creates the SQL file only
+- The Drizzle migration must be applied manually (or via CI) — the task creates the SQL file only
 - `expo-image-manipulator` is needed for image processing — verify it's installed or add it

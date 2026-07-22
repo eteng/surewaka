@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace direct Supabase Storage calls with a provider abstraction — Cloudinary for public images (avatars) and Cloudflare R2 for private documents (KYC, delivery photos).
+**Goal:** Replace direct Cloudinary/R2 calls with a provider abstraction — Cloudinary for public images (avatars) and Cloudflare R2 for private documents (KYC, delivery photos).
 
 **Architecture:** Provider interface types live in `packages/shared/src/storage.ts`; Cloudinary and R2 implementations live in `apps/api/src/lib/storage/`; a singleton index exports `avatarStorage` and `documentStorage`. `profile-service.ts` is the only live storage caller today — `apps/api/src/lib/storage.ts` (the old stub) is deleted.
 
@@ -22,11 +22,11 @@
 
 **Modify:**
 - `packages/shared/src/index.ts` — add `export * from './storage'`
-- `apps/api/src/services/profile-service.ts` — swap Supabase storage for `avatarStorage`
+- `apps/api/src/services/profile-service.ts` — swap deprecated storage for `avatarStorage`
 - `apps/api/package.json` — add three new deps
 - `.env.example` — add Cloudinary + R2 env vars
 - `CLAUDE.md` — mark storage as done, update packages table
-- `.kiro/steering/project-context.md` — update `packages/supabase` description
+- `.kiro/steering/project-context.md` — update `packages/db` description
 
 **Delete:**
 - `apps/api/src/lib/storage.ts` — superseded; functions were never wired to any route
@@ -48,7 +48,7 @@ In `apps/api/package.json`, update the `"dependencies"` block to add:
   "@hono/node-server": "^1.13.0",
   "@surewaka/shared": "workspace:*",
   "@surewaka/db": "workspace:*",
-  "@surewaka/supabase": "workspace:*",
+  "@surewaka/db": "workspace:*",
   "drizzle-orm": "^0.45.2",
   "zod": "^3.23.0",
   "cloudinary": "^2.5.1",
@@ -626,7 +626,7 @@ git rm apps/api/src/lib/storage.ts
 Find this block (lines 6–16 in `apps/api/src/services/profile-service.ts`):
 
 ```typescript
-import { createServiceClient } from '@surewaka/supabase';
+import { getClerkClient } from '@surewaka/db';
 import {
   ALLOWED_AVATAR_EXTENSIONS,
   ALLOWED_AVATAR_TYPES,
@@ -639,7 +639,7 @@ import {
 Replace with:
 
 ```typescript
-import { createServiceClient } from '@surewaka/supabase';
+import { getClerkClient } from '@surewaka/db';
 import {
   ALLOWED_AVATAR_TYPES,
   MAX_AVATAR_SIZE_BYTES,
@@ -781,7 +781,7 @@ Expected: all tests pass including the new storage tests.
 
 ```bash
 git add apps/api/src/services/profile-service.ts
-git commit -m "feat(api): swap Supabase storage for Cloudinary avatarStorage in profile-service"
+git commit -m "feat(api): swap deprecated storage for Cloudinary avatarStorage in profile-service"
 ```
 
 ---
@@ -844,27 +844,27 @@ In `CLAUDE.md`, find the Current State block and add a new checked item after `[
 Find this row in the monorepo table:
 
 ```
-| `packages/supabase` | Supabase client (auth, storage, realtime) | — |
+| `packages/db` | Drizzle client (auth, storage, realtime) | — |
 ```
 
 Replace with:
 
 ```
-| `packages/supabase` | Supabase client (auth, realtime — storage is Cloudinary/R2 via `apps/api/src/lib/storage/`) | — |
+| `packages/db` | Drizzle client (auth, realtime — storage is Cloudinary/R2 via `apps/api/src/lib/storage/`) | — |
 ```
 
 - [ ] **Step 3: Update .kiro/steering/project-context.md**
 
-Find the `packages/supabase` row in the monorepo structure table:
+Find the `packages/db` row in the monorepo structure table:
 
 ```
-| `packages/supabase` | Supabase client (auth, storage, realtime) |
+| `packages/db` | Drizzle client (auth, storage, realtime) |
 ```
 
 Replace with:
 
 ```
-| `packages/supabase` | Supabase client (auth and realtime only — file storage handled by Cloudinary/R2 via `apps/api/src/lib/storage/`) |
+| `packages/db` | Drizzle client (auth and realtime only — file storage handled by Cloudinary/R2 via `apps/api/src/lib/storage/`) |
 ```
 
 - [ ] **Step 4: Commit**

@@ -4,9 +4,9 @@
 
 **Goal:** Replace the basic 4-stat `/dashboard` with a live operations command center — 5 real-time KPI cards, a colour-coded delivery map, an at-risk delivery list, and a severity-ranked alert feed.
 
-**Architecture:** The dashboard splits into three zones (KPI bar, map+at-risk list, alert feed). Two new API endpoints serve aggregated data (`/admin/ops-hub/stats` and `/admin/alerts`). The admin polls stats every 30 s via a custom `useOpsHub` hook using `useAuth` + `fetch` (matching the existing pattern in `use-deliveries.ts`). The alert feed subscribes to Supabase Realtime on the `alerts` table INSERT events (alerts table is created in Spec 3; until then the feed shows an empty state). The delivery map reuses the existing `delivery-map.tsx` component. Status colours always pair icon + colour + text — never colour alone.
+**Architecture:** The dashboard splits into three zones (KPI bar, map+at-risk list, alert feed). Two new API endpoints serve aggregated data (`/admin/ops-hub/stats` and `/admin/alerts`). The admin polls stats every 30 s via a custom `useOpsHub` hook using `useAuth` + `fetch` (matching the existing pattern in `use-deliveries.ts`). The alert feed subscribes to Ably on the `alerts` table INSERT events (alerts table is created in Spec 3; until then the feed shows an empty state). The delivery map reuses the existing `delivery-map.tsx` component. Status colours always pair icon + colour + text — never colour alone.
 
-**Tech Stack:** React Router v7 SPA, React 19, shadcn/ui (Tailwind v4), Lucide React, Clerk auth (`useAuth`), Supabase JS client (`@surewaka/supabase`), Hono API, Drizzle ORM, TypeScript strict
+**Tech Stack:** React Router v7 SPA, React 19, shadcn/ui (Tailwind v4), Lucide React, Clerk auth (`useAuth`), Drizzle client (`@surewaka/db`), Hono API, Drizzle ORM, TypeScript strict
 
 ## Global Constraints
 

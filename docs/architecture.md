@@ -22,11 +22,11 @@ SureWaka is a logistics marketplace built as a TypeScript monorepo. The system c
           ┌──────────────┼──────────────┐
           │              │              │
     ┌─────▼─────┐ ┌─────▼─────┐ ┌─────▼─────┐
-    │ Supabase  │ │   Redis   │ │  Workers  │
-    │ Postgres  │ │ (BullMQ)  │ │ (BullMQ)  │
-    │ Auth      │ └───────────┘ └───────────┘
-    │ Storage   │                     │
-    │ Realtime  │              ┌──────┼──────┐
+    │  NeonDB   │ │   Redis   │ │  Workers  │
+    │ (Postgres)│ │ (BullMQ)  │ │ (BullMQ)  │
+    │  Clerk    │ └───────────┘ └───────────┘
+    │Cloudinary │                     │
+    │   Ably    │              ┌──────┼──────┐
     └───────────┘              │      │      │
                             Email  Payment  Agent
 ```
@@ -41,7 +41,7 @@ SureWaka is a logistics marketplace built as a TypeScript monorepo. The system c
 ## Key Design Decisions
 
 - **Modular monolith API** — single Hono server, split into route modules. No microservices until proven necessary.
-- **Supabase as backend services** — Postgres + Auth + Storage + Realtime from one provider. Drizzle ORM for queries (not PostgREST).
+- **Separate best-of-breed services** — NeonDB (Postgres), Clerk (auth), Cloudinary/R2 (storage), Ably (realtime). Drizzle ORM for all DB queries.
 - **Workers for async** — anything that doesn't need to block a request goes through BullMQ (emails, matching, payments).
 - **SSR for customer-facing** — Nigerian networks are unreliable; server-rendered pages load faster on 3G.
 - **SPA for admin** — internal tool, always on good network, no SEO needed.

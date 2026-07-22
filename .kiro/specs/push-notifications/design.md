@@ -37,7 +37,7 @@ Push notifications for SureWaka's mobile applications (customer and driver), ena
             │                      │                          │
             ▼                      ▼                          ▼
 ┌────────────────────┐   ┌────────────────────┐   ┌────────────────────┐
-│   Supabase PG      │   │     Redis          │   │     Redis          │
+│   NeonDB      │   │     Redis          │   │     Redis          │
 │   (push_tokens)    │   │  (push:queue)      │   │  (push:queue)      │
 └────────────────────┘   └─────────┬──────────┘   └────────────────────┘
                                    │
@@ -583,7 +583,7 @@ EXPO_PUBLIC_EAS_PROJECT_ID=92aac293-ebd9-41a4-ba22-9694655e91bb
 
 | New File | Package | Purpose | Requirements |
 |----------|---------|---------|-------------|
-| `supabase/migrations/XXX_push_tokens.sql` | infra | DB migration | 1.3, 2.3, 4.1, 10.1 |
+| `drizzle/migrations/XXX_push_tokens.sql` | infra | DB migration | 1.3, 2.3, 4.1, 10.1 |
 | `packages/shared/src/types.ts` (additions) | shared | Push types | 9.1 |
 | `packages/shared/src/validators.ts` (additions) | shared | Zod schemas | 1.7, 7.4, 9.5 |
 | `packages/shared/src/constants.ts` (additions) | shared | Push constants | 9.3, 10.2-10.6 |

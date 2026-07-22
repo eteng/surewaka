@@ -21,12 +21,12 @@ let transactionCalled = false;
 let transactionRolledBack = false;
 let assignRoleCalls: unknown[] = [];
 let assignRoleResult: unknown = { data: null, error: null, meta: null };
-let supabaseInviteResult: { error: unknown } = { error: null };
+let clerkInviteResult: { error: unknown } = { error: null };
 let rolesSelectResult: unknown[] = [];
 let carriersSelectResult: unknown[] = [];
 let txInsertCalls: { table: unknown; values: unknown }[] = [];
 let txUpdateCalls: { table: unknown; setData: unknown; whereArgs: unknown }[] = [];
-let supabaseUpdateUserResult: { error: unknown } = { error: null };
+let clerkUpdateUserResult: { error: unknown } = { error: null };
 let syncRolesToAuthCalls: string[] = [];
 
 // Track whether user record was persisted (for atomicity verification)
@@ -192,14 +192,14 @@ vi.mock('@surewaka/auth', () => ({
   getClerkClient: () => ({
     invitations: {
       createInvitation: async (_data?: unknown) => {
-        if (supabaseInviteResult.error) {
-          throw new Error(supabaseInviteResult.error.message);
+        if (clerkInviteResult.error) {
+          throw new Error(clerkInviteResult.error.message);
         }
       },
     },
     users: {
       updateUserMetadata: (_userId: string, _data?: unknown) => {
-        return Promise.resolve(supabaseUpdateUserResult);
+        return Promise.resolve(clerkUpdateUserResult);
       },
     },
   }),
@@ -233,12 +233,12 @@ beforeEach(() => {
   transactionRolledBack = false;
   assignRoleCalls = [];
   assignRoleResult = { data: { id: 'role-1' }, error: null, meta: null };
-  supabaseInviteResult = { error: null };
+  clerkInviteResult = { error: null };
   rolesSelectResult = [];
   carriersSelectResult = [];
   txInsertCalls = [];
   txUpdateCalls = [];
-  supabaseUpdateUserResult = { error: null };
+  clerkUpdateUserResult = { error: null };
   syncRolesToAuthCalls = [];
   userRecordCreated = false;
   roleRecordCreated = false;
@@ -254,7 +254,7 @@ describe('User Management Routes — Integration Tests', () => {
     it('when email already exists, returns CONFLICT without sending invitation', async () => {
       // Setup: email already exists in DB
       dbSelectResult = [{ id: 'existing-user-id' }];
-      supabaseInviteResult = { error: null };
+      clerkInviteResult = { error: null };
 
       const result = await inviteEmployee({
         email: 'existing@example.com',
@@ -281,7 +281,7 @@ describe('User Management Routes — Integration Tests', () => {
       dbSelectResult = [];
 
       // Force Clerk invite to throw
-      supabaseInviteResult = { error: { message: 'Email service unavailable' } };
+      clerkInviteResult = { error: { message: 'Email service unavailable' } };
 
       const result = await inviteEmployee({
         email: 'new@example.com',
@@ -307,7 +307,7 @@ describe('User Management Routes — Integration Tests', () => {
     it('successful invitation sends Clerk invite and returns success (no DB user record created at invite time)', async () => {
       // Setup: email does not exist, Clerk invite succeeds
       dbSelectResult = [];
-      supabaseInviteResult = { error: null };
+      clerkInviteResult = { error: null };
 
       const result = await inviteEmployee({
         email: 'new@example.com',

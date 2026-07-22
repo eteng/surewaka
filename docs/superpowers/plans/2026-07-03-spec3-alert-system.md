@@ -4,15 +4,15 @@
 
 **Goal:** Build a 60-second polling alert engine worker, admin push notification infrastructure, and Pumble webhook routing — all wired to a settings UI at `/settings/alerts` — so critical delivery incidents are never silent.
 
-**Architecture:** A new `workers/alert-engine/` package runs a 60-second `setInterval` polling loop. Each tick evaluates 7 alert rules against the live DB state, writes or escalates rows in the `alerts` table, resolves cleared conditions, and routes Critical alerts to admin Expo push (via the existing push-worker queue) and a Pumble webhook. The admin's alert feed (built in Spec 1) receives alert events via Supabase Realtime subscribed to the `alerts` table. Alert thresholds are stored in a `settings` DB table and exposed via a new admin API route and a `/settings/alerts` UI page.
+**Architecture:** A new `workers/alert-engine/` package runs a 60-second `setInterval` polling loop. Each tick evaluates 7 alert rules against the live DB state, writes or escalates rows in the `alerts` table, resolves cleared conditions, and routes Critical alerts to admin Expo push (via the existing push-worker queue) and a Pumble webhook. The admin's alert feed (built in Spec 1) receives alert events via Ably subscribed to the `alerts` table. Alert thresholds are stored in a `settings` DB table and exposed via a new admin API route and a `/settings/alerts` UI page.
 
 **Tech Stack:** Node 22 (tsx), Drizzle ORM via `@surewaka/db`, BullMQ (for push enqueue), Hono (API routes), React Router v7 (settings UI), shadcn/ui + Tailwind v4 + Lucide React (admin UI), Expo Server SDK (push), Pumble incoming webhook (same format as Slack)
 
 ## Global Constraints
 
-- Never manually edit `packages/db/src/schema.ts` — run `pnpm --filter @surewaka/db db:pull` after migrations
+- Never manually edit `packages/db/src/schema.ts` — run `pnpm --filter @surewaka/db db:generate + db:migrate` after migrations
 - Every migration: RLS enable + service_role bypass + authenticated grants in the same file
-- Reference RLS pattern: `supabase/migrations/20260603045850_fix_rls_and_grants_all_tables.sql`
+- Reference RLS pattern: `drizzle/migrations/20260603045850_fix_rls_and_grants_all_tables.sql`
 - Worker reads DB via `@surewaka/db` (Drizzle + Neon HTTP) — never exposes SUPABASE_SERVICE_ROLE_KEY to client
 - Alert thresholds from `@surewaka/shared` constants (ALERT_DRIVER_SILENT_WARNING_MIN etc.) as defaults
 - TypeScript strict, `type` over `interface`, `unknown` not `any`
@@ -24,7 +24,7 @@
 ## File Structure
 
 ```
-supabase/migrations/
+drizzle/migrations/
   20260703000002_alerts_table.sql       — alerts table + push_tokens admin app support + RLS
 
 workers/alert-engine/
@@ -68,7 +68,7 @@ apps/admin/app/hooks/
 ### Task 1: DB Migration — alerts table, push_tokens admin support, RLS
 
 **Files:**
-- Create: `supabase/migrations/20260703000002_alerts_table.sql`
+- Create: `drizzle/migrations/20260703000002_alerts_table.sql`
 
 **Interfaces:**
 - Produces: `alerts` table (id, delivery_id, leg_id, rule, severity, original_severity, context, fired_at, escalated_at, resolved_at, ack_by); `push_tokens.app` constraint extended to include `'admin'`; `alert_settings` table for configurable thresholds
@@ -76,7 +76,7 @@ apps/admin/app/hooks/
 - [ ] **Step 1: Create the migration file**
 
 ```bash
-supabase migration new alerts_table
+pnpm db:generate new alerts_table
 ```
 
 Rename to `20260703000002_alerts_table.sql`.
@@ -177,7 +177,7 @@ GRANT SELECT ON alert_settings TO authenticated;
 - [ ] **Step 3: Apply the migration**
 
 ```bash
-supabase db push
+pnpm --filter @surewaka/db db:push
 ```
 
 Expected: no errors.
@@ -185,7 +185,7 @@ Expected: no errors.
 - [ ] **Step 4: Regenerate Drizzle schema**
 
 ```bash
-pnpm --filter @surewaka/db db:pull
+pnpm --filter @surewaka/db db:generate + db:migrate
 ```
 
 Expected: `packages/db/src/schema.ts` updated with `alerts` and `alert_settings` tables.
@@ -193,7 +193,7 @@ Expected: `packages/db/src/schema.ts` updated with `alerts` and `alert_settings`
 - [ ] **Step 5: Commit**
 
 ```bash
-git add supabase/migrations/20260703000002_alerts_table.sql packages/db/src/schema.ts
+git add drizzle/migrations/20260703000002_alerts_table.sql packages/db/src/schema.ts
 git commit -m "feat(db): add alerts table, alert_settings, extend push_tokens for admin app"
 ```
 

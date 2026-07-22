@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+**Superseded** — The Supabase `auth.users` trigger approach was removed with the Clerk migration. Email sync now happens via Clerk webhooks that notify the API, which updates `public.users.email`. Historical context below is preserved for reference.
 
 ## Context
 

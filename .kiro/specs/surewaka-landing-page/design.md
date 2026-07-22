@@ -2,7 +2,7 @@
 
 ## Overview
 
-The SureWaka landing page is a server-side rendered marketing site built with React Router v7 (framework mode) inside the existing `apps/landing` app. It communicates SureWaka's value proposition to three audience segments (senders, businesses, drivers), captures waitlist signups via Supabase, and supports focused campaign pages for paid traffic.
+The SureWaka landing page is a server-side rendered marketing site built with React Router v7 (framework mode) inside the existing `apps/landing` app. It communicates SureWaka's value proposition to three audience segments (senders, businesses, drivers), captures waitlist signups via Clerk, and supports focused campaign pages for paid traffic.
 
 The design prioritizes:
 - **Performance on Nigerian mobile networks** — SSR, minimal JS, lazy-loaded images
@@ -35,7 +35,7 @@ graph TD
         WF --> UI[@surewaka/ui components]
     end
 
-    subgraph Supabase
+    subgraph NeonDB
         WF -->|action POST| DB[(waitlist_signups table)]
     end
 ```
@@ -61,7 +61,7 @@ graph TD
 1. **Vercel receives request** → runs `@react-router/serve` entry
 2. **Basic auth middleware** checks `BASIC_AUTH_ENABLED` env var; if enabled, validates credentials via `Authorization` header
 3. **React Router** matches route, runs `loader` (SSR data fetch), renders component to HTML
-4. **Waitlist form submission** → `action` function validates with Zod, inserts into Supabase `waitlist_signups` table, returns success/error
+4. **Waitlist form submission** → `action` function validates with Zod, inserts into NeonDB `waitlist_signups` table, returns success/error
 
 ## Components and Interfaces
 
@@ -177,13 +177,13 @@ export function requireBasicAuth(request: Request): Response | null;
 
 This middleware is called in `root.tsx`'s loader (or a parent layout loader) so it applies to all routes. Static assets served by Vercel's CDN bypass the middleware naturally since they don't hit the SSR function.
 
-### Supabase Integration (`app/lib/supabase.server.ts`)
+### DB Integration (Drizzle + NeonDB)
 
 ```typescript
-import { createServiceClient } from '@surewaka/supabase';
+import { getClerkClient } from '@surewaka/db';
 
-export function getSupabaseAdmin() {
-  return createServiceClient();
+export function db (from @surewaka/db) {
+  return getClerkClient();
 }
 
 // Used in waitlist form action to insert signups
@@ -233,7 +233,7 @@ export type WaitlistSignup = z.infer<typeof waitlistSignupSchema>;
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `SUPABASE_URL` | Yes | Supabase project URL |
+| `DATABASE_URL | Yes | NeonDB connection string (from CLAUDE.md env) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Service role key for server-side inserts |
 | `BASIC_AUTH_ENABLED` | No | Set to `"true"` to enable basic auth |
 | `BASIC_AUTH_USER` | Conditional | Username (required if auth enabled) |
@@ -246,7 +246,7 @@ export type WaitlistSignup = z.infer<typeof waitlistSignupSchema>;
 
 ### Property 1: Waitlist signup data persistence round-trip
 
-*For any* valid waitlist signup (fullName of 2–100 chars, well-formed email, userType in {sender, business, driver}), submitting the form action SHALL successfully store the data in Supabase and the stored record SHALL contain the same fullName, email, and userType that were submitted.
+*For any* valid waitlist signup (fullName of 2–100 chars, well-formed email, userType in {sender, business, driver}), submitting the form action SHALL successfully store the data in NeonDB and the stored record SHALL contain the same fullName, email, and userType that were submitted.
 
 **Validates: Requirements 5.3, 5.6**
 
@@ -278,7 +278,7 @@ export type WaitlistSignup = z.infer<typeof waitlistSignupSchema>;
 | Missing full name | Inline error below name field: "Name must be at least 2 characters" |
 | Missing user type | Inline error below select: "Please select how you'll use SureWaka" |
 | Duplicate email | Server returns error; display: "This email is already on the waitlist" |
-| Supabase insert failure | Generic error: "Something went wrong. Please try again." + log server-side |
+| DB insert failure | Generic error: "Something went wrong. Please try again." + log server-side |
 
 ### Implementation Pattern
 
@@ -296,7 +296,7 @@ On the client, `useActionData()` provides the errors object. Each form field che
 
 ### Network/Server Errors
 
-- Supabase connection failure → catch in action, return generic error message, log to console (Vercel logs)
+- DB connection failure → catch in action, return generic error message, log to console (Vercel logs)
 - Basic auth middleware errors → return 401 with `WWW-Authenticate: Basic realm="SureWaka"` header
 - 404 routes → React Router's default error boundary with a "Page not found" message and link home
 
@@ -327,7 +327,7 @@ Each correctness property is implemented as a property-based test with minimum 1
 
 | Property | Test Description | Generator Strategy |
 |----------|-----------------|-------------------|
-| Property 1 | Valid signup → persisted correctly | Generate random names (2–100 chars), valid emails, random userType. Mock Supabase insert to capture args. |
+| Property 1 | Valid signup → persisted correctly | Generate random names (2–100 chars), valid emails, random userType. Mock db.insert call to capture args. |
 | Property 2 | Invalid emails → rejected | Generate strings without valid email structure (fc.string filtered to exclude valid emails, plus targeted invalid patterns). |
 | Property 3 | Missing fields → per-field errors | Generate random subsets of {fullName, email, userType} to omit. Verify error keys match omitted fields. |
 | Property 4 | Auth middleware gating | Generate random (enabled: bool, credentials: string, configured: {user, pass}) tuples. Verify 401 iff enabled AND credentials don't match. |
@@ -343,7 +343,7 @@ Each correctness property is implemented as a property-based test with minimum 1
 | Test | What to Verify |
 |------|---------------|
 | SSR smoke test | Fetch `/` without JS, verify HTML contains hero content |
-| Waitlist form E2E | Submit form via HTTP POST, verify Supabase receives data |
+| Waitlist form E2E | Submit form via HTTP POST, verify NeonDB receives data |
 | Basic auth E2E | Request with/without credentials when enabled |
 | Campaign page routing | `/campaigns/lagos-launch` renders without nav/footer |
 

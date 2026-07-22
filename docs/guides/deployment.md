@@ -9,7 +9,10 @@
 | Admin | **Vercel** | SPA mode, static hosting |
 | API | **Fly.io** | Johannesburg region, Docker, always-on |
 | Workers | **Fly.io** | Background processes, same infra as API |
-| Database | **Supabase** | Managed Postgres + Auth + Storage + Realtime |
+| Database | **NeonDB** | Managed Postgres (London, `aws-eu-west-2`), Drizzle ORM |
+| Auth | **Clerk** | JWT sessions, roles in `publicMetadata`, EU region |
+| Storage | **Cloudinary / R2** | Avatars → Cloudinary; private docs → Cloudflare R2 |
+| Realtime | **Ably** | Pub/sub for driver tracking and live delivery updates |
 | Redis | **Upstash** | Serverless Redis, pay-per-request |
 
 ## Vercel Setup (Web Apps)

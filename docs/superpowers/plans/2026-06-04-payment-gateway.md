@@ -15,8 +15,8 @@
 ## File Map
 
 **Create:**
-- `supabase/migrations/YYYYMMDDXXXXXX_add_wallet_tables.sql`
-- `supabase/migrations/YYYYMMDDXXXXXX_refactor_delivery_status.sql`
+- `drizzle/migrations/YYYYMMDDXXXXXX_add_wallet_tables.sql`
+- `drizzle/migrations/YYYYMMDDXXXXXX_refactor_delivery_status.sql`
 - `packages/shared/src/validators.ts` ← modify (add payment schemas)
 - `apps/api/src/lib/paystack.ts`
 - `apps/api/src/lib/wallet-service.ts`
@@ -61,16 +61,16 @@
 ### Task 1: Migration — wallet tables
 
 **Files:**
-- Create: `supabase/migrations/<timestamp>_add_wallet_tables.sql`
+- Create: `drizzle/migrations/<timestamp>_add_wallet_tables.sql`
 
 - [x] **Step 1: Create the migration file**
 
 ```bash
 cd /path/to/project
-supabase migration new add_wallet_tables
+pnpm db:generate new add_wallet_tables
 ```
 
-Expected: creates `supabase/migrations/YYYYMMDDXXXXXX_add_wallet_tables.sql`
+Expected: creates `drizzle/migrations/YYYYMMDDXXXXXX_add_wallet_tables.sql`
 
 - [x] **Step 2: Write the migration SQL**
 
@@ -248,7 +248,7 @@ GRANT SELECT ON public.payout_requests TO authenticated;
 - [x] **Step 3: Commit the migration file**
 
 ```bash
-git add supabase/migrations/
+git add drizzle/migrations/
 git commit -m "feat(db): add wallet, wallet_transactions, escrow_holds, payout_requests tables"
 ```
 
@@ -257,12 +257,12 @@ git commit -m "feat(db): add wallet, wallet_transactions, escrow_holds, payout_r
 ### Task 2: Migration — delivery status enum + payment columns
 
 **Files:**
-- Create: `supabase/migrations/<timestamp>_refactor_delivery_status.sql`
+- Create: `drizzle/migrations/<timestamp>_refactor_delivery_status.sql`
 
 - [x] **Step 1: Create the migration file**
 
 ```bash
-supabase migration new refactor_delivery_status
+pnpm db:generate new refactor_delivery_status
 ```
 
 - [x] **Step 2: Write the migration SQL**
@@ -307,7 +307,7 @@ CREATE INDEX idx_deliveries_payment_status ON public.deliveries(payment_status);
 - [x] **Step 3: Commit the migration**
 
 ```bash
-git add supabase/migrations/
+git add drizzle/migrations/
 git commit -m "feat(db): refactor delivery_status enum + add payment columns"
 ```
 
@@ -315,10 +315,10 @@ git commit -m "feat(db): refactor delivery_status enum + add payment columns"
 
 ### Task 3: Apply migrations and regenerate schema
 
-- [x] **Step 1: Apply migrations to the local Supabase instance**
+- [x] **Step 1: Apply migrations to the NeonDB (local or remote via db:push)**
 
 ```bash
-supabase db push
+pnpm --filter @surewaka/db db:push
 ```
 
 Expected: both migrations apply without error.
@@ -326,7 +326,7 @@ Expected: both migrations apply without error.
 - [x] **Step 2: Regenerate Drizzle schema**
 
 ```bash
-pnpm --filter @surewaka/db db:pull
+pnpm --filter @surewaka/db db:generate + db:migrate
 ```
 
 Expected: `packages/db/src/schema.ts` regenerated. Verify it contains `wallets`, `walletTransactions`, `escrowHolds`, `payoutRequests` table exports and `deliveryStatus` enum has the 12 new values.
@@ -795,7 +795,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 
 const mockGetUser = vi.fn();
-vi.mock('@surewaka/supabase', () => ({
+vi.mock('@surewaka/db', () => ({
   createServerClient: () => ({ auth: { getUser: mockGetUser } }),
 }));
 
@@ -922,9 +922,9 @@ import { requireAuth } from '../middleware/auth';
 import { getWalletByUserId, checkBalance } from '../lib/wallet-service';
 import { initializeTransaction, verifyTransaction, createCustomer, createDedicatedVirtualAccount } from '../lib/paystack';
 import { initializeTopupSchema, walletCheckSchema } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { ClerkUser } from '@surewaka/db';
 
-type Env = { Variables: { user: SupabaseUser; accessToken: string } };
+type Env = { Variables: { user: ClerkUser; accessToken: string } };
 
 const walletRoutes = new Hono<Env>();
 walletRoutes.use('*', requireAuth);
@@ -1282,7 +1282,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 
 const mockGetUser = vi.fn();
-vi.mock('@surewaka/supabase', () => ({
+vi.mock('@surewaka/db', () => ({
   createServerClient: () => ({ auth: { getUser: mockGetUser } }),
 }));
 
@@ -1381,10 +1381,10 @@ import { db, deliveries, escrowHolds, walletTransactions } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { getWalletByUserId, creditWallet, debitWallet } from '../lib/wallet-service';
 import { bookingConfirmSchema, cancelDeliverySchema } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { ClerkUser } from '@surewaka/db';
 import { randomUUID } from 'crypto';
 
-type Env = { Variables: { user: SupabaseUser; accessToken: string } };
+type Env = { Variables: { user: ClerkUser; accessToken: string } };
 
 const bookingPaymentRoutes = new Hono<Env>();
 bookingPaymentRoutes.use('*', requireAuth);
@@ -1546,7 +1546,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 
 const mockGetUser = vi.fn();
-vi.mock('@surewaka/supabase', () => ({
+vi.mock('@surewaka/db', () => ({
   createServerClient: () => ({ auth: { getUser: mockGetUser } }),
 }));
 vi.mock('@surewaka/db', () => ({
@@ -1639,10 +1639,10 @@ import { db, payoutRequests, wallets } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { getWalletByUserId, debitWallet } from '../lib/wallet-service';
 import { payoutRequestSchema } from '@surewaka/shared';
-import type { SupabaseUser } from '@surewaka/supabase';
+import type { ClerkUser } from '@surewaka/db';
 import { randomUUID } from 'crypto';
 
-type Env = { Variables: { user: SupabaseUser; accessToken: string } };
+type Env = { Variables: { user: ClerkUser; accessToken: string } };
 
 const payoutRoutes = new Hono<Env>();
 payoutRoutes.use('*', requireAuth);

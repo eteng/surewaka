@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+**Superseded** — Supabase was removed in mid-2026. The mobile profile now goes through `apps/api` (Hono API) using Clerk for auth and Drizzle ORM for DB access — the same pattern as the admin portal. Historical context below is preserved for reference.
 
 ## Context
 

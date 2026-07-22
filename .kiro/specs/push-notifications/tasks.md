@@ -7,12 +7,12 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
 ## Tasks
 
 - [x] 1. Database migration — push_tokens table and users.notification_push column
-  - Create migration file `supabase/migrations/<timestamp>_push_tokens.sql`
+  - Create migration file `drizzle/migrations/<timestamp>_push_tokens.sql`
   - Add `push_tokens` table with columns: id (UUID PK), user_id (UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE), expo_push_token (TEXT UNIQUE), device_id (TEXT NOT NULL), platform (TEXT NOT NULL CHECK ios/android), app (TEXT NOT NULL CHECK customer/driver), is_active (BOOLEAN DEFAULT true NOT NULL), created_at (TIMESTAMPTZ DEFAULT now()), updated_at (TIMESTAMPTZ DEFAULT now())
   - Add partial indexes: idx_push_tokens_user_active and idx_push_tokens_user_app_active (WHERE is_active = true)
-  - **No RLS needed** — project uses Neon (not Supabase Postgres); authorization is in application code via `requireAuth` middleware
+  - **No RLS needed** — project uses Neon (not NeonDB); authorization is in application code via `requireAuth` middleware
   - Add `notification_push BOOLEAN DEFAULT true NOT NULL` column to users table
-  - Run `pnpm --filter @surewaka/db db:pull` to regenerate Drizzle schema
+  - Run `pnpm --filter @surewaka/db db:generate + db:migrate` to regenerate Drizzle schema
   - **Requirements:** 1.3, 2.3, 4.1, 10.1
 
 - [x] 2. Shared types, validators, and constants for push notifications
@@ -203,7 +203,7 @@ This plan implements push notifications for SureWaka's mobile apps (customer and
 
 ## Notes
 
-- Tasks 1 creates the migration file but does NOT apply it — that's done via Supabase dashboard or CI pipeline per project workflow.
+- Tasks 1 creates the migration file but does NOT apply it — that's done via Clerk dashboard or CI pipeline per project workflow.
 - Task 5 requires Redis running locally (via docker-compose).
 - Tasks 11 and 12 can only be fully tested on physical devices (Expo push tokens aren't generated in simulators).
 - Task 13 depends on identifying the exact handler locations — these may need investigation if delivery/payment handlers have changed since this spec was written.

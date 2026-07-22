@@ -5,10 +5,10 @@ Terms resolved through explicit design decisions. Do not include implementation 
 ## Terms
 
 ### Customer_Profile
-The `public.users` row for a user whose role is `'customer'`. The single source of truth for profile display in the mobile app — always fetched from the DB, not derived from Supabase Auth session metadata.
+The `public.users` row for a user whose role is `'customer'`. The single source of truth for profile display in the mobile app — always fetched from the DB, not derived from Clerk session metadata.
 
 ### Email_Verification_Flow
-The process by which a customer's new email is confirmed. Initiated by calling `supabase.auth.updateUser({ email })` from the mobile client, which sends a verification link. On confirmation, a Postgres trigger on `auth.users` syncs the confirmed email to `public.users.email`. See ADR-008.
+The process by which a customer's new email is confirmed. Initiated via the Clerk user update API from the mobile client, which sends a verification link. On confirmation, a webhook from Clerk syncs the confirmed email to `public.users.email`. See ADR-008 (now superseded — originally described a Supabase trigger approach).
 
 ### Gender
 An optional attribute on Customer_Profile. One of three values: `'woman'`, `'man'`, `'prefer_not_to_disclose'`. Stored in `public.users.gender`. Display labels: "Woman", "Man", "Prefer not to disclose".

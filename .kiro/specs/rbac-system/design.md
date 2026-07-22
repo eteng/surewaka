@@ -4,20 +4,20 @@
 
 The RBAC (Role-Based Access Control) system provides fine-grained authorization for SureWaka's multi-app logistics platform. It manages six distinct roles — `customer`, `driver`, `carrier_driver`, `carrier_admin`, `support_agent`, and `surewaka_admin` — across web, admin, carrier, and mobile applications.
 
-The system uses a dual-storage strategy: roles are stored in Supabase `app_metadata` (for JWT claims and RLS) and mirrored in a Postgres `user_roles` table (for querying, auditing, and multi-role support). This gives us fast middleware checks via JWT claims while maintaining queryable role data for admin operations and analytics.
+The system uses a dual-storage strategy: roles are stored in Clerk `publicMetadata` (for JWT claims and RLS) and mirrored in a Postgres `user_roles` table (for querying, auditing, and multi-role support). This gives us fast middleware checks via JWT claims while maintaining queryable role data for admin operations and analytics.
 
 ## Design Principles
 
-1. **Defense in Depth** — Access control enforced at two layers: API middleware (application) AND Supabase RLS policies (database). Even if one layer is bypassed, the other protects data.
+1. **Defense in Depth** — Access control enforced at two layers: API middleware (application) AND API-layer authorization policies (database). Even if one layer is bypassed, the other protects data.
 2. **Least Privilege** — Every route explicitly declares required roles. No route is open by default.
-3. **Separation of Concerns** — Auth (identity) via Supabase; authorization (permissions) via our middleware + RLS.
+3. **Separation of Concerns** — Auth (identity) via Clerk; authorization (permissions) via our middleware + RLS.
 4. **Fail Closed** — Missing/empty roles default to `['customer']` (lowest privilege). Never grants elevated access on ambiguity.
 5. **Composability** — Middleware chains: `requireAuth` → `requireRole('driver')`. Roles combine freely.
 6. **Scoped Roles** — Permissions are context-aware. `carrier_admin` and `carrier_driver` are org-bound (scoped to their carrier). Global roles (`customer`, `driver`, `support_agent`, `surewaka_admin`) apply platform-wide.
 7. **Immutable Audit Trail** — Every role change logged with performer, timestamp, and reason. Append-only.
 8. **Eventual Consistency with Safety** — Dual-storage (DB + JWT) may briefly diverge. Sensitive ops re-validate against DB. JWT expiry naturally resolves staleness.
 9. **Backward Compatibility** — Migration preserves existing `users.role` column during transition.
-10. **Single Source of Truth** — `user_roles` table is canonical. Supabase `app_metadata` is a derived cache.
+10. **Single Source of Truth** — `user_roles` table is canonical. Clerk `publicMetadata` is a derived cache.
 11. **No Client-Side Trust** — Frontend role checks are UX-only. All enforcement is server-side.
 12. **Multi-role Support** — A user can hold multiple roles simultaneously (e.g., a carrier_admin who is also a driver).
 
@@ -139,7 +139,7 @@ graph TD
     end
 
     subgraph "Data Layer"
-        SUPA_AUTH[Supabase Auth<br/>app_metadata.roles]
+        SUPA_AUTH[Clerk<br/>app_metadata.roles]
         PG_ROLES[user_roles table<br/>Postgres via Drizzle]
         PG_MEMBERS[carrier_members table<br/>org membership]
         RLS[RLS Policies<br/>role + scope-based row access]
@@ -171,13 +171,13 @@ sequenceDiagram
     participant API as Hono API
     participant AuthMW as requireAuth
     participant RoleMW as requireRole
-    participant Supabase as Supabase Auth
+    participant Clerk
     participant DB as Postgres
 
     Client->>API: POST /api/v1/deliveries (Bearer token)
     API->>AuthMW: Extract JWT
-    AuthMW->>Supabase: getUser(token)
-    Supabase-->>AuthMW: User + app_metadata
+    AuthMW->>Clerk: getUser(token)
+    Clerk-->>AuthMW: User + app_metadata
     AuthMW->>RoleMW: user.app_metadata.roles
     RoleMW->>RoleMW: Check roles includes 'customer'
     alt Authorized
@@ -219,7 +219,7 @@ sequenceDiagram
     participant API as Hono API
     participant RoleMW as requireRole('surewaka_admin')
     participant DB as Postgres
-    participant Supabase as Supabase Auth
+    participant Clerk
 
     Admin->>API: POST /api/v1/admin/users/:id/roles { role: 'carrier_admin', scopeId: carrier_uuid }
     API->>RoleMW: Check caller is surewaka_admin
@@ -228,8 +228,8 @@ sequenceDiagram
     API->>DB: INSERT carrier_members
     DB-->>API: OK
     API->>DB: INSERT role_audit_log
-    API->>Supabase: updateUserById (sync app_metadata)
-    Supabase-->>API: OK
+    API->>Clerk: updateUserMetadata (sync publicMetadata)
+    Clerk-->>API: OK
     API-->>Admin: 201 { data: { roles } }
 ```
 
@@ -242,7 +242,7 @@ sequenceDiagram
     participant RoleMW as requireRole('carrier_admin')
     participant ScopeMW as requireCarrierScope
     participant DB as Postgres
-    participant Supabase as Supabase Auth
+    participant Clerk
 
     CarrierApp->>API: POST /api/v1/carriers/:carrierId/drivers/invite { phone, name }
     API->>RoleMW: Check caller has carrier_admin
@@ -252,7 +252,7 @@ sequenceDiagram
     API->>DB: INSERT user_roles (role: carrier_driver, scope_id: carrierId)
     API->>DB: INSERT carrier_members (role: carrier_driver)
     API->>DB: INSERT role_audit_log
-    API->>Supabase: updateUserById (sync app_metadata)
+    API->>Clerk: updateUserMetadata (sync publicMetadata)
     API-->>CarrierApp: 201 { data: { driver } }
 ```
 
@@ -359,7 +359,7 @@ export const carrierMembers = pgTable('carrier_members', {
 }));
 ```
 
-### Supabase app_metadata Shape
+### Clerk publicMetadata Shape
 
 ```typescript
 type AppMetadata = {
@@ -541,7 +541,7 @@ import type { UserRole } from '@surewaka/shared';
 
 type RoleEnv = {
   Variables: {
-    user: SupabaseUser;
+    user: ClerkUser;
     userRoles: UserRole[];
   };
 };
@@ -795,10 +795,10 @@ async function checkScopedAccess(
  * - user.app_metadata.carrier_id is set if user has org-scoped role
  * - If no active roles exist, roles = ['customer'] (default)
  */
-async function syncRolesToSupabaseAuth(
+async function syncRolesToClerk(
   userId: string,
   db: DrizzleClient,
-  supabaseAdmin: SupabaseServiceClient
+  clerkClient: ClerkClient
 ): Promise<void> {
   const activeRoles = await db
     .select({ role: userRoles.role, scopeId: userRoles.scopeId })
@@ -815,7 +815,7 @@ async function syncRolesToSupabaseAuth(
     (r) => r.role === 'carrier_admin' || r.role === 'carrier_driver'
   );
 
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+  const { error } = await clerkClient.users.updateUserMetadata(userId, {
     app_metadata: {
       roles,
       primary_role: roles[0],
@@ -841,7 +841,7 @@ async function syncRolesToSupabaseAuth(
  * - User has carrier_driver role with scope_id = carrierId
  * - User is in carrier_members table
  * - Audit log entry created
- * - Supabase app_metadata synced
+ * - Clerk publicMetadata synced
  */
 async function onboardCarrierDriver(params: {
   carrierId: string;
@@ -886,8 +886,8 @@ async function onboardCarrierDriver(params: {
       reason: 'Onboarded by carrier admin',
     });
 
-    // Step 5: Sync to Supabase
-    await syncRolesToSupabaseAuth(user.id, tx, supabaseAdmin);
+    // Step 5: Sync to Clerk
+    await syncRolesToClerk(user.id, tx);
 
     return { user, role: roleRecord };
   });
@@ -1100,7 +1100,7 @@ carriers.patch(
 | Scenario | Response | Recovery |
 |----------|----------|----------|
 | Missing roles in JWT | Default to `['customer']` | Background sync job |
-| Role sync failure (DB ok, Supabase fails) | Return success, queue retry | Cron reconciliation |
+| Role sync failure (DB ok, Clerk fails) | Return success, queue retry | Cron reconciliation |
 | Stale JWT (role revoked, token valid) | Sensitive ops re-validate against DB | JWT expiry (1hr) |
 | Concurrent role assignment | DB unique constraint → 409 Conflict | Idempotent outcome |
 | Carrier scope mismatch | 403 Forbidden | User must be added to carrier first |
@@ -1121,7 +1121,7 @@ carriers.patch(
 
 1. Create `user_roles`, `role_audit_log`, `carriers`, `carrier_members` tables
 2. Migrate existing `users.role` data into `user_roles`
-3. Sync all users' roles to Supabase `app_metadata`
+3. Sync all users' roles to Clerk `publicMetadata`
 4. Deploy `requireRole` + `requireCarrierScope` middleware
 5. Update routes to use new middleware
 6. Deprecate `users.role` column (keep reading, stop writing)

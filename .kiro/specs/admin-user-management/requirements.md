@@ -2,14 +2,14 @@
 
 ## Introduction
 
-The Admin User Management feature provides surewaka_admin users with a comprehensive interface to invite, manage, and control employee access on the SureWaka platform. It leverages the existing RBAC system for role assignment and permission enforcement, adding an invitation workflow (via Supabase Auth email invites), employee lifecycle management (view, edit, deactivate/reactivate), and role administration with full audit trail visibility. This feature lives in the `apps/admin` portal and communicates with the API at `apps/api`.
+The Admin User Management feature provides surewaka_admin users with a comprehensive interface to invite, manage, and control employee access on the SureWaka platform. It leverages the existing RBAC system for role assignment and permission enforcement, adding an invitation workflow (via Clerk email invites), employee lifecycle management (view, edit, deactivate/reactivate), and role administration with full audit trail visibility. This feature lives in the `apps/admin` portal and communicates with the API at `apps/api`.
 
 ## Glossary
 
 - **Admin_Portal**: The `apps/admin` React Router v7 SPA used by SureWaka internal operations staff
 - **User_Management_Service**: The API service handling employee invitation, listing, editing, deactivation, and role operations
 - **Employee**: Any user in the `users` table who holds a non-customer role (i.e., a team member managed by surewaka_admin)
-- **Invitation_Service**: The component responsible for sending email invitations via Supabase Auth `inviteUserByEmail`
+- **Invitation_Service**: The component responsible for sending email invitations via Clerk `inviteUserByEmail`
 - **Employee_List**: The paginated, searchable UI view displaying all managed employees
 - **Role_Assignment_Panel**: The UI component for assigning and revoking roles on a specific employee
 - **Audit_History_View**: The UI component displaying role change history from the `role_audit_log` table
@@ -23,13 +23,13 @@ The Admin User Management feature provides surewaka_admin users with a comprehen
 
 #### Acceptance Criteria
 
-1. WHEN a surewaka_admin submits an invitation request with a valid email, full name, and target role, THEN THE Invitation_Service SHALL send an email invitation via Supabase Auth `inviteUserByEmail`
+1. WHEN a surewaka_admin submits an invitation request with a valid email, full name, and target role, THEN THE Invitation_Service SHALL send an email invitation via Clerk `inviteUserByEmail`
 2. WHEN the invitation is sent successfully, THEN THE User_Management_Service SHALL create a record in the `users` table with the provided email, name, and `verified = false`
 3. WHEN the invitation is sent successfully, THEN THE User_Management_Service SHALL assign the specified role to the new user via the RBAC_System
 4. IF the provided email already exists in the `users` table, THEN THE User_Management_Service SHALL return HTTP 409 with error code `CONFLICT` and message indicating the user already exists
 5. WHEN an org-scoped role (`carrier_admin` or `carrier_driver`) is specified, THEN THE Invitation_Service SHALL require a valid `scopeId` (carrier ID) in the request
 6. THE User_Management_Service SHALL validate invitation requests using a Zod schema requiring: email (valid format), fullName (2-100 chars), role (valid user_role enum value), and optional scopeType/scopeId
-7. WHEN the Supabase Auth invitation fails, THEN THE User_Management_Service SHALL return HTTP 502 with error code `INVITATION_FAILED` and not create any database records
+7. WHEN the Clerk invitation fails, THEN THE User_Management_Service SHALL return HTTP 502 with error code `INVITATION_FAILED` and not create any database records
 8. THE User_Management_Service SHALL execute the user creation and role assignment within a single database transaction
 
 ### Requirement 2: Employee List with Search and Filtering
@@ -67,7 +67,7 @@ The Admin User Management feature provides surewaka_admin users with a comprehen
 #### Acceptance Criteria
 
 1. WHEN a surewaka_admin deactivates an employee, THEN THE User_Management_Service SHALL set `verified = false` on the user record and revoke all active roles in the `user_roles` table
-2. WHEN a surewaka_admin deactivates an employee, THEN THE User_Management_Service SHALL update the user's Supabase Auth metadata to remove all roles (setting `app_metadata.roles` to empty)
+2. WHEN a surewaka_admin deactivates an employee, THEN THE User_Management_Service SHALL update the user's Clerk metadata to remove all roles (setting `app_metadata.roles` to empty)
 3. WHEN a surewaka_admin deactivates an employee, THEN THE User_Management_Service SHALL log each role revocation in the `role_audit_log` with reason `'Account deactivated by admin'`
 4. WHEN a surewaka_admin reactivates an employee, THEN THE User_Management_Service SHALL set `verified = true` on the user record
 5. WHEN a surewaka_admin reactivates an employee, THEN THE Admin_Portal SHALL prompt the admin to re-assign roles before completing reactivation
@@ -86,7 +86,7 @@ The Admin User Management feature provides surewaka_admin users with a comprehen
 4. WHEN assigning an org-scoped role, THEN THE Role_Assignment_Panel SHALL present a carrier selection dropdown populated from the `carriers` table
 5. THE User_Management_Service SHALL validate role assignment requests against the existing `assignRoleSchema` from `@surewaka/shared`
 6. THE User_Management_Service SHALL validate role revocation requests against the existing `revokeRoleSchema` from `@surewaka/shared`
-7. WHEN a role is assigned or revoked, THEN THE RBAC_System SHALL sync the updated roles to Supabase Auth `app_metadata` as defined in the existing Role_Sync process
+7. WHEN a role is assigned or revoked, THEN THE RBAC_System SHALL sync the updated roles to Clerk `app_metadata` as defined in the existing Role_Sync process
 8. WHEN a duplicate active role assignment is attempted, THEN THE User_Management_Service SHALL return HTTP 409 with error code `CONFLICT`
 
 ### Requirement 6: Role Assignment Audit History

@@ -12,7 +12,7 @@ This plan implements the waitlist admin feature in incremental steps: database i
   - _Requirements: 1.3, 2.1, 3.1, 3.3, 4.1, 8.1_
 
 - [x] 2. Create database migration for waitlist indexes
-  - Create a Supabase migration adding indexes: `idx_waitlist_signups_created_at` (created_at DESC), `idx_waitlist_signups_user_type_created_at` (user_type, created_at DESC), `idx_waitlist_signups_source` (source), `idx_waitlist_signups_email` (email)
+  - Create a Drizzle migration adding indexes: `idx_waitlist_signups_created_at` (created_at DESC), `idx_waitlist_signups_user_type_created_at` (user_type, created_at DESC), `idx_waitlist_signups_source` (source), `idx_waitlist_signups_email` (email)
   - Enable `pg_trgm` extension and create trigram GIN indexes on `full_name` and `email` for ILIKE search performance
   - _Requirements: 10.1, 10.7_
 
@@ -93,7 +93,7 @@ This plan implements the waitlist admin feature in incremental steps: database i
   - [x] 7.1 Create `apps/admin/app/hooks/use-waitlist-data.ts`
     - Implement `useWaitlistData(params)` hook that fetches from `GET /api/v1/admin/waitlist` with query params
     - Return `{ data, meta, isLoading, error, refetch }`
-    - Include Authorization header with Supabase access token
+    - Include Authorization header with Clerk JWT
     - _Requirements: 5.8_
 
   - [x] 7.2 Create `apps/admin/app/hooks/use-waitlist-stats.ts`
@@ -185,4 +185,4 @@ This plan implements the waitlist admin feature in incremental steps: database i
 - Property tests validate universal correctness properties from the design document
 - Unit tests validate specific examples and edge cases
 - The design uses TypeScript throughout — all implementations use TypeScript with Zod, Drizzle, Hono, and React
-- Database migration should be applied via Supabase MCP or CLI (not Drizzle push)
+- Database migration should be applied via Clerk MCP or CLI (not Drizzle push)

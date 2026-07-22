@@ -190,13 +190,12 @@ describe('Role Sync — Property Tests', () => {
     });
 
     it('sync failure does not throw (logs error instead)', async () => {
-      // Override the mock to simulate failure
-      vi.doMock('@surewaka/supabase', () => ({
-        createServiceClient: () => ({
-          auth: {
-            admin: {
-              updateUserById: () =>
-                Promise.resolve({ error: { message: 'Network error' } }),
+      // Simulate Clerk metadata update failure
+      vi.doMock('@surewaka/auth', () => ({
+        getClerkClient: () => ({
+          users: {
+            updateUserMetadata: async () => {
+              throw new Error('Network error');
             },
           },
         }),

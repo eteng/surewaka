@@ -4,12 +4,12 @@
 
 This plan implements the user profile management feature for the SureWaka admin portal. It extends the existing `public.users` table with profile columns, introduces a `name_change_requests` table, adds API endpoints for self-service profile management and admin name-change approval, and creates the frontend profile page at `/settings/profile`.
 
-The implementation follows existing patterns: Hono routes with `requireAuth` middleware, Drizzle ORM, Zod validators in `@surewaka/shared`, and Supabase Storage for avatar uploads.
+The implementation follows existing patterns: Hono routes with `requireAuth` middleware, Drizzle ORM, Zod validators in `@surewaka/shared`, and Cloudinary/R2 for avatar uploads.
 
 ## Tasks
 
 - [x] 1. Database schema and validators
-  - [x] 1.1 Apply Supabase migration to add profile columns and name_change_requests table
+  - [x] 1.1 Apply Drizzle migration to add profile columns and name_change_requests table
     - Add `avatar_url` (text, nullable), `notification_email` (boolean, default true), `notification_sms` (boolean, default true) to `public.users`
     - Create `name_change_status` enum (`pending`, `approved`, `rejected`)
     - Create `name_change_requests` table with columns: `id`, `user_id`, `current_name`, `requested_name`, `reason`, `status`, `reviewed_by`, `reviewed_at`, `created_at`
@@ -43,10 +43,10 @@ The implementation follows existing patterns: Hono routes with `requireAuth` mid
   - [x] 2.1 Create `apps/api/src/services/profile-service.ts`
     - Implement `maskPhone` utility (preserve last 4 digits, replace other digits with `*`, keep non-digit chars)
     - Implement `generateAvatarPath(userId, extension)` returning `{userId}/{timestamp}.{extension}` with sanitized extension
-    - Implement `syncAvatarMetadata(userId, avatarUrl)` using Supabase Auth admin API (non-throwing)
+    - Implement `syncAvatarMetadata(userId, avatarUrl)` using Clerk admin API (non-throwing)
     - Implement `getProfile(userId)` — query user + pending name change request, mask phone, return `ProfileResponse`
     - Implement `updatePreferences(userId, data)` — partial update of notification columns, return updated profile
-    - Implement `uploadAvatar(userId, file)` — validate file, upload to Supabase Storage `avatars` bucket, delete old avatar if exists, update DB, sync auth metadata
+    - Implement `uploadAvatar(userId, file)` — validate file, upload to Cloudinary/R2 `avatars` bucket, delete old avatar if exists, update DB, sync auth metadata
     - Implement `removeAvatar(userId)` — delete from storage, set `avatar_url` to null, sync auth metadata
     - Implement `submitNameChangeRequest(userId, data)` — check no pending request exists (409 if so), insert record
     - _Requirements: 1.3, 2.3, 2.4, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 4.2, 4.3, 4.4, 5.1, 5.2, 5.3_
@@ -167,6 +167,6 @@ The implementation follows existing patterns: Hono routes with `requireAuth` mid
 - Each task references specific requirements for traceability
 - Checkpoints ensure incremental validation
 - Property tests validate universal correctness properties from the design document (11 total)
-- The project uses Supabase migrations for DDL — task 1.1 applies the migration, task 1.2 keeps Drizzle schema in sync
-- Avatar storage uses Supabase Storage with public bucket access
+- The project uses Drizzle migrations for DDL — task 1.1 applies the migration, task 1.2 keeps Drizzle schema in sync
+- Avatar storage uses Cloudinary/R2 with public bucket access
 - Auth metadata sync is fire-and-forget (non-throwing) per design

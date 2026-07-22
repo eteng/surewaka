@@ -29,7 +29,7 @@ graph TD
         K --> L[requireRole]
         L --> M[WaitlistService]
         N[GET /api/v1/admin/waitlist/stats] --> K
-        M --> O[(Supabase Postgres)]
+        M --> O[(NeonDB)]
     end
 
     D -->|fetch with query params| J
@@ -155,7 +155,7 @@ export type WaitlistQuery = z.infer<typeof waitlistQuerySchema>;
 | `created_at` | timestamp | NOT NULL, defaultNow |
 | `updated_at` | timestamp | NOT NULL, defaultNow |
 
-### New Database Indexes (via Supabase migration)
+### New Database Indexes (via Drizzle migration)
 
 ```sql
 -- Support sorting by created_at (default sort)
@@ -265,14 +265,14 @@ This section addresses relevant OWASP Top 10 (2021) risks and API Security Top 1
 
 | Threat | Mitigation |
 |--------|-----------|
-| Unauthenticated access to waitlist data | `requireAuth` middleware validates Supabase JWT on every request; missing/expired tokens return 401 |
+| Unauthenticated access to waitlist data | `requireAuth` middleware validates Clerk JWT on every request; missing/expired tokens return 401 |
 | Horizontal privilege escalation (non-admin users) | `requireRole('surewaka_admin')` middleware checks the user's role claim; non-admin roles return 403 |
 | Direct object reference (IDOR) | Endpoints are list-only (no per-record mutation); no user-supplied IDs used in queries |
 | Forced browsing to admin routes | Frontend route guard (`AuthGuard`) redirects unauthenticated users; API enforces independently |
 
 **Implementation:**
 - Auth middleware runs before any route handler — no bypass path exists.
-- Role check uses the `user_role` claim from the JWT, verified server-side against Supabase.
+- Role check uses the `user_role` claim from the JWT, verified server-side against Clerk.
 - RLS policies on `waitlist_signups` table restrict access to `surewaka_admin` role at the database level as a defense-in-depth measure.
 
 ### A02:2021 — Cryptographic Failures
@@ -315,7 +315,7 @@ const searchPattern = `%${params.search}%`;
 |--------|-----------|
 | CORS misconfiguration | API CORS middleware restricts `Access-Control-Allow-Origin` to the admin app's domain only |
 | Verbose error messages | 500 errors return generic `INTERNAL_ERROR` code; stack traces and DB error details are never sent to the client |
-| Default credentials | No default credentials; auth is delegated to Supabase Auth |
+| Default credentials | No default credentials; auth is delegated to Clerk |
 | Missing security headers | API responses include `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security` headers |
 
 ### A06:2021 — Vulnerable and Outdated Components
@@ -329,9 +329,9 @@ const searchPattern = `%${params.search}%`;
 
 | Threat | Mitigation |
 |--------|-----------|
-| Session fixation | Supabase Auth handles session management with rotating refresh tokens |
+| Session fixation | Clerk handles session management with rotating refresh tokens |
 | Brute force on admin endpoints | Rate limiting middleware (existing) applies to all API routes |
-| JWT tampering | JWTs are verified using Supabase's public key; signature validation rejects tampered tokens |
+| JWT tampering | JWTs are verified using Clerk's public key; signature validation rejects tampered tokens |
 
 ### A08:2021 — Software and Data Integrity Failures
 
@@ -357,7 +357,7 @@ Not applicable — this feature makes no outbound HTTP requests based on user in
 | Risk | Mitigation |
 |------|-----------|
 | API1 — Broken Object Level Authorization | List-only endpoints; no per-object access decisions needed |
-| API2 — Broken Authentication | Supabase JWT validation on every request |
+| API2 — Broken Authentication | Clerk JWT validation on every request |
 | API3 — Broken Object Property Level Authorization | Response shape is fixed; no user-controlled field selection |
 | API4 — Unrestricted Resource Consumption | Page size capped at 100; search string capped at 200 chars; rate limiting on all endpoints |
 | API5 — Broken Function Level Authorization | `requireRole('surewaka_admin')` enforces function-level access |

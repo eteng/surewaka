@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+**Partially superseded** — The Termii provider choice still stands, but the Supabase Auth Hook integration approach no longer applies. Auth is now handled by Clerk; SMS OTP delivery for Clerk should be evaluated against Termii vs Clerk's built-in providers. Historical context below is preserved for reference.
 
 ## Context
 

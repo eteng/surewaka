@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement a Role-Based Access Control system for SureWaka's multi-app logistics platform. The system manages six roles (`customer`, `driver`, `carrier_driver`, `carrier_admin`, `support_agent`, `surewaka_admin`) with dual storage (Postgres `user_roles` table + Supabase `app_metadata`), API middleware guards, org-scoped access control, and frontend role awareness.
+Implement a Role-Based Access Control system for SureWaka's multi-app logistics platform. The system manages six roles (`customer`, `driver`, `carrier_driver`, `carrier_admin`, `support_agent`, `surewaka_admin`) with dual storage (Postgres `user_roles` table + Clerk `publicMetadata`), API middleware guards, org-scoped access control, and frontend role awareness.
 
 Implementation follows an incremental approach: shared types/constants → database schema → API middleware → role service → API routes → frontend components → RLS policies → tests.
 
@@ -101,9 +101,9 @@ Implementation follows an incremental approach: shared types/constants → datab
     - Return 409 Conflict on duplicate active role assignment
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.7_
 
-  - [x] 5.2 Implement role sync to Supabase Auth in the role service
+  - [x] 5.2 Implement role sync to Clerk in the role service
     - After every role mutation, query all active roles from user_roles
-    - Update user's `app_metadata` via `supabaseAdmin.auth.admin.updateUserById`
+    - Update user's `publicMetadata` via `getClerkClient().users.updateUserMetadata`
     - Set `roles` array, `primary_role` (first in list), and `carrier_id` for org-scoped roles
     - Default to `['customer']` when no active roles exist
     - On sync failure: return success, log error for retry
@@ -175,14 +175,12 @@ Implementation follows an incremental approach: shared types/constants → datab
     - **Property 11: Role Query Correctness** — hasRole/hasAnyRole return correct boolean values
     - **Validates: Requirements 1.5, 8.2, 8.3**
 
-- [x] 9. Implement Supabase RLS policies for role-based row access
-  - [x] 9.1 Create RLS policy SQL migration file
-    - `customers_own_deliveries`: customers see only their own deliveries (+ surewaka_admin + support_agent)
-    - `drivers_assigned_deliveries`: drivers see deliveries assigned to them
-    - `carrier_org_deliveries`: carrier members see deliveries for their carrier
-    - `carrier_admin_drivers`: carrier admins manage only their org's carrier_members
-    - `support_read_users`: support agents can read all user profiles
-    - All policies grant surewaka_admin full access
+- [x] 9. Authorization enforced at API layer (no RLS — all DB access goes through `apps/api`)
+  - [x] 9.1 Role-based access enforced via `requireRole` middleware on API routes
+    - `requireRole('surewaka_admin')` gates admin-only routes
+    - `requireRole('driver')` gates driver routes
+    - `requireRole('carrier_agent')` gates carrier routes with `carrierId` scope check
+    - Row ownership verified in route handlers (e.g. `customerId === c.get('user').id`)
     - _Requirements: 3.1, 3.4, 8.6_
 
 - [x] 10. Checkpoint - Full integration verification

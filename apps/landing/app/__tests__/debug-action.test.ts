@@ -1,18 +1,17 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, vi } from 'vitest';
 
-vi.mock('~/lib/supabase.server', () => ({
-  getSupabaseAdmin: vi.fn(),
+const mockValues = vi.fn().mockResolvedValue([]);
+const mockInsert = vi.fn().mockReturnValue({ values: mockValues });
+
+vi.mock('@surewaka/db', () => ({
+  db: { insert: (...args: unknown[]) => mockInsert(...args) },
+  waitlistSignups: 'waitlist_signups',
 }));
 
 import { action } from '../routes/home';
-import { getSupabaseAdmin } from '~/lib/supabase.server';
 
 describe('debug', () => {
   it('shows response', async () => {
-    const mockInsert = vi.fn().mockResolvedValue({ error: null });
-    const mockFrom = vi.fn().mockReturnValue({ insert: mockInsert });
-    vi.mocked(getSupabaseAdmin).mockReturnValue({ from: mockFrom } as any);
-
     const formData = new URLSearchParams();
     formData.set('fullName', 'Aa');
     formData.set('email', 'a@a.aa');

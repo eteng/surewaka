@@ -2,9 +2,9 @@
 
 ## Overview
 
-The customer profile feature wires the existing profile UI shells (`(tabs)/profile.tsx`, `profile/edit.tsx`, `profile/settings.tsx`) to real data. All reads and writes go directly through the Supabase JS SDK — no API layer. The Supabase `authenticated` role already has `SELECT` and `UPDATE` grants on `public.users`, and RLS restricts operations to the user's own row.
+The customer profile feature wires the existing profile UI shells (`(tabs)/profile.tsx`, `profile/edit.tsx`, `profile/settings.tsx`) to real data. All reads and writes go through the Hono API using the Clerk JWT. See ADR-007 (superseded). Authorization is enforced at the API layer — no RLS.
 
-Email changes are the exception: they flow through Supabase Auth's built-in verification, then a Postgres trigger syncs the confirmed result to `public.users.email`.
+Email changes are the exception: they flow through Clerk's built-in verification, then a Postgres trigger syncs the confirmed result to `public.users.email`.
 
 See ADR-007 (SDK direct, no API layer) and ADR-008 (auth trigger for email sync).
 
@@ -17,9 +17,9 @@ See ADR-007 (SDK direct, no API layer) and ADR-008 (auth trigger for email sync)
                        │                                    │
               useCustomerProfile (hook)────────────────────┘
                        │
-              Supabase JS SDK
+              Hono API
               ┌────────┴────────┐
-     supabase.from('users')   supabase.auth.updateUser()
+     db.query('users')   clerk.updateUser()
               │                         │
        public.users              auth.users ──trigger──▶ public.users.email
 ```
@@ -83,7 +83,7 @@ apps/mobile-customer/app/
 packages/shared/src/
 └── validators.ts                     MODIFY — add GENDER_VALUES + customerProfileUpdateSchema
 
-supabase/migrations/
+drizzle/migrations/
 ├── <ts>_add_gender_to_users.sql      NEW
 └── <ts>_auth_email_sync_trigger.sql  NEW
 ```
@@ -114,7 +114,7 @@ type UseCustomerProfile = {
 };
 ```
 
-`pendingEmail` is derived from `supabase.auth.getUser()` → `user.new_email` (not stored in DB).
+`pendingEmail` is derived from `clerk.getUser()` → `user.new_email` (not stored in DB).
 
 ## Gender Validator (packages/shared/src/validators.ts)
 
@@ -130,7 +130,7 @@ export const customerProfileUpdateSchema = z.object({
 
 ## Email Pending State
 
-After `supabase.auth.updateUser({ email })`, the SDK returns an updated user object. The `user.new_email` field holds the unconfirmed email. The profile tab reads this from `supabase.auth.getUser()` at load time — no DB query needed for this.
+After `clerk.updateUser({ email })`, the SDK returns an updated user object. The `user.new_email` field holds the unconfirmed email. The profile tab reads this from `clerk.getUser()` at load time — no DB query needed for this.
 
 Display logic:
 - `user.email` confirmed and no `new_email` → show email normally

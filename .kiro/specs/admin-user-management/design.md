@@ -31,7 +31,7 @@ graph TD
     end
 
     subgraph "External Services"
-        SUPA[Supabase Auth<br/>inviteUserByEmail]
+        SUPA[Clerk<br/>inviteUserByEmail]
     end
 
     subgraph "Database (Drizzle ORM)"
@@ -67,7 +67,7 @@ sequenceDiagram
     participant UMS as UserManagementService
     participant RS as RoleService (existing)
     participant DB as Postgres
-    participant Supa as Supabase Auth
+    participant Supa as Clerk
 
     Admin->>API: POST /api/v1/admin/users/invite
     API->>MW: requireAuth → requireRole('surewaka_admin')
@@ -468,9 +468,9 @@ packages/shared/src/
 
 **Validates: Requirements 1.5, 1.6**
 
-### Property 4: Failed Supabase invitation creates no records
+### Property 4: Failed Clerk invitation creates no records
 
-*For any* valid invitation input, if the Supabase Auth `inviteUserByEmail` call fails, the service SHALL NOT create any user record or role assignment in the database (transactional rollback).
+*For any* valid invitation input, if the Clerk `inviteUserByEmail` call fails, the service SHALL NOT create any user record or role assignment in the database (transactional rollback).
 
 **Validates: Requirements 1.7**
 
@@ -571,18 +571,18 @@ All errors follow the standard API response shape:
 | `CONFLICT` | 409 | Duplicate email/phone, duplicate role, existing user on invite |
 | `VALIDATION_ERROR` | 400 | Request body/query fails Zod validation |
 | `SELF_DEACTIVATION_NOT_ALLOWED` | 400 | Admin attempting to deactivate themselves |
-| `INVITATION_FAILED` | 502 | Supabase Auth `inviteUserByEmail` returned an error |
+| `INVITATION_FAILED` | 502 | Clerk `inviteUserByEmail` returned an error |
 | `INTERNAL_ERROR` | 500 | Unexpected server error |
 
 ### Transaction Safety
 
-- **Invitation:** User creation + role assignment wrapped in a DB transaction. If Supabase invitation fails, the transaction is not started (invitation is called first).
+- **Invitation:** User creation + role assignment wrapped in a DB transaction. If Clerk invitation fails, the transaction is not started (invitation is called first).
 - **Deactivation:** User update + all role revocations + audit log entries wrapped in a single transaction. If any step fails, all changes roll back.
 - **Role sync failures:** Non-fatal. The `syncRolesToAuth` function logs errors but does not throw (existing behavior from RoleService). JWT claims will self-correct on next token refresh.
 
 ### Retry Strategy
 
-- Supabase Auth calls: No automatic retry. Return 502 to the client on failure.
+- Clerk calls: No automatic retry. Return 502 to the client on failure.
 - Database operations: Rely on Drizzle/pg connection pool retry behavior.
 - Frontend: Hooks expose `refetch()` for manual retry. Error states show retry buttons.
 
@@ -601,7 +601,7 @@ Property-based testing is appropriate for this feature because:
 
 Each correctness property (1–16) maps to a single property-based test that:
 1. Generates random valid/invalid inputs using fast-check arbitraries
-2. Exercises the service function (with mocked DB/Supabase where needed)
+2. Exercises the service function (with mocked DB/Clerk where needed)
 3. Asserts the universal property holds
 
 ### Unit Tests (Vitest)
@@ -616,7 +616,7 @@ Each correctness property (1–16) maps to a single property-based test that:
 - **Transaction atomicity:** Force failures mid-transaction, verify rollback
 - **Middleware chain:** Verify `requireAuth` + `requireRole` applied to all routes
 - **Role service delegation:** Verify `assignRole`/`revokeRole` called with correct params
-- **Supabase Auth mock:** Verify `inviteUserByEmail` called with correct email and metadata
+- **Clerk mock:** Verify `inviteUserByEmail` called with correct email and metadata
 
 ### Frontend Tests
 

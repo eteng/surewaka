@@ -4,12 +4,12 @@
 
 This plan implements the admin notifications feature for the SureWaka admin portal. It adds a polling-based notification system with a bell icon + unread badge in the header, a popover for quick review, a full notifications page with filtering, and a backend API for CRUD operations on notifications. Cleanup of old notifications is handled by a daily cron job.
 
-The implementation follows existing patterns: Supabase migrations for DDL, Drizzle ORM schema sync, Zod validators in `@surewaka/shared`, Hono routes with `requireAuth` middleware, and React components with custom hooks for state management.
+The implementation follows existing patterns: Drizzle migrations for DDL, Drizzle ORM schema sync, Zod validators in `@surewaka/shared`, Hono routes with `requireAuth` middleware, and React components with custom hooks for state management.
 
 ## Tasks
 
 - [x] 1. Database schema and shared types
-  - [x] 1.1 Apply Supabase migration for notifications table and enum
+  - [x] 1.1 Apply Drizzle migration for notifications table and enum
     - Create `notification_type` enum with values: `new_user_signup`, `delivery_issue`, `carrier_verification_request`, `carrier_verified`, `dispute_opened`, `driver_verification_request`, `system_alert`
     - Create `notifications` table with columns: `id` (UUID PK), `user_id` (UUID FK → users), `type` (notification_type), `title` (text), `message` (text), `resource_link` (text nullable), `is_read` (boolean default false), `created_at` (timestamptz), `updated_at` (timestamptz)
     - Add partial index `idx_notifications_user_unread` on (user_id, is_read) WHERE is_read = false
@@ -169,7 +169,7 @@ The implementation follows existing patterns: Supabase migrations for DDL, Drizz
 
 - Property-based tests use `fast-check` consistent with existing patterns in the codebase
 - Each property test references a specific correctness property from the design document (12 total)
-- The project uses Supabase migrations for DDL — task 1.1 applies the migration, task 1.2 keeps Drizzle schema in sync
+- The project uses Drizzle migrations for DDL — task 1.1 applies the migration, task 1.2 keeps Drizzle schema in sync
 - Polling interval is 30 seconds with tab visibility awareness to conserve resources
 - Optimistic updates provide responsive UX with automatic revert on failure
 - The "all_admins" broadcast creates individual records per admin user for independent read state
