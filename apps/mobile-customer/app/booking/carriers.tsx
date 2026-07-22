@@ -59,99 +59,56 @@ export default function CarriersScreen() {
     loadCarriers();
   }, []);
 
-  // Build the quote request legs for a given carrier
-  const buildQuoteLegs = useCallback(
-    (carrierId: string) => {
-      const legs: unknown[] = [];
+  // Build the quote request legs for the on-demand instant option only
+  const buildInstantQuoteLegs = useCallback(() => {
+    if (pickup?.lat == null || pickup?.lng == null || dropoff?.lat == null || dropoff?.lng == null) {
+      return [];
+    }
+    return [{
+      legType: 'first_mile',
+      vehicleType,
+      pickup: { lat: pickup.lat, lng: pickup.lng },
+      dropoff: { lat: dropoff.lat, lng: dropoff.lng },
+    }];
+  }, [pickup, dropoff, vehicleType]);
 
-      // First-mile on-demand leg (pickup to some hub — use pickup/dropoff as estimate)
-      if (pickup?.lat != null && pickup?.lng != null && dropoff?.lat != null && dropoff?.lng != null) {
-        if (carrierId !== 'instant') {
-          // For carrier comparison: first_mile + intercity + last_mile
-          legs.push({
-            legType: 'first_mile',
-            vehicleType,
-            pickup: { lat: pickup.lat, lng: pickup.lng },
-            dropoff: { lat: pickup.lat, lng: pickup.lng }, // same point estimate for first-mile
-          });
-          legs.push({
-            legType: 'intercity',
-            carrierId,
-          });
-          legs.push({
-            legType: 'last_mile',
-            vehicleType,
-            pickup: { lat: dropoff.lat, lng: dropoff.lng },
-            dropoff: { lat: dropoff.lat, lng: dropoff.lng }, // same point estimate for last-mile
-          });
-        } else {
-          // Instant match: single on-demand leg from pickup to dropoff
-          legs.push({
-            legType: 'first_mile',
-            vehicleType,
-            pickup: { lat: pickup.lat, lng: pickup.lng },
-            dropoff: { lat: dropoff.lat, lng: dropoff.lng },
-          });
-        }
-      }
+  // Fetch the on-demand (instant) speculative quote only — carrier prices are not compared in MVP1
+  const fetchInstantQuote = useCallback(async () => {
+    const token = await getToken();
+    if (!token) return;
 
-      return legs;
-    },
-    [pickup, dropoff, vehicleType],
-  );
+    const legs = buildInstantQuoteLegs();
+    if (legs.length === 0) return;
 
-  // Fetch speculative quote for a specific carrier
-  const fetchQuote = useCallback(
-    async (carrierId: string) => {
-      const token = await getToken();
-      if (!token) return;
+    setQuotes((prev) => ({
+      ...prev,
+      instant: { loading: true, quote: null, error: null },
+    }));
 
-      const legs = buildQuoteLegs(carrierId);
-      if (legs.length === 0) return;
+    const res = await apiClient.post<QuoteResponse>(
+      '/api/v1/booking/quote',
+      { legs, packageWeight },
+      token,
+    );
 
+    if (res.error || !res.data) {
       setQuotes((prev) => ({
         ...prev,
-        [carrierId]: { loading: true, quote: null, error: null },
+        instant: { loading: false, quote: null, error: res.error?.message ?? 'Could not get quote' },
       }));
-
-      const res = await apiClient.post<QuoteResponse>(
-        '/api/v1/booking/quote',
-        { legs, packageWeight },
-        token,
-      );
-
-      if (res.error || !res.data) {
-        setQuotes((prev) => ({
-          ...prev,
-          [carrierId]: {
-            loading: false,
-            quote: null,
-            error: res.error?.message ?? 'Could not get quote',
-          },
-        }));
-      } else {
-        setQuotes((prev) => ({
-          ...prev,
-          [carrierId]: { loading: false, quote: res.data, error: null },
-        }));
-      }
-    },
-    [getToken, buildQuoteLegs, packageWeight],
-  );
-
-  // Fetch quotes for all carriers + instant once carriers are loaded and locations are available
-  useEffect(() => {
-    if (loading || error || carriers.length === 0) return;
-    if (!pickup?.lat || !dropoff?.lat) return;
-
-    // Fetch instant quote
-    fetchQuote('instant');
-
-    // Fetch quote for each carrier
-    for (const carrier of carriers) {
-      fetchQuote(carrier.id);
+    } else {
+      setQuotes((prev) => ({
+        ...prev,
+        instant: { loading: false, quote: res.data, error: null },
+      }));
     }
-  }, [loading, error, carriers, pickup, dropoff, packageWeight, vehicleType]);
+  }, [getToken, buildInstantQuoteLegs, packageWeight]);
+
+  // Fetch instant quote once locations are available
+  useEffect(() => {
+    if (!pickup?.lat || !dropoff?.lat) return;
+    void fetchInstantQuote();
+  }, [pickup, dropoff, packageWeight, vehicleType]);
 
   function selectCarrier(id: string) {
     setMode('carrier_direct');
@@ -276,7 +233,7 @@ export default function CarriersScreen() {
   return (
     <ScrollView className="flex-1 bg-white px-6 pt-6">
       <Text className="text-2xl font-bold text-gray-900 mb-2">Choose a Service</Text>
-      <Text className="text-base text-gray-500 mb-6">Compare prices and delivery times</Text>
+      <Text className="text-base text-gray-500 mb-6">Choose how to send your package</Text>
 
       {pickup?.city && dropoff?.city && pickup.city !== dropoff.city && (
         <Pressable
@@ -304,7 +261,7 @@ export default function CarriersScreen() {
             <Text className="text-lg font-bold text-primary">Instant Match</Text>
             <Text className="text-sm text-gray-500 mt-1">Get a driver in ~15 minutes</Text>
           </View>
-          {renderPriceBadge('instant', 300000)}
+          {renderPriceBadge('instant', null)}
         </View>
         {renderQuoteDetails('instant')}
       </Pressable>
@@ -355,9 +312,8 @@ export default function CarriersScreen() {
                     : ''}
                 </Text>
               </View>
-              {renderPriceBadge(carrier.id, carrier.basePrice)}
+              <Text className="text-sm text-gray-400">Price at checkout</Text>
             </View>
-            {renderQuoteDetails(carrier.id)}
           </Pressable>
         ))}
 
