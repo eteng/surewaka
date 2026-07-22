@@ -1,13 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import { stubAuthModule, personas } from '../test-utils/auth-mock';
 
 vi.mock('@surewaka/db', () => ({
   db: { execute: vi.fn().mockResolvedValue({ rows: [] }) },
 }));
-vi.mock('../middleware/auth', () => ({
-  requireAuth: vi.fn(async (c: Context, next: () => Promise<void>) => { c.set('user', { id: 'u1' }); await next(); }),
-}));
+vi.mock('../middleware/auth', () => stubAuthModule(personas.admin()));
 vi.mock('../middleware/role', () => ({
   requireRole: () => vi.fn(async (_c: Context, next: () => Promise<void>) => next()),
 }));

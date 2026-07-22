@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
+import { asUser } from '../test-utils/auth-mock';
 
 const mockVerifyToken = vi.fn();
 vi.mock('@surewaka/auth', () => ({
@@ -52,19 +53,6 @@ vi.mock('@surewaka/db', () => ({
   desc: vi.fn(),
 }));
 
-/** Returns a ClerkUserInfo as produced by verifyToken() */
-function clerkUser() {
-  return {
-    clerkId: 'clerk_user_123',
-    email: 'driver@example.com',
-    phone: undefined,
-    name: 'Test Driver',
-    avatarUrl: undefined,
-    roles: ['driver'],
-    carrierId: undefined,
-  };
-}
-
 async function createTestApp() {
   const mod = await import('../routes/payouts');
   const app = new Hono();
@@ -93,7 +81,7 @@ describe('Payouts routes', () => {
     );
 
     // Default: valid token
-    mockVerifyToken.mockResolvedValue(clerkUser());
+    asUser(mockVerifyToken, 'driver');
 
     app = await createTestApp();
   });

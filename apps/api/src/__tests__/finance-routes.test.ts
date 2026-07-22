@@ -13,15 +13,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { buildSummary } from '../routes/admin/finance';
-
-// ── Auth stubs — always passes, sets admin context ────────────────────────────
-
-vi.mock('../middleware/auth', () => ({
-  requireAuth: createMiddleware(async (c, next) => {
-    c.set('user', { id: 'user-uuid', clerkId: 'clerk_admin' });
-    await next();
-  }),
-}));
+// async import avoids stale-closure issues when vi.resetModules() is called in createApp()
+vi.mock('../middleware/auth', async () => {
+  const { stubAuthModule, personas } = await import('../test-utils/auth-mock');
+  return stubAuthModule(personas.admin());
+});
 
 vi.mock('../middleware/role', () => ({
   requireRole: () =>

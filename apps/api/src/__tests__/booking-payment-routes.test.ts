@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
+import { asUser } from '../test-utils/auth-mock';
 
 const mockVerifyToken = vi.fn();
 vi.mock('@surewaka/auth', () => ({
@@ -48,10 +49,6 @@ vi.mock('@surewaka/db', () => ({
   eq: vi.fn(),
 }));
 
-function clerkUser() {
-  return { clerkId: 'user_clerk123', email: 'user@example.com', roles: ['customer'] as string[] };
-}
-
 async function createTestApp() {
   const mod = await import('../routes/booking-payment');
   const app = new Hono();
@@ -80,7 +77,7 @@ describe('Booking payment routes', () => {
   });
 
   it('POST /booking/confirm returns 400 for invalid body', async () => {
-    mockVerifyToken.mockResolvedValue(clerkUser());
+    asUser(mockVerifyToken, 'customer');
     mockGetWalletByUserId.mockResolvedValue({ id: 'wallet-1' });
     const res = await app.request('/api/v1/booking/confirm', {
       method: 'POST',
@@ -91,7 +88,7 @@ describe('Booking payment routes', () => {
   });
 
   it('POST /deliveries/:id/cancel returns 422 for non-cancellable status', async () => {
-    mockVerifyToken.mockResolvedValue(clerkUser());
+    asUser(mockVerifyToken, 'customer');
     mockGetWalletByUserId.mockResolvedValue({ id: 'wallet-1' });
     // The locked select resolves at .for('update') — override for this test
     mockDbSelect.for.mockResolvedValueOnce([{ id: 'del-1', status: 'delivered', customerId: 'user-123', amountPaid: 350000, escrowHoldId: null }]);

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
+import { stubAuthModule, personas } from '../test-utils/auth-mock';
 
 vi.mock('@surewaka/db', () => ({
   db: {
@@ -20,12 +21,7 @@ vi.mock('@surewaka/db', () => ({
   drivers: {},
 }));
 
-vi.mock('../middleware/auth', () => ({
-  requireAuth: vi.fn(async (c: any, next: any) => {
-    c.set('user', { id: 'user-1' });
-    await next();
-  }),
-}));
+vi.mock('../middleware/auth', () => stubAuthModule(personas.driver()));
 
 async function createTestApp() {
   const { default: driverLocationRoutes } = await import('../routes/driver-locations');

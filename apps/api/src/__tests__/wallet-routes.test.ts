@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
+import { personas, makeDbSelectChain, resetDbSelectChain, asUser } from '../test-utils/auth-mock';
 
 const mockVerifyToken = vi.fn();
 vi.mock('@surewaka/auth', () => ({
@@ -26,11 +27,7 @@ vi.mock('../lib/paystack', () => ({
   createDedicatedVirtualAccount: vi.fn(),
 }));
 
-const mockDbSelect = {
-  from: vi.fn().mockReturnThis(),
-  where: vi.fn().mockReturnThis(),
-  limit: vi.fn().mockResolvedValue([{ id: 'user-123' }]),
-};
+const mockDbSelect = makeDbSelectChain('user-123');
 
 vi.mock('@surewaka/db', () => ({
   db: { select: vi.fn(() => mockDbSelect) },
@@ -39,10 +36,6 @@ vi.mock('@surewaka/db', () => ({
   users: 'users',
   eq: vi.fn(),
 }));
-
-function clerkUser() {
-  return { clerkId: 'user_clerk123', email: 'test@example.com', roles: ['customer'] as string[] };
-}
 
 async function createTestApp() {
   const walletModule = await import('../routes/wallet');
@@ -56,7 +49,7 @@ describe('Wallet routes', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockDbSelect.limit.mockResolvedValue([{ id: 'user-123' }]);
+    resetDbSelectChain(mockDbSelect, 'user-123');
     app = await createTestApp();
   });
 
@@ -69,7 +62,7 @@ describe('Wallet routes', () => {
   });
 
   it('GET /balance returns balance for authenticated user', async () => {
-    mockVerifyToken.mockResolvedValue(clerkUser());
+    asUser(mockVerifyToken, 'customer');
     mockGetWalletByUserId.mockResolvedValue({ id: 'wallet-1', balance: 350000, currency: 'NGN', status: 'active' });
     const res = await app.request('/api/v1/wallet/balance', {
       headers: { Authorization: 'Bearer valid-token' },
@@ -81,7 +74,7 @@ describe('Wallet routes', () => {
   });
 
   it('POST /check returns sufficient=false with shortfall', async () => {
-    mockVerifyToken.mockResolvedValue(clerkUser());
+    asUser(mockVerifyToken, 'customer');
     mockGetOrCreateWallet.mockResolvedValue({ id: 'wallet-1', balance: 100000 });
     mockCheckBalance.mockResolvedValue({ sufficient: false, balance: 100000, shortfall: 250000 });
     const res = await app.request('/api/v1/wallet/check', {
@@ -96,7 +89,7 @@ describe('Wallet routes', () => {
   });
 
   it('POST /fund returns reference and authorization_url', async () => {
-    mockVerifyToken.mockResolvedValue(clerkUser());
+    asUser(mockVerifyToken, 'customer');
     mockGetWalletByUserId.mockResolvedValue({ id: 'wallet-1', balance: 0 });
     mockInitializeTransaction.mockResolvedValue({
       reference: 'ref_abc',
@@ -113,7 +106,7 @@ describe('Wallet routes', () => {
   });
 
   it('POST /fund returns 400 for amount below minimum', async () => {
-    mockVerifyToken.mockResolvedValue(clerkUser());
+    asUser(mockVerifyToken, 'customer');
     mockGetWalletByUserId.mockResolvedValue({ id: 'wallet-1', balance: 0 });
     const res = await app.request('/api/v1/wallet/fund', {
       method: 'POST',
