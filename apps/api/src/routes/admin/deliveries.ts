@@ -27,7 +27,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // ─── Lifecycle tab status groups ─────────────────────────────────────────────
 
 const TAB_STATUSES = {
-  requests: ['draft', 'pending', 'accepted'] as const,
+  requests: ['pending_routing', 'routing_failed', 'draft', 'pending', 'accepted'] as const,
   active: [
     'en_route_pickup',
     'arrived_pickup',

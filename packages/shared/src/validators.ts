@@ -638,6 +638,7 @@ export const adminDeliveryListQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().max(200).optional(),
   status: z.enum([
+    'pending_routing', 'routing_failed',
     'draft', 'pending', 'accepted',
     'en_route_pickup', 'arrived_pickup', 'picked_up',
     'en_route_dropoff', 'arrived_dropoff',
