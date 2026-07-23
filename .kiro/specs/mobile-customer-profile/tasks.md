@@ -15,7 +15,7 @@
     - No-op if no matching row in `public.users`
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-  - [ ] 1.3 Regenerate Drizzle schema  ← edit schema file then generate + migrate
+  - [x] 1.3 Regenerate Drizzle schema  ← edit schema file then generate + migrate
     - Edit `packages/db/src/schema/users.ts` to add the column
     - Run `pnpm --filter @surewaka/db db:generate` then `pnpm --filter @surewaka/db db:migrate`
     - _Requirements: 4.3_

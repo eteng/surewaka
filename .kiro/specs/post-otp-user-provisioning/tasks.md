@@ -11,7 +11,7 @@ Bottom-up: schema → shared types → API → store → mobile UI.
   ALTER TABLE public.users ALTER COLUMN email DROP NOT NULL;
   ```
 
-- [ ] 2. After editing the schema in `packages/db/src/schema/users.ts`: run `pnpm --filter @surewaka/db db:generate` then `pnpm --filter @surewaka/db db:migrate` to apply the migration
+- [x] 2. After editing the schema in `packages/db/src/schema/users.ts`: run `pnpm --filter @surewaka/db db:generate` then `pnpm --filter @surewaka/db db:migrate` to apply the migration
 
 - [x] 3. Add `otpRegisterSchema` and `OtpRegister` type to `packages/shared/src/validators.ts`:
   ```typescript
