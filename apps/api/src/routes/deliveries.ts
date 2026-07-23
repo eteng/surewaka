@@ -124,6 +124,9 @@ deliveryRoutes.post('/', async (c) => {
       'motorcycle', // default — driver vehicle type applied when driver is assigned
     );
 
+    const hasIntercityLeg = legs ? legs.some(l => l.legType === 'intercity') : false;
+    const derivedMode = hasIntercityLeg ? 'carrier_direct' : 'on_demand';
+
     // No legs — create delivery only (backwards-compatible path, no quotes)
     if (!legs || legs.length === 0) {
       const [delivery] = await db
@@ -131,6 +134,7 @@ deliveryRoutes.post('/', async (c) => {
         .values({
           customerId:         user.id,
           status:             'draft',
+          deliveryMode:       'on_demand',
           pickupAddress:      pickup.address,
           pickupCity:         pickup.city,
           pickupLat:          pickup.lat,
@@ -212,6 +216,7 @@ deliveryRoutes.post('/', async (c) => {
         .values({
           customerId:         user.id,
           status:             'draft',
+          deliveryMode:       derivedMode,
           pickupAddress:      pickup.address,
           pickupCity:         pickup.city,
           pickupLat:          pickup.lat,
