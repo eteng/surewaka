@@ -362,6 +362,7 @@ deliveryRoutes.post('/:id/requote', async (c) => {
         id: deliveries.id,
         customerId: deliveries.customerId,
         status: deliveries.status,
+        deliveryMode: deliveries.deliveryMode,
         packageWeight: deliveries.packageWeight,
         priceKobo: deliveries.priceKobo,
       })
@@ -372,6 +373,22 @@ deliveryRoutes.post('/:id/requote', async (c) => {
       return c.json(
         { data: null, error: { code: 'NOT_FOUND', message: 'Delivery not found' }, meta: null },
         404,
+      );
+    }
+
+    // surewaka_way deliveries are re-routed via the routing worker when quotes expire —
+    // the standard fee-engine requote path would use the wrong intercity pricing.
+    if (delivery.deliveryMode === 'surewaka_way') {
+      return c.json(
+        {
+          data: null,
+          error: {
+            code: 'NOT_REQUOTABLE',
+            message: 'surewaka_way deliveries are re-routed automatically when quotes expire',
+          },
+          meta: null,
+        },
+        409,
       );
     }
 
