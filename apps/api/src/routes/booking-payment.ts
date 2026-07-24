@@ -192,7 +192,7 @@ const REFUND_RATES: Record<string, number> = {
   arrived_dropoff: 0.5,
 };
 
-const NON_CANCELLABLE = new Set(['delivered', 'cancelled', 'failed', 'returned', 'draft']);
+const NON_CANCELLABLE = new Set(['delivered', 'cancelled', 'failed', 'returned']);
 
 // POST /deliveries/:id/cancel — tiered refund
 bookingPaymentRoutes.post('/deliveries/:id/cancel', async (c) => {
@@ -227,8 +227,8 @@ bookingPaymentRoutes.post('/deliveries/:id/cancel', async (c) => {
         throw Object.assign(new Error('NOT_FOUND'), { code: 'NOT_FOUND' });
       }
 
-      // Special case: surewaka_way draft — free cancel, no escrow at this stage
-      if (locked.status === 'draft' && locked.deliveryMode === 'surewaka_way') {
+      // Draft deliveries (all modes) — no payment has been taken, free cancel
+      if (locked.status === 'draft') {
         await tx
           .update(deliveries)
           .set({ status: 'cancelled', paymentStatus: 'released' })

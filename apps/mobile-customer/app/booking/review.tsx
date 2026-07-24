@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/expo';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -74,6 +74,27 @@ export default function ReviewScreen() {
 
   // Quote expiry countdown — tracks time remaining on the authoritative quote
   const { isExpiringSoon, isExpired, countdownDisplay } = useQuoteExpiry(quoteExpiresAt);
+
+  // Tracks whether the booking completed successfully so the cleanup below doesn't
+  // cancel a delivery that's already been confirmed and is progressing normally.
+  const confirmedRef = useRef(false);
+
+  // Cancel any in-progress draft delivery when the user navigates away without confirming.
+  // Uses getState() to read the current store value rather than a stale closure.
+  useEffect(() => {
+    return () => {
+      if (confirmedRef.current) return;
+      const { deliveryId: id } = useBookingStore.getState();
+      if (!id) return;
+      getToken().then((token) => {
+        if (!token) return;
+        createAuthClient(token)
+          .post(`/api/v1/deliveries/${id}/cancel`, {})
+          .catch(() => {});
+      });
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * Refreshes the quote by calling the re-quote endpoint.
@@ -150,6 +171,7 @@ export default function ReviewScreen() {
         Alert.alert('Booking Failed', json.error?.message ?? 'Something went wrong');
         return;
       }
+      confirmedRef.current = true; // prevent cleanup from cancelling this delivery
       resetBooking();
       router.push({ pathname: '/booking/confirmed', params: { deliveryId } });
     } catch (err) {
@@ -182,6 +204,12 @@ export default function ReviewScreen() {
     setSubmitting(true);
 
     const client = createAuthClient((await getToken())!);
+
+    // Cancel any previous draft from a failed or abandoned attempt before creating a new one
+    if (storedDeliveryId) {
+      client.post(`/api/v1/deliveries/${storedDeliveryId}/cancel`, {}).catch(() => {});
+      setDeliveryId(null);
+    }
 
     const legs = buildLegs();
     const isSurewakaWay = mode === 'surewaka_way';
