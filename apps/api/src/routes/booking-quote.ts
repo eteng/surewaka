@@ -168,9 +168,19 @@ bookingQuoteRoutes.post('/booking/quote', async (c) => {
           const [route] = await db
             .select({ basePriceKobo: carrierRoutes.basePriceKobo })
             .from(carrierRoutes)
-            .where(eq(carrierRoutes.id, leg.routeId))
+            .where(and(eq(carrierRoutes.id, leg.routeId), eq(carrierRoutes.carrierId, leg.carrierId)))
             .limit(1);
-          if (route) basePriceKobo = route.basePriceKobo;
+          if (!route) {
+            return c.json(
+              {
+                data: null,
+                error: { code: 'ROUTE_NOT_FOUND', message: `Route ${leg.routeId} does not belong to carrier ${leg.carrierId}` },
+                meta: null,
+              },
+              400,
+            );
+          }
+          basePriceKobo = route.basePriceKobo;
         }
 
         if (!basePriceKobo) {

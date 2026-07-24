@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq, and, isNull, inArray } from 'drizzle-orm';
+import { eq, and, or, isNull, inArray } from 'drizzle-orm';
 import { db, deliveries, deliveryLegs, users, carriers, carrierRoutes, feeSettings, vehicleTypeRates, quotes, carrierParks } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { requireRole } from '../middleware/role';
@@ -203,15 +203,27 @@ deliveryRoutes.post('/', async (c) => {
         carriersMap.set(row.id, { basePrice: row.basePrice ?? 0, name: row.name });
       }
 
-      // Override with route-specific pricing when the client supplied a routeId
-      const routeIds = intercityLegs
-        .map((l) => l.routeId)
-        .filter((id): id is string => !!id);
-      if (routeIds.length > 0) {
+      // Override with route-specific pricing when the client supplied a routeId.
+      // Scope by both id AND carrierId so a mismatched pair is rejected, not silently ignored.
+      const legsWithRoute = intercityLegs.filter(
+        (l): l is { legType: 'intercity'; carrierId: string; routeId: string } => !!l.routeId,
+      );
+      if (legsWithRoute.length > 0) {
+        const routeConditions = legsWithRoute.map((l) =>
+          and(eq(carrierRoutes.id, l.routeId), eq(carrierRoutes.carrierId, l.carrierId)),
+        );
         const routeRows = await db
           .select({ id: carrierRoutes.id, carrierId: carrierRoutes.carrierId, basePriceKobo: carrierRoutes.basePriceKobo })
           .from(carrierRoutes)
-          .where(inArray(carrierRoutes.id, routeIds));
+          .where(or(...routeConditions));
+
+        if (routeRows.length !== legsWithRoute.length) {
+          return c.json(
+            { data: null, error: { code: 'ROUTE_NOT_FOUND', message: 'One or more route IDs do not match the specified carrier' }, meta: null },
+            400,
+          );
+        }
+
         for (const route of routeRows) {
           const existing = carriersMap.get(route.carrierId);
           if (existing) {
