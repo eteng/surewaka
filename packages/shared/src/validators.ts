@@ -34,6 +34,7 @@ const deliveryOnDemandLegSchema = z.object({
 const deliveryCarrierLegSchema = z.object({
   legType: z.literal('intercity'),
   carrierId: z.string().uuid(),
+  routeId: z.string().uuid().optional(),
 });
 
 const deliveryLegInputSchema = z.union([deliveryOnDemandLegSchema, deliveryCarrierLegSchema]);
@@ -667,6 +668,7 @@ const quoteOnDemandLegSchema = z.object({
 const quoteCarrierLegSchema = z.object({
   legType: z.literal('intercity'),
   carrierId: z.string().uuid(),
+  routeId: z.string().uuid().optional(),
 });
 
 const quoteLegSchema = z.discriminatedUnion('legType', [

@@ -8,6 +8,8 @@ type BookingState = {
   packageDetails: Partial<PackageDetails> | null;
   recipientDetails: Partial<RecipientDetails> | null;
   selectedCarrier: string | null;
+  /** Route ID for the selected intercity carrier route — used for route-specific pricing */
+  selectedRouteId: string | null;
   /** Vehicle type for on-demand legs — determines driver pool and price multiplier */
   vehicleType: VehicleType;
   /** Delivery mode set when user picks a service from the carriers screen */
@@ -20,6 +22,7 @@ type BookingState = {
   setPackageDetails: (details: Partial<PackageDetails>) => void;
   setRecipientDetails: (details: Partial<RecipientDetails>) => void;
   setSelectedCarrier: (carrier: string | null) => void;
+  setSelectedRouteId: (routeId: string | null) => void;
   setVehicleType: (vehicleType: VehicleType) => void;
   setMode: (mode: DeliveryMode | null) => void;
   setDeliveryId: (id: string | null) => void;
@@ -34,6 +37,7 @@ export const useBookingStore = create<BookingState>((set) => ({
   packageDetails: null,
   recipientDetails: null,
   selectedCarrier: null,
+  selectedRouteId: null,
   vehicleType: 'motorcycle',
   mode: null,
   deliveryId: null,
@@ -45,6 +49,7 @@ export const useBookingStore = create<BookingState>((set) => ({
   setPackageDetails: (packageDetails) => set({ packageDetails }),
   setRecipientDetails: (recipientDetails) => set({ recipientDetails }),
   setSelectedCarrier: (selectedCarrier) => set({ selectedCarrier }),
+  setSelectedRouteId: (selectedRouteId) => set({ selectedRouteId }),
   setVehicleType: (vehicleType) => set({ vehicleType }),
   setMode: (mode) => set({ mode }),
   setDeliveryId: (deliveryId) => set({ deliveryId }),
@@ -58,6 +63,7 @@ export const useBookingStore = create<BookingState>((set) => ({
       packageDetails: null,
       recipientDetails: null,
       selectedCarrier: null,
+      selectedRouteId: null,
       vehicleType: 'motorcycle',
       mode: null,
       deliveryId: null,

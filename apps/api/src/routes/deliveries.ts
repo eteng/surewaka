@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, and, isNull, inArray } from 'drizzle-orm';
-import { db, deliveries, deliveryLegs, users, carriers, feeSettings, vehicleTypeRates, quotes, carrierParks } from '@surewaka/db';
+import { db, deliveries, deliveryLegs, users, carriers, carrierRoutes, feeSettings, vehicleTypeRates, quotes, carrierParks } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { requireRole } from '../middleware/role';
 import { createDeliverySchema, weightCorrectionRequestSchema, weightCorrectionRespondSchema } from '@surewaka/shared';
@@ -186,9 +186,11 @@ deliveryRoutes.post('/', async (c) => {
       vTypeRates[row.vehicleType as VehicleType] = { multiplier: Number(row.multiplier) };
     }
 
-    const carrierIds = legs
-      .filter((l): l is { legType: 'intercity'; carrierId: string } => l.legType === 'intercity')
-      .map((l) => l.carrierId);
+    const intercityLegs = legs.filter(
+      (l): l is { legType: 'intercity'; carrierId: string; routeId?: string } =>
+        l.legType === 'intercity',
+    );
+    const carrierIds = intercityLegs.map((l) => l.carrierId);
 
     const carriersMap = new Map<string, { basePrice: number; name: string }>();
     if (carrierIds.length > 0) {
@@ -199,6 +201,23 @@ deliveryRoutes.post('/', async (c) => {
 
       for (const row of carrierRows) {
         carriersMap.set(row.id, { basePrice: row.basePrice ?? 0, name: row.name });
+      }
+
+      // Override with route-specific pricing when the client supplied a routeId
+      const routeIds = intercityLegs
+        .map((l) => l.routeId)
+        .filter((id): id is string => !!id);
+      if (routeIds.length > 0) {
+        const routeRows = await db
+          .select({ id: carrierRoutes.id, carrierId: carrierRoutes.carrierId, basePriceKobo: carrierRoutes.basePriceKobo })
+          .from(carrierRoutes)
+          .where(inArray(carrierRoutes.id, routeIds));
+        for (const route of routeRows) {
+          const existing = carriersMap.get(route.carrierId);
+          if (existing) {
+            carriersMap.set(route.carrierId, { ...existing, basePrice: route.basePriceKobo });
+          }
+        }
       }
     }
 

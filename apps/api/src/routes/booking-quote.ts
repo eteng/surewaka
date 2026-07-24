@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, and } from 'drizzle-orm';
-import { db, feeSettings, vehicleTypeRates, carriers, carrierParks } from '@surewaka/db';
+import { db, feeSettings, vehicleTypeRates, carriers, carrierParks, carrierRoutes } from '@surewaka/db';
 import { quoteRequestSchema, FEE_ENGINE_ERRORS } from '@surewaka/shared';
 import type { FeeSettings, VehicleType, VehicleTypeRates } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
@@ -144,7 +144,7 @@ bookingQuoteRoutes.post('/booking/quote', async (c) => {
           totalKobo: quote.totalKobo,
         });
       } else if (leg.legType === 'intercity') {
-        // Carrier leg — look up carrier's basePrice
+        // Carrier leg — prefer route-specific base price when routeId is provided
         const [carrier] = await db
           .select({ id: carriers.id, name: carriers.name, basePrice: carriers.basePrice })
           .from(carriers)
@@ -162,7 +162,18 @@ bookingQuoteRoutes.post('/booking/quote', async (c) => {
           );
         }
 
-        if (!carrier.basePrice) {
+        let basePriceKobo: number | null = carrier.basePrice ?? null;
+
+        if (leg.routeId) {
+          const [route] = await db
+            .select({ basePriceKobo: carrierRoutes.basePriceKobo })
+            .from(carrierRoutes)
+            .where(eq(carrierRoutes.id, leg.routeId))
+            .limit(1);
+          if (route) basePriceKobo = route.basePriceKobo;
+        }
+
+        if (!basePriceKobo) {
           return c.json(
             {
               data: null,
@@ -174,7 +185,7 @@ bookingQuoteRoutes.post('/booking/quote', async (c) => {
         }
 
         const quote = computeCarrierQuote(
-          { carrierBasePrice: carrier.basePrice, carrierName: carrier.name },
+          { carrierBasePrice: basePriceKobo, carrierName: carrier.name },
           feeSettingsObj,
         );
 

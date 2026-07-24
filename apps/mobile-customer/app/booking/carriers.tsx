@@ -2,8 +2,18 @@ import { useAuth } from '@clerk/expo';
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useBookingStore, carriersApi, apiClient } from '@surewaka/mobile-shared';
-import type { Carrier, LineItem } from '@surewaka/shared';
+import { useBookingStore, apiClient } from '@surewaka/mobile-shared';
+import type { LineItem } from '@surewaka/shared';
+
+type CarrierRoute = {
+  routeId: string;
+  carrierId: string;
+  carrierName: string;
+  basePriceKobo: number;
+  estimatedTransitHours: number;
+  maxWeightKg: number;
+  nextDepartureAt: string | null;
+};
 
 type LegQuoteResult = {
   legType: string;
@@ -16,7 +26,7 @@ type QuoteResponse = {
   compositeTotalKobo: number;
 };
 
-type CarrierQuoteState = {
+type RouteQuoteState = {
   loading: boolean;
   quote: QuoteResponse | null;
   error: string | null;
@@ -27,72 +37,92 @@ export default function CarriersScreen() {
   const { getToken } = useAuth();
   const setStep = useBookingStore((s) => s.setStep);
   const setSelectedCarrier = useBookingStore((s) => s.setSelectedCarrier);
+  const setSelectedRouteId = useBookingStore((s) => s.setSelectedRouteId);
   const setMode = useBookingStore((s) => s.setMode);
   const pickup = useBookingStore((s) => s.pickup);
   const dropoff = useBookingStore((s) => s.dropoff);
   const packageDetails = useBookingStore((s) => s.packageDetails);
 
-  const [carriers, setCarriers] = useState<Carrier[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [routes, setRoutes] = useState<CarrierRoute[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Quotes state: keyed by carrier id (or 'instant' for on-demand)
-  const [quotes, setQuotes] = useState<Record<string, CarrierQuoteState>>({});
+  // Quotes state: keyed by routeId (or 'instant' for on-demand)
+  const [quotes, setQuotes] = useState<Record<string, RouteQuoteState>>({});
 
   const vehicleType = useBookingStore((s) => s.vehicleType);
-
   const packageWeight = packageDetails?.weight ?? 1;
 
-  async function loadCarriers() {
+  const isIntercity =
+    !!pickup?.city && !!dropoff?.city && pickup.city !== dropoff.city;
+
+  async function loadRoutes() {
+    if (!pickup?.city || !dropoff?.city) return;
+
     setLoading(true);
     setError(null);
-    const res = await carriersApi.list();
+    setRoutes([]);
+
+    const token = await getToken();
+    if (!token) {
+      setError('Authentication required.');
+      setLoading(false);
+      return;
+    }
+
+    const res = await apiClient.get<CarrierRoute[]>(
+      `/api/v1/carrier-routes?fromCity=${encodeURIComponent(pickup.city)}&toCity=${encodeURIComponent(dropoff.city)}`,
+      token,
+    );
+
     if (res.error || !res.data) {
-      setError('Could not load carriers. Please try again.');
+      setError('Could not load carriers for this route. Please try again.');
     } else {
-      setCarriers(res.data);
+      setRoutes(res.data);
     }
     setLoading(false);
   }
 
   useEffect(() => {
-    loadCarriers();
-  }, []);
+    if (isIntercity) {
+      loadRoutes();
+    }
+  }, [pickup?.city, dropoff?.city]);
 
-  // Build the quote request legs for a given carrier
+  // Build quote request legs for a given carrierId (or 'instant')
   const buildQuoteLegs = useCallback(
-    (carrierId: string) => {
+    (carrierId: string, routeId?: string) => {
       const legs: unknown[] = [];
 
-      // First-mile on-demand leg (pickup to some hub — use pickup/dropoff as estimate)
-      if (pickup?.lat != null && pickup?.lng != null && dropoff?.lat != null && dropoff?.lng != null) {
-        if (carrierId !== 'instant') {
-          // For carrier comparison: first_mile + intercity + last_mile
-          legs.push({
-            legType: 'first_mile',
-            vehicleType,
-            pickup: { lat: pickup.lat, lng: pickup.lng },
-            dropoff: { lat: pickup.lat, lng: pickup.lng }, // API uses nearest park; fallback only
-          });
-          legs.push({
-            legType: 'intercity',
-            carrierId,
-          });
-          legs.push({
-            legType: 'last_mile',
-            vehicleType,
-            pickup: { lat: dropoff.lat, lng: dropoff.lng },
-            dropoff: { lat: dropoff.lat, lng: dropoff.lng }, // API uses nearest park; fallback only
-          });
-        } else {
-          // Instant match: single on-demand leg from pickup to dropoff
-          legs.push({
-            legType: 'first_mile',
-            vehicleType,
-            pickup: { lat: pickup.lat, lng: pickup.lng },
-            dropoff: { lat: dropoff.lat, lng: dropoff.lng },
-          });
-        }
+      if (pickup?.lat == null || pickup?.lng == null || dropoff?.lat == null || dropoff?.lng == null) {
+        return legs;
+      }
+
+      if (carrierId === 'instant') {
+        legs.push({
+          legType: 'first_mile',
+          vehicleType,
+          pickup: { lat: pickup.lat, lng: pickup.lng },
+          dropoff: { lat: dropoff.lat, lng: dropoff.lng },
+        });
+      } else {
+        legs.push({
+          legType: 'first_mile',
+          vehicleType,
+          pickup: { lat: pickup.lat, lng: pickup.lng },
+          dropoff: { lat: pickup.lat, lng: pickup.lng },
+        });
+        legs.push({
+          legType: 'intercity',
+          carrierId,
+          ...(routeId ? { routeId } : {}),
+        });
+        legs.push({
+          legType: 'last_mile',
+          vehicleType,
+          pickup: { lat: dropoff.lat, lng: dropoff.lng },
+          dropoff: { lat: dropoff.lat, lng: dropoff.lng },
+        });
       }
 
       return legs;
@@ -100,18 +130,17 @@ export default function CarriersScreen() {
     [pickup, dropoff, vehicleType],
   );
 
-  // Fetch speculative quote for a specific carrier
   const fetchQuote = useCallback(
-    async (carrierId: string) => {
+    async (key: string, carrierId: string, routeId?: string) => {
       const token = await getToken();
       if (!token) return;
 
-      const legs = buildQuoteLegs(carrierId);
+      const legs = buildQuoteLegs(carrierId, routeId);
       if (legs.length === 0) return;
 
       setQuotes((prev) => ({
         ...prev,
-        [carrierId]: { loading: true, quote: null, error: null },
+        [key]: { loading: true, quote: null, error: null },
       }));
 
       const res = await apiClient.post<QuoteResponse>(
@@ -123,7 +152,7 @@ export default function CarriersScreen() {
       if (res.error || !res.data) {
         setQuotes((prev) => ({
           ...prev,
-          [carrierId]: {
+          [key]: {
             loading: false,
             quote: null,
             error: res.error?.message ?? 'Could not get quote',
@@ -132,30 +161,40 @@ export default function CarriersScreen() {
       } else {
         setQuotes((prev) => ({
           ...prev,
-          [carrierId]: { loading: false, quote: res.data, error: null },
+          [key]: { loading: false, quote: res.data, error: null },
         }));
       }
     },
     [getToken, buildQuoteLegs, packageWeight],
   );
 
-  // Fetch quotes for all carriers + instant once carriers are loaded and locations are available
   useEffect(() => {
-    if (loading || error || carriers.length === 0) return;
     if (!pickup?.lat || !dropoff?.lat) return;
 
-    // Fetch instant quote
-    fetchQuote('instant');
+    fetchQuote('instant', 'instant');
+  }, [pickup, dropoff, packageWeight, vehicleType]);
 
-    // Fetch quote for each carrier
-    for (const carrier of carriers) {
-      fetchQuote(carrier.id);
+  useEffect(() => {
+    if (loading || error || routes.length === 0) return;
+    if (!pickup?.lat || !dropoff?.lat) return;
+
+    for (const route of routes) {
+      fetchQuote(route.routeId, route.carrierId, route.routeId);
     }
-  }, [loading, error, carriers, pickup, dropoff, packageWeight, vehicleType]);
+  }, [loading, error, routes, pickup, dropoff, packageWeight, vehicleType]);
 
-  function selectCarrier(id: string) {
+  function selectRoute(route: CarrierRoute) {
     setMode('carrier_direct');
-    setSelectedCarrier(id);
+    setSelectedCarrier(route.carrierId);
+    setSelectedRouteId(route.routeId);
+    setStep(4);
+    router.push('/booking/review');
+  }
+
+  function selectInstant() {
+    setMode('on_demand');
+    setSelectedCarrier('instant');
+    setSelectedRouteId(null);
     setStep(4);
     router.push('/booking/review');
   }
@@ -163,6 +202,7 @@ export default function CarriersScreen() {
   function selectSurewakaWay() {
     setMode('surewaka_way');
     setSelectedCarrier(null);
+    setSelectedRouteId(null);
     setStep(4);
     router.push('/booking/review');
   }
@@ -171,9 +211,19 @@ export default function CarriersScreen() {
     return `₦${(kobo / 100).toLocaleString()}`;
   }
 
-  // Render line items for a carrier's quote
-  function renderQuoteDetails(carrierId: string) {
-    const quoteState = quotes[carrierId];
+  function formatDeparture(isoString: string | null): string {
+    if (!isoString) return 'Schedule TBD';
+    const date = new Date(isoString);
+    return date.toLocaleTimeString('en-NG', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Africa/Lagos',
+    });
+  }
+
+  function renderQuoteDetails(key: string) {
+    const quoteState = quotes[key];
 
     if (!quoteState || quoteState.loading) {
       return (
@@ -191,7 +241,6 @@ export default function CarriersScreen() {
 
     if (!quoteState.quote) return null;
 
-    // For carrier comparison, show the intercity leg's line items
     const intercityLeg = quoteState.quote.legs.find((l) => l.legType === 'intercity');
     const onDemandLegs = quoteState.quote.legs.filter(
       (l) => l.legType === 'first_mile' || l.legType === 'last_mile',
@@ -242,9 +291,8 @@ export default function CarriersScreen() {
     );
   }
 
-  // Render the total price badge for a carrier
-  function renderPriceBadge(carrierId: string, fallbackPrice: number | null) {
-    const quoteState = quotes[carrierId];
+  function renderPriceBadge(key: string, fallbackPriceKobo: number | null) {
+    const quoteState = quotes[key];
 
     if (!quoteState || quoteState.loading) {
       return (
@@ -255,11 +303,10 @@ export default function CarriersScreen() {
     }
 
     if (quoteState.error || !quoteState.quote) {
-      // Fallback to static basePrice if quote fails
-      if (fallbackPrice != null) {
+      if (fallbackPriceKobo != null) {
         return (
           <Text className="text-lg font-bold text-gray-900 shrink-0">
-            From {formatKobo(fallbackPrice)}
+            From {formatKobo(fallbackPriceKobo)}
           </Text>
         );
       }
@@ -278,7 +325,7 @@ export default function CarriersScreen() {
       <Text className="text-2xl font-bold text-gray-900 mb-2">Choose a Service</Text>
       <Text className="text-base text-gray-500 mb-6">Compare prices and delivery times</Text>
 
-      {pickup?.city && dropoff?.city && pickup.city !== dropoff.city && (
+      {isIntercity && (
         <Pressable
           onPress={selectSurewakaWay}
           className="bg-emerald-50 rounded-xl p-4 mb-4 border-2 border-emerald-600"
@@ -296,7 +343,7 @@ export default function CarriersScreen() {
       )}
 
       <Pressable
-        onPress={() => { setMode('on_demand'); selectCarrier('instant'); }}
+        onPress={selectInstant}
         className="bg-primary-light rounded-xl p-4 mb-4 border-2 border-primary"
       >
         <View className="flex-row items-center justify-between">
@@ -309,57 +356,61 @@ export default function CarriersScreen() {
         {renderQuoteDetails('instant')}
       </Pressable>
 
-      <Text className="text-base font-semibold text-gray-900 mb-3 mt-2">Registered Carriers</Text>
+      {isIntercity && (
+        <>
+          <Text className="text-base font-semibold text-gray-900 mb-3 mt-2">Registered Carriers</Text>
 
-      {loading && (
-        <View className="py-10 items-center">
-          <ActivityIndicator size="large" color="#16a34a" />
-        </View>
-      )}
-
-      {!loading && error && (
-        <View className="py-8 items-center gap-3">
-          <Text className="text-gray-500 text-sm text-center">{error}</Text>
-          <Pressable onPress={loadCarriers} className="px-4 py-2 bg-primary rounded-lg">
-            <Text className="text-white font-semibold text-sm">Retry</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {!loading && !error && carriers.length === 0 && (
-        <View className="py-8 items-center">
-          <Text className="text-gray-400 text-sm">No carriers available at the moment.</Text>
-        </View>
-      )}
-
-      {!loading &&
-        !error &&
-        carriers.map((carrier) => (
-          <Pressable
-            key={carrier.id}
-            onPress={() => selectCarrier(carrier.id)}
-            className="bg-gray-50 rounded-xl p-4 mb-3"
-          >
-            <View className="flex-row items-center justify-between">
-              <View className="flex-1 mr-4">
-                <View className="flex-row items-center gap-2">
-                  <Text className="text-base font-semibold text-gray-900">{carrier.name}</Text>
-                  {carrier.isVerified && (
-                    <Text className="text-xs text-green-600 font-medium">✓ Verified</Text>
-                  )}
-                </View>
-                <Text className="text-sm text-gray-500 mt-0.5">
-                  {carrier.rating != null ? `⭐ ${carrier.rating.toFixed(1)}` : 'No ratings yet'}
-                  {carrier.deliveryCount != null && carrier.deliveryCount > 0
-                    ? ` · ${carrier.deliveryCount.toLocaleString()} deliveries`
-                    : ''}
-                </Text>
-              </View>
-              {renderPriceBadge(carrier.id, carrier.basePrice)}
+          {loading && (
+            <View className="py-10 items-center">
+              <ActivityIndicator size="large" color="#16a34a" />
             </View>
-            {renderQuoteDetails(carrier.id)}
-          </Pressable>
-        ))}
+          )}
+
+          {!loading && error && (
+            <View className="py-8 items-center gap-3">
+              <Text className="text-gray-500 text-sm text-center">{error}</Text>
+              <Pressable onPress={loadRoutes} className="px-4 py-2 bg-primary rounded-lg">
+                <Text className="text-white font-semibold text-sm">Retry</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {!loading && !error && routes.length === 0 && (
+            <View className="py-8 items-center">
+              <Text className="text-gray-400 text-sm">No carriers available for this route.</Text>
+            </View>
+          )}
+
+          {!loading &&
+            !error &&
+            routes.map((route) => (
+              <Pressable
+                key={route.routeId}
+                onPress={() => selectRoute(route)}
+                className="bg-gray-50 rounded-xl p-4 mb-3"
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 mr-4">
+                    <Text className="text-base font-semibold text-gray-900">{route.carrierName}</Text>
+                    <Text className="text-sm text-gray-500 mt-0.5">
+                      {route.estimatedTransitHours}h transit
+                      {route.nextDepartureAt
+                        ? ` · Next: ${formatDeparture(route.nextDepartureAt)}`
+                        : ''}
+                    </Text>
+                    {route.maxWeightKg < 1000 && (
+                      <Text className="text-xs text-gray-400 mt-0.5">
+                        Max {route.maxWeightKg}kg
+                      </Text>
+                    )}
+                  </View>
+                  {renderPriceBadge(route.routeId, route.basePriceKobo)}
+                </View>
+                {renderQuoteDetails(route.routeId)}
+              </Pressable>
+            ))}
+        </>
+      )}
 
       <View className="h-8" />
     </ScrollView>

@@ -53,6 +53,7 @@ export default function ReviewScreen() {
   const packageDetails = useBookingStore((s) => s.packageDetails);
   const recipientDetails = useBookingStore((s) => s.recipientDetails);
   const selectedCarrier = useBookingStore((s) => s.selectedCarrier);
+  const selectedRouteId = useBookingStore((s) => s.selectedRouteId);
   const vehicleType = useBookingStore((s) => s.vehicleType);
   const mode = useBookingStore((s) => s.mode);
   const storedDeliveryId = useBookingStore((s) => s.deliveryId);
@@ -124,7 +125,11 @@ export default function ReviewScreen() {
 
     return [
       { legType: 'first_mile' as const, vehicleType },
-      { legType: 'intercity' as const, carrierId: selectedCarrier },
+      {
+        legType: 'intercity' as const,
+        carrierId: selectedCarrier,
+        ...(selectedRouteId ? { routeId: selectedRouteId } : {}),
+      },
       { legType: 'last_mile' as const, vehicleType },
     ];
   }
