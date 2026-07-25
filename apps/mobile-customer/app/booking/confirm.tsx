@@ -136,8 +136,14 @@ export default function ConfirmRoutedScreen() {
 
       {expiresAt ? (
         <View className="bg-amber-50 rounded-xl p-4 mb-4 border border-amber-200">
-          <Text className="text-sm text-amber-700">
-            Quote expires {formatEta(expiresAt)}. Confirm before then.
+          <Text className="text-sm font-semibold text-amber-700 uppercase mb-1">
+            Free cancellation until
+          </Text>
+          <Text className="text-base font-bold text-amber-900">
+            {formatEta(expiresAt)}
+          </Text>
+          <Text className="text-xs text-amber-600 mt-1">
+            Cancel for free before this time. After this, a cancellation fee applies.
           </Text>
         </View>
       ) : null}

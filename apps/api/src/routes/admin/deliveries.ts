@@ -7,10 +7,12 @@ import { requireRole } from '../../middleware/role';
 import { adminDeliveryListQuerySchema } from '@surewaka/shared';
 import type { UserRole } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
-import { db, deliveries, users, drivers, carriers } from '@surewaka/db';
+import { db, deliveries, users, drivers, carriers, weightDiscrepancyCorrections } from '@surewaka/db';
 import { eq, and, or, ilike, inArray, sql, asc, desc } from 'drizzle-orm';
 import { getDeliveryDetail } from '../../services/delivery-detail-service';
 import { getDeliveryEvents } from '../../services/delivery-events-service';
+import { getWalletByUserId, creditWallet } from '../../lib/wallet-service';
+import { writeLedgerEvent } from '../../lib/ledger';
 
 type DeliveryManagementEnv = {
   Variables: {
@@ -305,6 +307,121 @@ deliveryRoutes.get('/:id', async (c) => {
   }
 
   return c.json({ data: delivery, error: null, meta: null }, 200);
+});
+
+// ─── Admin Weight Correction Reversal ─────────────────────────────────────────
+
+/**
+ * POST /admin/deliveries/:id/reverse-weight-correction
+ *
+ * Reverses an auto-expired or declined weight correction. Credits the customer
+ * the remaining 15% that was withheld and writes a commission_reversal ledger event.
+ *
+ * REQ-4: Admin manual correction reversal.
+ */
+deliveryRoutes.post('/:id/reverse-weight-correction', async (c) => {
+  const user = c.get('user');
+  const deliveryId = c.req.param('id');
+
+  // 1. Load delivery
+  const [delivery] = await db
+    .select({
+      id: deliveries.id,
+      status: deliveries.status,
+      customerId: deliveries.customerId,
+      amountPaid: deliveries.amountPaid,
+      escrowHoldId: deliveries.escrowHoldId,
+    })
+    .from(deliveries)
+    .where(eq(deliveries.id, deliveryId));
+
+  if (!delivery) {
+    return c.json(
+      { data: null, error: { code: 'NOT_FOUND', message: 'Delivery not found' }, meta: null },
+      404,
+    );
+  }
+
+  if (delivery.status !== 'failed') {
+    return c.json(
+      { data: null, error: { code: 'INVALID_STATUS', message: 'Only failed deliveries can be reversed' }, meta: null },
+      422,
+    );
+  }
+
+  // 2. Find the expired/declined correction
+  const [correction] = await db
+    .select()
+    .from(weightDiscrepancyCorrections)
+    .where(
+      and(
+        eq(weightDiscrepancyCorrections.deliveryId, deliveryId),
+        inArray(weightDiscrepancyCorrections.status, ['expired', 'declined']),
+      ),
+    )
+    .limit(1);
+
+  if (!correction) {
+    return c.json(
+      { data: null, error: { code: 'NO_CORRECTION', message: 'No expired/declined weight correction found for this delivery' }, meta: null },
+      422,
+    );
+  }
+
+  if (correction.status === 'reversed') {
+    return c.json(
+      { data: null, error: { code: 'ALREADY_REVERSED', message: 'Correction already reversed' }, meta: null },
+      409,
+    );
+  }
+
+  // 3. Compute the withheld amount (15% of original escrow)
+  const originalAmount = Number(delivery.amountPaid ?? 0);
+  const alreadyRefunded = Math.floor(originalAmount * 0.85);
+  const withheldAmount = originalAmount - alreadyRefunded;
+
+  if (withheldAmount <= 0) {
+    return c.json(
+      { data: null, error: { code: 'NOTHING_TO_REVERSE', message: 'No withheld amount to refund' }, meta: null },
+      422,
+    );
+  }
+
+  // 4. Credit the customer
+  const wallet = await getWalletByUserId(delivery.customerId);
+  await creditWallet(
+    wallet.id,
+    withheldAmount,
+    'refund',
+    `weight_correction_reversal_${correction.id}`,
+    `Admin reversal of weight correction for delivery ${deliveryId}`,
+    { correction_id: correction.id, delivery_id: deliveryId, reversed_by: user.id },
+  );
+
+  // 5. Update correction status
+  await db
+    .update(weightDiscrepancyCorrections)
+    .set({ status: 'reversed', respondedAt: new Date() })
+    .where(eq(weightDiscrepancyCorrections.id, correction.id));
+
+  // 6. Ledger event (fire-and-forget)
+  writeLedgerEvent({
+    category: 'revenue',
+    type: 'commission_reversal',
+    amountKobo: withheldAmount,
+    sourceId: delivery.escrowHoldId ?? delivery.id,
+    sourceType: 'escrow_hold',
+  }).catch((err) => console.error('[admin] reversal ledger write failed:', err));
+
+  return c.json({
+    data: {
+      correctionId: correction.id,
+      refundedAmountKobo: withheldAmount,
+      newCorrectionStatus: 'reversed',
+    },
+    error: null,
+    meta: null,
+  });
 });
 
 export default deliveryRoutes;

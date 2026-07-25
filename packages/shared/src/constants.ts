@@ -151,6 +151,7 @@ export const ALERT_RULES = [
   'delivery_failed',
   'ontime_rate_drop',
   'customer_update_gap',
+  'weight_correction_abuse',
 ] as const;
 
 export const ALERT_SEVERITIES = ['info', 'warning', 'critical'] as const;
@@ -162,3 +163,10 @@ export const FEE_ENGINE_ERRORS = {
   QUOTE_EXPIRED: 'QUOTE_EXPIRED',
   QUOTE_MISSING: 'QUOTE_MISSING',
 } as const;
+
+// ─── Weight Correction Guards ─────────────────────────────────────────────────
+
+export const MAX_WEIGHT_CORRECTION_MULTIPLIER = 3;
+export const MIN_WEIGHT_CORRECTION_KG = 0.5;
+export const WEIGHT_CORRECTION_ABUSE_COUNT = 5;
+export const WEIGHT_CORRECTION_ABUSE_WINDOW_DAYS = 7;

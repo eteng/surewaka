@@ -5,9 +5,16 @@ import {
   deliveryLegs,
   quotes,
   escrowHolds,
+  alerts,
 } from '@surewaka/db';
-import { eq, and, lt, isNull } from 'drizzle-orm';
+import { eq, and, lt, gte, isNull, inArray, sql } from 'drizzle-orm';
 import type { FeeSettings, VehicleType, VehicleTypeRates } from '@surewaka/shared';
+import {
+  MAX_WEIGHT_CORRECTION_MULTIPLIER,
+  MIN_WEIGHT_CORRECTION_KG,
+  WEIGHT_CORRECTION_ABUSE_COUNT,
+  WEIGHT_CORRECTION_ABUSE_WINDOW_DAYS,
+} from '@surewaka/shared';
 import { computeOnDemandQuote } from '../lib/fee-engine';
 import { creditWallet, debitWallet, getWalletByUserId } from '../lib/wallet-service';
 
@@ -84,6 +91,18 @@ export async function reportDiscrepancy(
   }
 
   const declaredWeightKg = delivery.packageWeight;
+
+  // ─── Validation Guards ────────────────────────────────────────────────────
+  // REQ-2: Minimum delta threshold — differences under 0.5kg are within tolerance
+  const absDelta = Math.abs(reportedWeightKg - declaredWeightKg);
+  if (absDelta < MIN_WEIGHT_CORRECTION_KG) {
+    throw new Error('WITHIN_TOLERANCE');
+  }
+
+  // REQ-1: Maximum delta cap — block reports exceeding 3× declared weight
+  if (reportedWeightKg > declaredWeightKg * MAX_WEIGHT_CORRECTION_MULTIPLIER) {
+    throw new Error('WEIGHT_DELTA_TOO_LARGE');
+  }
 
   // 2. Query all delivery_legs for this delivery where actor_type = 'driver' (on-demand legs only)
   const onDemandLegs = await db
@@ -168,6 +187,9 @@ export async function reportDiscrepancy(
     })
     .returning({ id: weightDiscrepancyCorrections.id });
 
+  // REQ-3: Check driver correction frequency (fire-and-forget — don't block the response)
+  void checkDriverCorrectionFrequency(db, reportedLegId, deliveryId);
+
   // 7. Return correction details
   return {
     correctionId: correction.id,
@@ -176,6 +198,71 @@ export async function reportDiscrepancy(
     deltaKobo,
     approvalDeadline,
   };
+}
+
+// ─── Driver Correction Frequency Check ────────────────────────────────────────
+
+/**
+ * Checks if a driver has exceeded the weight correction abuse threshold.
+ * Fires a 'weight_correction_abuse' alert if count > 5 in the last 7 days.
+ *
+ * Fire-and-forget — errors are logged but don't affect the correction flow.
+ * REQ-3.
+ */
+async function checkDriverCorrectionFrequency(
+  db: DrizzleDB,
+  reportedLegId: string,
+  deliveryId: string,
+): Promise<void> {
+  try {
+    // Find the driver who owns this leg
+    const [leg] = await db
+      .select({ actorId: deliveryLegs.actorId })
+      .from(deliveryLegs)
+      .where(eq(deliveryLegs.id, reportedLegId));
+
+    if (!leg) return;
+    const driverId = leg.actorId;
+
+    // Get all leg IDs assigned to this driver
+    const driverLegs = await db
+      .select({ id: deliveryLegs.id })
+      .from(deliveryLegs)
+      .where(eq(deliveryLegs.actorId, driverId));
+
+    const driverLegIds = driverLegs.map((l) => l.id);
+    if (driverLegIds.length === 0) return;
+
+    // Count corrections on this driver's legs in the rolling window
+    const windowStart = new Date(
+      Date.now() - WEIGHT_CORRECTION_ABUSE_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+    );
+
+    const [result] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(weightDiscrepancyCorrections)
+      .where(
+        and(
+          inArray(weightDiscrepancyCorrections.reportedLegId, driverLegIds),
+          gte(weightDiscrepancyCorrections.createdAt, windowStart),
+        ),
+      );
+
+    const count = result?.count ?? 0;
+
+    if (count > WEIGHT_CORRECTION_ABUSE_COUNT) {
+      await db.insert(alerts).values({
+        deliveryId,
+        legId: reportedLegId,
+        rule: 'weight_correction_abuse',
+        severity: 'warning',
+        context: { driverId, count, window: `${WEIGHT_CORRECTION_ABUSE_WINDOW_DAYS}d` },
+        firedAt: new Date(),
+      });
+    }
+  } catch (err) {
+    console.error('[weight-correction] Failed to check driver frequency:', err);
+  }
 }
 
 // ─── Respond to Correction ────────────────────────────────────────────────────

@@ -18,6 +18,9 @@ type Delivery = {
   packageWeight: number;
   packageCategory: string;
   price: number | null;
+  priceKobo: number | null;
+  deliveryMode: string | null;
+  cancellationDeadlineAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -172,7 +175,34 @@ export default function TrackingScreen() {
         {delivery.price && (
           <View className="bg-gray-50 rounded-xl p-4 mb-4">
             <Text className="text-sm font-semibold text-gray-500 uppercase mb-1">Price</Text>
-            <Text className="text-xl font-bold text-primary">₦{delivery.price.toLocaleString()}</Text>
+            <Text className="text-xl font-bold text-primary">
+              ₦{((delivery.priceKobo ?? delivery.price ?? 0) / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+            </Text>
+          </View>
+        )}
+
+        {delivery.cancellationDeadlineAt &&
+          delivery.status === 'pending' &&
+          delivery.deliveryMode === 'surewaka_way' && (
+          <View className="bg-amber-50 rounded-xl p-4 mb-4 border border-amber-200">
+            <Text className="text-sm font-semibold text-amber-700 uppercase mb-1">
+              Free cancellation until
+            </Text>
+            <Text className="text-base font-bold text-amber-900">
+              {new Date(delivery.cancellationDeadlineAt).toLocaleString('en-NG', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+              })}
+            </Text>
+            <Text className="text-xs text-amber-600 mt-1">
+              {new Date(delivery.cancellationDeadlineAt) > new Date()
+                ? 'Cancel for free before this time. After this, a cancellation fee applies.'
+                : 'Free cancellation window has passed. Cancellation fee applies.'}
+            </Text>
           </View>
         )}
 

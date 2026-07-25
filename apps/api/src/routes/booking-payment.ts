@@ -214,6 +214,8 @@ bookingPaymentRoutes.post('/deliveries/:id/cancel', async (c) => {
     // Captured outside the tx for post-commit ledger write (fire-and-forget)
     let cancellationFeeKobo = 0;
     let feeSourceEscrowId: string | null = null;
+    let capturedAmountPaid = 0;
+    let capturedEscrowHoldId: string | null = null;
 
     await db.transaction(async (tx) => {
       // SELECT with row lock inside the transaction
@@ -250,6 +252,8 @@ bookingPaymentRoutes.post('/deliveries/:id/cancel', async (c) => {
       }
 
       const amountPaid = Number(locked.amountPaid ?? 0);
+      capturedAmountPaid = amountPaid;
+      capturedEscrowHoldId = locked.escrowHoldId;
 
       if (locked.cancellationDeadlineAt) {
         // surewaka_way pending — apply deadline-based refund logic
@@ -330,6 +334,25 @@ bookingPaymentRoutes.post('/deliveries/:id/cancel', async (c) => {
         sourceId: feeSourceEscrowId,
         sourceType: 'escrow_hold',
       }).catch((err) => console.error('[cancel] commission ledger write failed:', err));
+    }
+
+    // For partial refunds (non-surewaka_way), the retained portion is platform revenue.
+    // Record as commission so P&L accurately reflects earnings from forfeited escrow.
+    if (
+      cancellationFeeKobo === 0 &&
+      capturedAmountPaid > 0 &&
+      refundAmount > 0 &&
+      refundAmount < capturedAmountPaid &&
+      capturedEscrowHoldId
+    ) {
+      const retainedAmount = capturedAmountPaid - refundAmount;
+      writeLedgerEvent({
+        category: 'revenue',
+        type: 'commission',
+        amountKobo: retainedAmount,
+        sourceId: capturedEscrowHoldId,
+        sourceType: 'escrow_hold',
+      }).catch((err) => console.error('[cancel] retained commission ledger write failed:', err));
     }
 
     // Push notification: notify customer of cancellation.
