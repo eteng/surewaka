@@ -2,8 +2,9 @@ import { Worker } from 'bullmq';
 import { cronQueue, connection } from './queue';
 import type { CronJobName } from './queue';
 import { handleSyncInfraCosts } from './jobs/sync-infra-costs/index';
+import { rescueStaleRouting } from './jobs/rescue-stale-routing';
 
-// Seed repeating job — idempotent (BullMQ deduplicates by jobId)
+// Seed repeating jobs — idempotent (BullMQ deduplicates by jobId)
 await cronQueue.add(
   'sync-infra-costs',
   {},
@@ -15,12 +16,24 @@ await cronQueue.add(
   },
 );
 
+await cronQueue.add(
+  'rescue-stale-routing',
+  {},
+  {
+    jobId: 'rescue-stale-routing-5min',
+    repeat: { pattern: '*/5 * * * *' },  // Every 5 minutes
+    attempts: 1,
+  },
+);
+
 const worker = new Worker<Record<string, never>, void, CronJobName>(
   'cron',
   async (job) => {
     switch (job.name) {
       case 'sync-infra-costs':
         return handleSyncInfraCosts();
+      case 'rescue-stale-routing':
+        return rescueStaleRouting();
       default:
         throw new Error(`Unknown cron job: ${String(job.name)}`);
     }
