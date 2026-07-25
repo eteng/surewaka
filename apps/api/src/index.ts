@@ -1,5 +1,8 @@
 import { serve } from '@hono/node-server';
+import { swaggerUI } from '@hono/swagger-ui';
 import { Hono } from 'hono';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { cors } from 'hono/cors';
 import { requestLogger } from './middleware/logging';
 import authRoutes from './routes/auth';
@@ -55,6 +58,15 @@ app.use('*', cors({
 
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok', service: 'surewaka-api' }));
+
+// Swagger UI — dev only
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/docs', swaggerUI({ url: '/openapi.yaml' }));
+  app.get('/openapi.yaml', (c) => {
+    const yaml = readFileSync(resolve('../../docs/openapi.yaml'), 'utf-8');
+    return c.text(yaml, 200, { 'Content-Type': 'application/yaml' });
+  });
+}
 
 // API routes
 app.get('/api/v1', (c) => c.json({ message: 'SureWaka API v1' }));

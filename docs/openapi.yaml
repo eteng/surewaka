@@ -1,0 +1,2046 @@
+openapi: 3.0.3
+info:
+  title: SureWaka API
+  description: |
+    SureWaka logistics platform API. Connects senders with verified logistics providers
+    and independent drivers across Nigeria using a multi-leg delivery model.
+
+    **Auth:** All endpoints require a Clerk JWT Bearer token unless marked `security: []`.
+
+    **Response envelope:** Every response is `{ data, error, meta }` where exactly one of
+    data/error is non-null. meta carries pagination when applicable.
+
+    **Currency:** All monetary values are in kobo (1 NGN = 100 kobo).
+  version: "1.0.0"
+servers:
+  - url: https://api.surewaka.com/api/v1
+    description: Production
+  - url: http://localhost:4000/api/v1
+    description: Development
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Auth
+  - name: Profile
+  - name: Addresses
+  - name: Deliveries
+  - name: Booking
+  - name: Wallet
+  - name: Payouts
+  - name: Notifications
+  - name: Push Tokens
+  - name: Carriers
+  - name: Carrier Routes
+  - name: Carrier Applications
+  - name: Driver Location
+  - name: Zones
+  - name: Webhooks
+  - name: Admin — Users
+  - name: Admin — Roles
+  - name: Admin — Dashboard
+  - name: Admin — Carriers
+  - name: Admin — Carrier Parks
+  - name: Admin — Carrier Routes
+  - name: Admin — Customers
+  - name: Admin — Drivers
+  - name: Admin — Deliveries
+  - name: Admin — Waitlist
+  - name: Admin — Name Change Requests
+  - name: Admin — Ops Hub
+  - name: Admin — Alerts
+  - name: Admin — Alert Settings
+  - name: Admin — Fee Settings
+  - name: Admin — Analytics
+  - name: Admin — Finance
+  - name: Admin — Payouts
+  - name: Admin — Broadcast
+  - name: Admin — Zones
+
+paths:
+
+  # ── Auth ──────────────────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterUserRequest'
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /auth/register-employee:
+    post:
+      tags: [Auth]
+      summary: Register an invited employee (called after Clerk sign-up)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clerkId, clerkEmail, clerkName]
+              properties:
+                clerkId: { type: string }
+                clerkPhone: { type: string }
+                clerkEmail: { type: string, format: email }
+                clerkName: { type: string }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  # ── Profile ───────────────────────────────────────────────────────────────
+  /profile:
+    get:
+      tags: [Profile]
+      summary: Get authenticated user's profile
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/UserProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Profile]
+      summary: Update authenticated user's profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 2, maxLength: 100 }
+                gender:
+                  type: string
+                  enum: [woman, man, prefer_not_to_disclose]
+                  nullable: true
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /profile/avatar:
+    post:
+      tags: [Profile]
+      summary: Upload profile avatar (multipart/form-data)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Profile]
+      summary: Remove profile avatar
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /profile/name-change-request:
+    post:
+      tags: [Profile]
+      summary: Submit a name change request for admin review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestedName, reason]
+              properties:
+                requestedName: { type: string, minLength: 2, maxLength: 100 }
+                reason: { type: string, minLength: 5, maxLength: 500 }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+
+  # ── Addresses ─────────────────────────────────────────────────────────────
+  /addresses:
+    get:
+      tags: [Addresses]
+      summary: List saved addresses
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [Addresses]
+      summary: Create a saved address
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSavedAddressRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /addresses/recent:
+    get:
+      tags: [Addresses]
+      summary: List recent locations
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [Addresses]
+      summary: Upsert a recent location
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpsertRecentLocationRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /addresses/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Addresses]
+      summary: Get a saved address
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Addresses]
+      summary: Replace a saved address
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSavedAddressRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    delete:
+      tags: [Addresses]
+      summary: Delete a saved address
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Deliveries ────────────────────────────────────────────────────────────
+  /deliveries:
+    get:
+      tags: [Deliveries]
+      summary: List deliveries for authenticated user
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated deliveries
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Delivery' }
+                      meta: { $ref: '#/components/schemas/PaginationMeta' }
+    post:
+      tags: [Deliveries]
+      summary: Create a new delivery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateDeliveryRequest' }
+      responses:
+        '201':
+          description: Delivery created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Delivery' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /deliveries/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Deliveries]
+      summary: Get delivery details
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /deliveries/{id}/requote:
+    post:
+      tags: [Deliveries]
+      summary: Re-quote a delivery (surewaka_way only; price may change)
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /deliveries/{id}/weight-correction/{correctionId}/respond:
+    post:
+      tags: [Deliveries]
+      summary: Customer approves or declines a weight correction
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - name: correctionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approved, declined] }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Booking ───────────────────────────────────────────────────────────────
+  /booking/quote:
+    post:
+      tags: [Booking]
+      summary: Get a price quote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuoteRequest' }
+      responses:
+        '200':
+          description: Price quote
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/QuoteResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /booking/confirm:
+    post:
+      tags: [Booking]
+      summary: Confirm booking and deduct from wallet (escrow)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [delivery_id]
+              properties:
+                delivery_id: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '402':
+          description: Insufficient wallet balance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /deliveries/{id}/cancel:
+    post:
+      tags: [Booking]
+      summary: Cancel a delivery
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, minLength: 5, maxLength: 200 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422':
+          description: Cannot cancel (already delivered or in terminal state)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  # ── Wallet ────────────────────────────────────────────────────────────────
+  /wallet/balance:
+    get:
+      tags: [Wallet]
+      summary: Get wallet balance
+      responses:
+        '200':
+          description: Wallet balance
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          balance_kobo: { type: integer }
+                          escrow_kobo: { type: integer }
+                          available_kobo: { type: integer }
+
+  /wallet/transactions:
+    get:
+      tags: [Wallet]
+      summary: List wallet transactions
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /wallet/dva:
+    get:
+      tags: [Wallet]
+      summary: Get dedicated virtual account (Paystack DVA)
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /wallet/fund:
+    post:
+      tags: [Wallet]
+      summary: Initialize a wallet top-up via Paystack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: integer
+                  description: Amount in kobo (min 50000 = ₦500)
+                  minimum: 50000
+                topup_type:
+                  type: string
+                  enum: [manual, booking_shortfall]
+                  default: manual
+                delivery_id: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /wallet/fund/{reference}:
+    get:
+      tags: [Wallet]
+      summary: Verify a top-up by Paystack reference
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /wallet/check:
+    post:
+      tags: [Wallet]
+      summary: Check if wallet has sufficient balance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount: { type: integer, description: Amount in kobo }
+      responses:
+        '200':
+          description: Balance check result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          sufficient: { type: boolean }
+                          balance_kobo: { type: integer }
+                          shortfall_kobo: { type: integer }
+
+  # ── Payouts ───────────────────────────────────────────────────────────────
+  /payouts:
+    get:
+      tags: [Payouts]
+      summary: List payout requests for authenticated user
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /payouts/request:
+    post:
+      tags: [Payouts]
+      summary: Request a payout (driver / carrier)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PayoutRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  # ── Push Tokens ───────────────────────────────────────────────────────────
+  /push-tokens:
+    post:
+      tags: [Push Tokens]
+      summary: Register an Expo push token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expoPushToken, deviceId, platform, app]
+              properties:
+                expoPushToken:
+                  type: string
+                  description: Must start with ExponentPushToken[
+                deviceId: { type: string }
+                platform: { type: string, enum: [ios, android] }
+                app: { type: string, enum: [customer, driver] }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /push-tokens/{token}:
+    delete:
+      tags: [Push Tokens]
+      summary: Unregister a push token
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Carriers (public) ─────────────────────────────────────────────────────
+  /carriers:
+    get:
+      tags: [Carriers]
+      summary: List active carriers
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Carrier Routes (public) ───────────────────────────────────────────────
+  /carrier-routes:
+    get:
+      tags: [Carrier Routes]
+      summary: List active carrier routes
+      parameters:
+        - name: carrierId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: originCity
+          in: query
+          schema: { type: string }
+        - name: destinationCity
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Carrier Applications ──────────────────────────────────────────────────
+  /carrier-applications:
+    post:
+      tags: [Carrier Applications]
+      summary: Submit a carrier application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubmitCarrierApplicationRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  # ── Driver Location ───────────────────────────────────────────────────────
+  /driver/location:
+    post:
+      tags: [Driver Location]
+      summary: Record a driver location update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat: { type: number, minimum: -90, maximum: 90 }
+                lng: { type: number, minimum: -180, maximum: 180 }
+                deliveryId: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Zones (public) ────────────────────────────────────────────────────────
+  /zones:
+    get:
+      tags: [Zones]
+      summary: List service zones
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Notifications ─────────────────────────────────────────────────────────
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications for authenticated user
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: type
+          in: query
+          schema: { type: string }
+        - name: isRead
+          in: query
+          schema: { type: string, enum: ['true', 'false'] }
+      responses:
+        '200':
+          description: Paginated notifications
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Notification' }
+                      meta: { $ref: '#/components/schemas/PaginationMeta' }
+    post:
+      tags: [Notifications]
+      summary: Create a notification (admin use)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateNotificationRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Get unread notification count
+      responses:
+        '200':
+          description: Unread count
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          count: { type: integer }
+
+  /notifications/mark-all-read:
+    post:
+      tags: [Notifications]
+      summary: Mark all notifications as read
+      responses:
+        '200':
+          description: Count of notifications updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          updated: { type: integer }
+
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark a notification as read
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Webhooks ──────────────────────────────────────────────────────────────
+  /webhook/paystack:
+    post:
+      tags: [Webhooks]
+      summary: Paystack payment webhook
+      security: []
+      description: Validated via x-paystack-signature header.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event: { type: string }
+                data: { type: object }
+      responses:
+        '200': { description: Webhook processed }
+
+  # ── Admin — Dashboard ─────────────────────────────────────────────────────
+  /admin/dashboard/stats:
+    get:
+      tags: [Admin — Dashboard]
+      summary: Platform overview statistics
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Users ─────────────────────────────────────────────────────────
+  /admin/users:
+    get:
+      tags: [Admin — Users]
+      summary: List users
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: role
+          in: query
+          schema: { $ref: '#/components/schemas/RoleEnum' }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, inactive] }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [Admin — Users]
+      summary: Invite an employee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InviteEmployeeRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /admin/users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [Admin — Users]
+      summary: Get user details
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Admin — Users]
+      summary: Update a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateEmployeeRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/users/{userId}/deactivate:
+    post:
+      tags: [Admin — Users]
+      summary: Deactivate a user account
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/users/{userId}/reactivate:
+    post:
+      tags: [Admin — Users]
+      summary: Reactivate a user account
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/users/{userId}/audit-log:
+    get:
+      tags: [Admin — Users]
+      summary: Get user audit log
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Roles ─────────────────────────────────────────────────────────
+  /admin/roles/users/{userId}/roles:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [Admin — Roles]
+      summary: Get roles for a user
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [Admin — Roles]
+      summary: Assign a role to a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignRoleRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    delete:
+      tags: [Admin — Roles]
+      summary: Revoke a role from a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevokeRoleRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/roles/users/{userId}/upgrade-driver:
+    post:
+      tags: [Admin — Roles]
+      summary: Upgrade a carrier driver to independent
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Waitlist ──────────────────────────────────────────────────────
+  /admin/waitlist:
+    get:
+      tags: [Admin — Waitlist]
+      summary: List waitlist signups
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: userType
+          in: query
+          schema: { type: string, enum: [sender, business, driver] }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/waitlist/stats:
+    get:
+      tags: [Admin — Waitlist]
+      summary: Waitlist statistics
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Name Change Requests ──────────────────────────────────────────
+  /admin/name-change-requests:
+    get:
+      tags: [Admin — Name Change Requests]
+      summary: List pending name change requests
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/name-change-requests/{id}:
+    patch:
+      tags: [Admin — Name Change Requests]
+      summary: Approve or reject a name change request
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [approved, rejected] }
+                reviewNote: { type: string, maxLength: 500 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Carriers ──────────────────────────────────────────────────────
+  /admin/carriers:
+    get:
+      tags: [Admin — Carriers]
+      summary: List all carriers
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [Admin — Carriers]
+      summary: Create a strategic carrier (direct onboarding)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateStrategicCarrierRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+
+  /admin/carriers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Admin — Carriers]
+      summary: Get carrier details
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/carriers/{id}/rate:
+    patch:
+      tags: [Admin — Carriers]
+      summary: Update carrier commission rate
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                commissionRatePct: { type: number, minimum: 0, maximum: 100 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/carriers/applications:
+    get:
+      tags: [Admin — Carriers]
+      summary: List carrier applications
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, under_review, approved, rejected] }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/carriers/applications/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Admin — Carriers]
+      summary: Get carrier application details
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/carriers/applications/{id}/review:
+    post:
+      tags: [Admin — Carriers]
+      summary: Move application to under_review
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/carriers/applications/{id}/approve:
+    post:
+      tags: [Admin — Carriers]
+      summary: Approve carrier application and create carrier
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApproveCarrierApplicationRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/carriers/applications/{id}/reject:
+    post:
+      tags: [Admin — Carriers]
+      summary: Reject a carrier application
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 10, maxLength: 1000 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Carrier Parks ─────────────────────────────────────────────────
+  /admin/carrier-parks:
+    get:
+      tags: [Admin — Carrier Parks]
+      summary: List carrier parks
+      parameters:
+        - name: carrierId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [Admin — Carrier Parks]
+      summary: Create a carrier park
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCarrierParkRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+
+  /admin/carrier-parks/{id}:
+    patch:
+      tags: [Admin — Carrier Parks]
+      summary: Update a carrier park
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateCarrierParkRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Carrier Routes ────────────────────────────────────────────────
+  /admin/carrier-routes:
+    get:
+      tags: [Admin — Carrier Routes]
+      summary: List carrier routes (admin)
+      parameters:
+        - name: carrierId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [Admin — Carrier Routes]
+      summary: Create a carrier route
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCarrierRouteRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+
+  /admin/carrier-routes/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Admin — Carrier Routes]
+      summary: Update a carrier route
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateCarrierRouteRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    delete:
+      tags: [Admin — Carrier Routes]
+      summary: Delete a carrier route
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/carrier-routes/{id}/schedules:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Admin — Carrier Routes]
+      summary: List departure schedules for a route
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [Admin — Carrier Routes]
+      summary: Add a departure schedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCarrierRouteScheduleRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+
+  /admin/carrier-routes/schedules/{scheduleId}:
+    patch:
+      tags: [Admin — Carrier Routes]
+      summary: Update a departure schedule
+      parameters:
+        - name: scheduleId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateCarrierRouteScheduleRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Customers ─────────────────────────────────────────────────────
+  /admin/customers:
+    get:
+      tags: [Admin — Customers]
+      summary: List customers
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: tier
+          in: query
+          schema: { type: string, enum: [power, regular, new, dormant] }
+        - name: city
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/customers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Admin — Customers]
+      summary: Get customer details
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/customers/{id}/deliveries:
+    get:
+      tags: [Admin — Customers]
+      summary: Get deliveries for a customer
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Drivers ───────────────────────────────────────────────────────
+  /admin/drivers:
+    get:
+      tags: [Admin — Drivers]
+      summary: List drivers
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: vehicleType
+          in: query
+          schema: { type: string, enum: [motorcycle, car, van, truck] }
+        - name: verified
+          in: query
+          schema: { type: string, enum: ['true', 'false'] }
+        - name: affiliation
+          in: query
+          schema: { type: string, enum: [independent, carrier] }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/drivers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Admin — Drivers]
+      summary: Get driver details
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Deliveries ────────────────────────────────────────────────────
+  /admin/deliveries:
+    get:
+      tags: [Admin — Deliveries]
+      summary: List all deliveries
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/DeliveryStatusEnum' }
+        - name: tab
+          in: query
+          schema: { type: string, enum: [all, requests, active, completed] }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/deliveries/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Admin — Deliveries]
+      summary: Get delivery details
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/deliveries/{id}/events:
+    get:
+      tags: [Admin — Deliveries]
+      summary: Get delivery event timeline
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/deliveries/{id}/reverse-weight-correction:
+    post:
+      tags: [Admin — Deliveries]
+      summary: Reverse a weight correction
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Ops Hub ───────────────────────────────────────────────────────
+  /admin/ops-hub/stats:
+    get:
+      tags: [Admin — Ops Hub]
+      summary: Operational intelligence statistics
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/ops-hub/at-risk:
+    get:
+      tags: [Admin — Ops Hub]
+      summary: List at-risk deliveries
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/ops-hub/escalate:
+    post:
+      tags: [Admin — Ops Hub]
+      summary: Escalate a delivery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deliveryId: { type: string, format: uuid }
+                action: { type: string }
+                note: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Alerts ────────────────────────────────────────────────────────
+  /admin/alerts:
+    get:
+      tags: [Admin — Alerts]
+      summary: List system alerts
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Alert Settings ────────────────────────────────────────────────
+  /admin/alert-settings:
+    get:
+      tags: [Admin — Alert Settings]
+      summary: Get alert threshold settings
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    put:
+      tags: [Admin — Alert Settings]
+      summary: Update alert threshold settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateAlertSettingsRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/alert-settings/test:
+    post:
+      tags: [Admin — Alert Settings]
+      summary: Send a test alert notification
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Fee Settings ──────────────────────────────────────────────────
+  /admin/fee-settings:
+    get:
+      tags: [Admin — Fee Settings]
+      summary: Get fee engine settings
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    put:
+      tags: [Admin — Fee Settings]
+      summary: Update fee engine settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateFeeSettingsRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/fee-settings/vehicle-type-rates:
+    get:
+      tags: [Admin — Fee Settings]
+      summary: Get vehicle type rate multipliers
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    put:
+      tags: [Admin — Fee Settings]
+      summary: Update a vehicle type rate multiplier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vehicleType, multiplier]
+              properties:
+                vehicleType: { type: string, enum: [motorcycle, car, van, truck] }
+                multiplier: { type: number, minimum: 0 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Analytics ─────────────────────────────────────────────────────
+  /admin/analytics/overview:
+    get:
+      tags: [Admin — Analytics]
+      summary: Platform overview analytics
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/analytics/delivery-performance:
+    get:
+      tags: [Admin — Analytics]
+      summary: Delivery performance metrics
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/analytics/driver-performance:
+    get:
+      tags: [Admin — Analytics]
+      summary: Driver performance metrics
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/analytics/carrier-performance:
+    get:
+      tags: [Admin — Analytics]
+      summary: Carrier performance metrics
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/analytics/customer-experience:
+    get:
+      tags: [Admin — Analytics]
+      summary: Customer experience metrics
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/analytics/root-cause:
+    get:
+      tags: [Admin — Analytics]
+      summary: Delivery failure root-cause analysis
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Finance ───────────────────────────────────────────────────────
+  /admin/finance/summary:
+    get:
+      tags: [Admin — Finance]
+      summary: Financial summary
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/finance/trend:
+    get:
+      tags: [Admin — Finance]
+      summary: Revenue trend over time
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/finance/ledger:
+    get:
+      tags: [Admin — Finance]
+      summary: Ledger entries
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/finance/costs:
+    get:
+      tags: [Admin — Finance]
+      summary: Cost breakdown
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Payouts ───────────────────────────────────────────────────────
+  /admin/payouts:
+    get:
+      tags: [Admin — Payouts]
+      summary: List all payout requests
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, approved, rejected, paid] }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Broadcast ─────────────────────────────────────────────────────
+  /admin/broadcast/estimate:
+    get:
+      tags: [Admin — Broadcast]
+      summary: Estimate broadcast reach
+      parameters:
+        - name: segment
+          in: query
+          schema: { type: string, enum: [all, customers, drivers] }
+        - name: city
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  /admin/broadcast:
+    post:
+      tags: [Admin — Broadcast]
+      summary: Send a push notification broadcast
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BroadcastRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+  # ── Admin — Zones ─────────────────────────────────────────────────────────
+  /admin/zones:
+    post:
+      tags: [Admin — Zones]
+      summary: Create a service zone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateZoneRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+
+  /admin/zones/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Admin — Zones]
+      summary: Replace a zone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateZoneRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    patch:
+      tags: [Admin — Zones]
+      summary: Partially update a zone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateZoneRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+
+# ── Components ───────────────────────────────────────────────────────────────
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Clerk JWT
+      description: |
+        Clerk-issued JWT. Obtain via @clerk/expo (mobile) or @clerk/react-router (web).
+        Include as: Authorization: Bearer <token>
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    Success:
+      description: OK
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Envelope' }
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Unauthorized:
+      description: Missing or invalid auth token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Conflict:
+      description: Resource already exists
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  schemas:
+
+    # ── Envelopes ────────────────────────────────────────────────────────────
+    Envelope:
+      type: object
+      description: Standard success envelope
+      properties:
+        data: {}
+        error: { nullable: true, example: null }
+        meta:
+          nullable: true
+          oneOf:
+            - $ref: '#/components/schemas/PaginationMeta'
+
+    ErrorEnvelope:
+      type: object
+      required: [data, error, meta]
+      properties:
+        data: { nullable: true, example: null }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: VALIDATION_ERROR }
+            message: { type: string }
+        meta: { nullable: true, example: null }
+
+    PaginationMeta:
+      type: object
+      properties:
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+
+    # ── Shared enums ─────────────────────────────────────────────────────────
+    RoleEnum:
+      type: string
+      enum: [customer, driver, surewaka_admin, carrier_driver, carrier_admin, support_agent]
+
+    VehicleTypeEnum:
+      type: string
+      enum: [motorcycle, car, van, truck]
+
+    DeliveryStatusEnum:
+      type: string
+      enum:
+        - pending_routing
+        - routing_failed
+        - draft
+        - pending
+        - accepted
+        - en_route_pickup
+        - arrived_pickup
+        - picked_up
+        - en_route_dropoff
+        - arrived_dropoff
+        - delivered
+        - cancelled
+        - failed
+        - returned
+
+    NotificationTypeEnum:
+      type: string
+      enum:
+        - new_user_signup
+        - delivery_issue
+        - carrier_verification_request
+        - carrier_verified
+        - dispute_opened
+        - driver_verification_request
+        - system_alert
+
+    # ── Domain objects ────────────────────────────────────────────────────────
+    Location:
+      type: object
+      required: [address, city, state, lat, lng]
+      properties:
+        address: { type: string }
+        city: { type: string }
+        state: { type: string }
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+
+    UserProfile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string }
+        gender:
+          type: string
+          enum: [woman, man, prefer_not_to_disclose]
+          nullable: true
+        avatarUrl: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    Delivery:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/DeliveryStatusEnum' }
+        mode: { type: string, enum: [on_demand, carrier_direct, surewaka_way] }
+        pickup: { $ref: '#/components/schemas/Location' }
+        dropoff: { $ref: '#/components/schemas/Location' }
+        packageDetails:
+          type: object
+          properties:
+            description: { type: string }
+            weight: { type: number }
+            category: { type: string }
+        recipientDetails:
+          type: object
+          properties:
+            recipientName: { type: string }
+            recipientPhone: { type: string }
+            deliveryNotes: { type: string, nullable: true }
+        totalPriceKobo: { type: integer }
+        paymentStatus: { type: string, enum: [unpaid, escrowed, released, refunded] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Notification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/NotificationTypeEnum' }
+        title: { type: string }
+        message: { type: string }
+        resourceLink: { type: string, nullable: true }
+        isRead: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    QuoteResponse:
+      type: object
+      properties:
+        legs:
+          type: array
+          items:
+            type: object
+            properties:
+              legType: { type: string }
+              lineItems:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    label: { type: string }
+                    amountKobo: { type: integer }
+              totalKobo: { type: integer }
+        compositeTotalKobo: { type: integer }
+
+    # ── Request schemas ───────────────────────────────────────────────────────
+    RegisterUserRequest:
+      type: object
+      required: [email, phone, name, role]
+      properties:
+        email: { type: string, format: email }
+        phone: { type: string, description: "Nigerian mobile number (+234XXXXXXXXXX or 0XXXXXXXXXX)" }
+        name: { type: string, minLength: 2, maxLength: 100 }
+        role: { type: string, enum: [customer, driver, carrier] }
+
+    CreateSavedAddressRequest:
+      type: object
+      required: [label, address_text, city, state, lat, lng]
+      properties:
+        label: { type: string, minLength: 1, maxLength: 50 }
+        address_text: { type: string }
+        city: { type: string }
+        state: { type: string }
+        lat: { type: number }
+        lng: { type: number }
+
+    UpsertRecentLocationRequest:
+      type: object
+      required: [address_text, city, state, lat, lng]
+      properties:
+        address_text: { type: string }
+        city: { type: string }
+        state: { type: string }
+        lat: { type: number }
+        lng: { type: number }
+
+    CreateDeliveryRequest:
+      type: object
+      required: [pickup, dropoff, packageDetails, recipientDetails]
+      properties:
+        pickup: { $ref: '#/components/schemas/Location' }
+        dropoff: { $ref: '#/components/schemas/Location' }
+        packageDetails:
+          type: object
+          required: [description, weight, category]
+          properties:
+            description: { type: string, minLength: 3, maxLength: 500 }
+            weight: { type: number, minimum: 0, maximum: 500, description: Weight in kg }
+            category:
+              type: string
+              enum: [documents, electronics, clothing, food, fragile, general, furniture, auto_parts]
+        recipientDetails:
+          type: object
+          required: [recipientName, recipientPhone]
+          properties:
+            recipientName: { type: string, minLength: 2, maxLength: 100 }
+            recipientPhone: { type: string }
+            deliveryNotes: { type: string, maxLength: 200 }
+        mode: { type: string, enum: [on_demand, carrier_direct, surewaka_way] }
+
+    QuoteRequest:
+      type: object
+      required: [legs, packageWeight]
+      properties:
+        legs:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            oneOf:
+              - type: object
+                required: [legType, vehicleType, pickup, dropoff]
+                properties:
+                  legType: { type: string, enum: [first_mile, last_mile] }
+                  vehicleType: { $ref: '#/components/schemas/VehicleTypeEnum' }
+                  pickup:
+                    type: object
+                    properties:
+                      lat: { type: number }
+                      lng: { type: number }
+                  dropoff:
+                    type: object
+                    properties:
+                      lat: { type: number }
+                      lng: { type: number }
+              - type: object
+                required: [legType, carrierId]
+                properties:
+                  legType: { type: string, enum: [intercity] }
+                  carrierId: { type: string, format: uuid }
+                  routeId: { type: string, format: uuid }
+        packageWeight: { type: number, minimum: 0, maximum: 500, description: Weight in kg }
+
+    PayoutRequest:
+      type: object
+      required: [amount, bank_code, account_number, account_name]
+      properties:
+        amount: { type: integer, minimum: 100000, description: "Kobo (min ₦1,000)" }
+        bank_code: { type: string, minLength: 3, maxLength: 10 }
+        account_number: { type: string, pattern: '^\d{10}$' }
+        account_name: { type: string, minLength: 2, maxLength: 100 }
+
+    CreateNotificationRequest:
+      type: object
+      required: [userId, type, title, message]
+      properties:
+        userId:
+          description: UUID or "all_admins" to broadcast
+          oneOf:
+            - { type: string, format: uuid }
+            - { type: string, enum: [all_admins] }
+        type: { $ref: '#/components/schemas/NotificationTypeEnum' }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        message: { type: string, minLength: 1, maxLength: 500 }
+        resourceLink: { type: string, description: "Relative URL (must start with /)" }
+
+    InviteEmployeeRequest:
+      type: object
+      required: [email, fullName, role]
+      properties:
+        email: { type: string, format: email }
+        fullName: { type: string, minLength: 2, maxLength: 100 }
+        role: { $ref: '#/components/schemas/RoleEnum' }
+        scopeType: { type: string, enum: [carrier] }
+        scopeId: { type: string, format: uuid }
+
+    UpdateEmployeeRequest:
+      type: object
+      properties:
+        fullName: { type: string, minLength: 2, maxLength: 100 }
+        phone: { type: string }
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/RoleEnum' }
+
+    AssignRoleRequest:
+      type: object
+      required: [userId, role]
+      properties:
+        userId: { type: string, format: uuid }
+        role: { $ref: '#/components/schemas/RoleEnum' }
+        scopeType: { type: string, enum: [carrier] }
+        scopeId: { type: string, format: uuid }
+        reason: { type: string, maxLength: 500 }
+
+    RevokeRoleRequest:
+      type: object
+      required: [userId, role, reason]
+      properties:
+        userId: { type: string, format: uuid }
+        role: { $ref: '#/components/schemas/RoleEnum' }
+        scopeId: { type: string, format: uuid }
+        reason: { type: string, minLength: 3, maxLength: 500 }
+
+    SubmitCarrierApplicationRequest:
+      type: object
+      required: [businessName, contactName, email, phone, serviceAreas]
+      properties:
+        businessName: { type: string, minLength: 2, maxLength: 200 }
+        contactName: { type: string, minLength: 2, maxLength: 100 }
+        email: { type: string, format: email }
+        phone: { type: string, description: "+234XXXXXXXXXX" }
+        cacNumber: { type: string, maxLength: 20 }
+        fleetSize: { type: integer, minimum: 1 }
+        serviceAreas: { type: array, items: { type: string }, minItems: 1 }
+        notes: { type: string, maxLength: 1000 }
+
+    ApproveCarrierApplicationRequest:
+      type: object
+      required: [carrierName, slug]
+      properties:
+        carrierName: { type: string, minLength: 2, maxLength: 200 }
+        slug: { type: string, pattern: '^[a-z0-9-]+$' }
+        driverVettingEnabled: { type: boolean, default: false }
+        adminPhone: { type: string }
+        adminEmail: { type: string, format: email }
+        notes: { type: string, maxLength: 500 }
+
+    CreateStrategicCarrierRequest:
+      type: object
+      required: [carrierName, slug, contactName]
+      properties:
+        carrierName: { type: string, minLength: 2, maxLength: 200 }
+        slug: { type: string, pattern: '^[a-z0-9-]+$' }
+        contactName: { type: string, minLength: 2, maxLength: 100 }
+        adminPhone: { type: string }
+        adminEmail: { type: string, format: email }
+        driverVettingEnabled: { type: boolean, default: false }
+
+    CreateCarrierParkRequest:
+      type: object
+      required: [carrierId, city, name, address, lat, lng]
+      properties:
+        carrierId: { type: string, format: uuid }
+        city: { type: string, minLength: 2, maxLength: 100 }
+        name: { type: string, minLength: 2, maxLength: 200 }
+        address: { type: string, minLength: 5, maxLength: 500 }
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+
+    UpdateCarrierParkRequest:
+      type: object
+      properties:
+        carrierId: { type: string, format: uuid }
+        city: { type: string }
+        name: { type: string }
+        address: { type: string }
+        lat: { type: number }
+        lng: { type: number }
+        isActive: { type: boolean }
+
+    CreateCarrierRouteRequest:
+      type: object
+      required: [carrierId, originParkId, destinationParkId, basePriceKobo, estimatedTransitHrs]
+      properties:
+        carrierId: { type: string, format: uuid }
+        originParkId: { type: string, format: uuid }
+        destinationParkId: { type: string, format: uuid }
+        basePriceKobo: { type: integer, minimum: 1 }
+        estimatedTransitHrs: { type: number, minimum: 0 }
+        maxWeightKg: { type: number, minimum: 0 }
+
+    UpdateCarrierRouteRequest:
+      type: object
+      properties:
+        basePriceKobo: { type: integer, minimum: 1 }
+        estimatedTransitHrs: { type: number, minimum: 0 }
+        maxWeightKg: { type: number, minimum: 0 }
+        isActive: { type: boolean }
+
+    CreateCarrierRouteScheduleRequest:
+      type: object
+      required: [hour]
+      properties:
+        hour: { type: integer, minimum: 0, maximum: 23 }
+        minute: { type: integer, minimum: 0, maximum: 59, default: 0 }
+        daysOfWeek:
+          type: array
+          items: { type: integer, minimum: 1, maximum: 7 }
+          description: "1=Mon … 7=Sun"
+
+    UpdateCarrierRouteScheduleRequest:
+      type: object
+      properties:
+        hour: { type: integer, minimum: 0, maximum: 23 }
+        minute: { type: integer, minimum: 0, maximum: 59 }
+        daysOfWeek:
+          type: array
+          items: { type: integer, minimum: 1, maximum: 7 }
+        isActive: { type: boolean }
+
+    BroadcastRequest:
+      type: object
+      required: [title, body, segment]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 100 }
+        body: { type: string, minLength: 1, maxLength: 500 }
+        segment: { type: string, enum: [all, customers, drivers] }
+        city: { type: string }
+        deepLink: { type: string, format: uri }
+
+    CreateZoneRequest:
+      type: object
+      required: [name, city, country, keywords]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        city: { type: string, minLength: 1, maxLength: 100 }
+        country: { type: string, minLength: 1, maxLength: 100 }
+        keywords: { type: array, items: { type: string }, minItems: 1, maxItems: 50 }
+        swLat: { type: number, nullable: true }
+        swLng: { type: number, nullable: true }
+        neLat: { type: number, nullable: true }
+        neLng: { type: number, nullable: true }
+        isActive: { type: boolean, default: true }
+
+    UpdateZoneRequest:
+      type: object
+      description: All fields optional for PATCH
+      properties:
+        name: { type: string }
+        city: { type: string }
+        country: { type: string }
+        keywords: { type: array, items: { type: string } }
+        swLat: { type: number, nullable: true }
+        swLng: { type: number, nullable: true }
+        neLat: { type: number, nullable: true }
+        neLng: { type: number, nullable: true }
+        isActive: { type: boolean }
+
+    UpdateFeeSettingsRequest:
+      type: object
+      properties:
+        baseRateKobo: { type: integer, minimum: 0 }
+        perKgRateKobo: { type: integer, minimum: 0 }
+        perKmRateKobo: { type: integer, minimum: 0 }
+        carrierCommissionRatePct: { type: number, minimum: 0, maximum: 100 }
+        taxRatePct: { type: number, minimum: 0, maximum: 100 }
+        minPriceKobo: { type: integer, minimum: 0 }
+        withdrawalFeeKobo: { type: integer, minimum: 0 }
+        weightCorrectionApprovalWindowMin: { type: integer, minimum: 1, maximum: 60 }
+
+    UpdateAlertSettingsRequest:
+      type: object
+      properties:
+        driverSilentWarningMin: { type: integer, minimum: 5, maximum: 60 }
+        driverSilentCriticalMin: { type: integer, minimum: 10, maximum: 120 }
+        legOverdueWarningMin: { type: integer, minimum: 10, maximum: 120 }
+        legOverdueCriticalMin: { type: integer, minimum: 20, maximum: 240 }
+        customerUpdateGapWarningMin: { type: integer, minimum: 15, maximum: 120 }
+        customerUpdateGapCriticalMin: { type: integer, minimum: 30, maximum: 240 }
+        ontimeRateWarningPct: { type: integer, minimum: 50, maximum: 100 }
+        ontimeRateCriticalPct: { type: integer, minimum: 30, maximum: 90 }
+        pumbleWebhookUrl: { type: string, format: uri, nullable: true }
+        pushEnabled: { type: boolean }
+        pumbleEnabled: { type: boolean }

@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "Update OpenAPI Spec",
+  "description": "When an API route file is modified, prompts the AI to update docs/openapi.yaml to reflect any endpoint changes.",
+  "version": "1",
+  "when": {
+    "type": "postToolUse",
+    "toolTypes": ["edit", "write"]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Check whether the file just modified is inside apps/api/src/routes/. If it is not, stop — do nothing. If it is, read the changed file and update docs/openapi.yaml to reflect only what changed: add any new paths, remove deleted endpoints, fix parameters, or update request/response schemas. Do not reformat or touch unrelated sections."
+  }
+}
