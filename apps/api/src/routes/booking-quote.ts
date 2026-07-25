@@ -6,7 +6,7 @@ import type { FeeSettings, VehicleType, VehicleTypeRates } from '@surewaka/share
 import type { AuthUser } from '@surewaka/auth';
 import { requireAuth } from '../middleware/auth';
 import { computeOnDemandQuote, computeCarrierQuote, assembleCompositeQuote } from '../lib/fee-engine';
-import { haversineKm } from '../lib/eta-calculator';
+import { getRoadDistanceKm, haversineKm } from '@surewaka/shared';
 
 type Env = { Variables: { user: AuthUser; accessToken: string } };
 
@@ -123,17 +123,17 @@ bookingQuoteRoutes.post('/booking/quote', async (c) => {
         if (leg.legType === 'first_mile') {
           const hub = nearestHub(leg.pickup);
           distanceKm = hub
-            ? haversineKm(leg.pickup.lat, leg.pickup.lng, hub.lat, hub.lng)
-            : haversineKm(leg.pickup.lat, leg.pickup.lng, leg.dropoff.lat, leg.dropoff.lng);
+            ? await getRoadDistanceKm(leg.pickup.lat, leg.pickup.lng, hub.lat, hub.lng)
+            : await getRoadDistanceKm(leg.pickup.lat, leg.pickup.lng, leg.dropoff.lat, leg.dropoff.lng);
         } else {
           const hub = nearestHub(leg.dropoff);
           distanceKm = hub
-            ? haversineKm(hub.lat, hub.lng, leg.dropoff.lat, leg.dropoff.lng)
-            : haversineKm(leg.pickup.lat, leg.pickup.lng, leg.dropoff.lat, leg.dropoff.lng);
+            ? await getRoadDistanceKm(hub.lat, hub.lng, leg.dropoff.lat, leg.dropoff.lng)
+            : await getRoadDistanceKm(leg.pickup.lat, leg.pickup.lng, leg.dropoff.lat, leg.dropoff.lng);
         }
 
         const quote = computeOnDemandQuote(
-          { packageWeight, distanceKm: Math.round(distanceKm * 10) / 10, vehicleType: leg.vehicleType },
+          { packageWeight, distanceKm, vehicleType: leg.vehicleType },
           feeSettingsObj,
           vehicleTypeRatesObj,
         );

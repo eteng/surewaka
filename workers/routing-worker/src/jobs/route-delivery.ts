@@ -18,22 +18,11 @@ import { buildGraph, findCheapestRoute } from '../lib/router';
 import type { RouteEdge, Park } from '../lib/router';
 import { enqueuePushFromWorker } from '../push-enqueue';
 import type { RouteDeliveryJobData } from '../queue';
+import { getRoadDistanceKm, haversineKm } from '@surewaka/shared';
 
 const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 const STALE_THRESHOLD_MS = 2 * 60 * 60 * 1000;
 const FIRST_LAST_MILE_SPEED_KMH = 20;
-
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 type LineItem = { label: string; amountKobo: number };
 
@@ -242,11 +231,11 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
     // 11b. Derive actual first/last mile km from the selected path's park coordinates
     const firstHopOrigin = path.hops[0]!.originPark;
     const lastHopDest = path.hops[path.hops.length - 1]!.destPark;
-    const firstMileDistKm = haversineKm(
+    const firstMileDistKm = await getRoadDistanceKm(
       delivery.pickupLat, delivery.pickupLng,
       firstHopOrigin.lat, firstHopOrigin.lng,
     );
-    const lastMileDistKm = haversineKm(
+    const lastMileDistKm = await getRoadDistanceKm(
       lastHopDest.lat, lastHopDest.lng,
       delivery.dropoffLat, delivery.dropoffLng,
     );
@@ -281,7 +270,7 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
       // transfer between consecutive hops (driver moves package between parks)
       if (i > 0) {
         const prevHop = path.hops[i - 1]!;
-        const transferDist = haversineKm(
+        const transferDist = await getRoadDistanceKm(
           prevHop.destPark.lat, prevHop.destPark.lng,
           hop.originPark.lat, hop.originPark.lng,
         );

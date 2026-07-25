@@ -6,10 +6,11 @@ import { requireRole } from '../middleware/role';
 import { createDeliverySchema, weightCorrectionRequestSchema, weightCorrectionRespondSchema } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
 import type { FeeSettings, VehicleType, VehicleTypeRates } from '@surewaka/shared';
-import { calculateSystemEta, haversineKm } from '../lib/eta-calculator';
+import { calculateSystemEta } from '../lib/eta-calculator';
 import { createAuthoritativeQuotesForDelivery, supersedeLeg } from '../services/quote-service';
 import { computeOnDemandQuote, computeCarrierQuote } from '../lib/fee-engine';
 import { respondToCorrection, reportDiscrepancy } from '../services/weight-correction-service';
+import { getRoadDistanceKm } from '@surewaka/shared';
 import { enqueueRouteDelivery } from '../lib/routing-queue';
 
 type DeliveriesEnv = {
@@ -307,7 +308,7 @@ deliveryRoutes.post('/', async (c) => {
         .returning();
 
       // 3. Build quote inputs from inserted legs
-      const quoteLegs = insertedLegs.map((dbLeg, index) => {
+      const quoteLegs = await Promise.all(insertedLegs.map(async (dbLeg, index) => {
         const inputLeg = legs[index];
         return {
           id:          dbLeg.id,
@@ -318,10 +319,10 @@ deliveryRoutes.post('/', async (c) => {
             ? (inputLeg as { vehicleType: VehicleType }).vehicleType
             : undefined,
           distanceKm:  dbLeg.actorType === 'driver'
-            ? haversineKm(dbLeg.pickupLat, dbLeg.pickupLng, dbLeg.dropoffLat, dbLeg.dropoffLng)
+            ? await getRoadDistanceKm(dbLeg.pickupLat, dbLeg.pickupLng, dbLeg.dropoffLat, dbLeg.dropoffLng)
             : undefined,
         };
-      });
+      }));
 
       // 4. Compute and persist authoritative quotes (tx — atomic with delivery + legs)
       const compositeQuote = await createAuthoritativeQuotesForDelivery(
@@ -541,7 +542,7 @@ deliveryRoutes.post('/:id/requote', async (c) => {
           : 'motorcycle';
 
         // Compute distance from leg coordinates
-        const distanceKm = haversineKm(
+        const distanceKm = await getRoadDistanceKm(
           leg.pickupLat,
           leg.pickupLng,
           leg.dropoffLat,
@@ -858,6 +859,27 @@ deliveryRoutes.post(
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
+
+      if (message === 'WITHIN_TOLERANCE') {
+        return c.json(
+          { data: { status: 'within_tolerance' }, error: null, meta: null },
+          200,
+        );
+      }
+
+      if (message === 'WEIGHT_DELTA_TOO_LARGE') {
+        return c.json(
+          {
+            data: null,
+            error: {
+              code: 'WEIGHT_DELTA_TOO_LARGE',
+              message: 'Reported weight exceeds 3× declared. Contact support for manual review.',
+            },
+            meta: null,
+          },
+          422,
+        );
+      }
 
       if (message === 'Delivery not found') {
         return c.json(
