@@ -63,6 +63,22 @@ export const systemConfig = pgTable('system_config', {
 - `updatedBy` is nullable (null = default value, never explicitly set by a user).
 - Table starts empty. Registry defaults are returned in-code for any missing row.
 
+### Key Naming Convention
+
+All config keys follow `<category>.<param>` where both sides use `snake_case`:
+
+```
+matching.first_mile_dispatch_buffer_min   ✓
+pricing.base_rate_kobo                    ✓
+app_helper.retry_limit                    ✓  (multi-word prefix is fine)
+app-helper.retry-limit                    ✗  (kebab-case not allowed)
+matching.firstMileBuffer                  ✗  (camelCase not allowed)
+```
+
+The category prefix can be multi-word (e.g. `app_helper`, `carrier_ops`) — it must be `snake_case`. The param portion follows the same rule.
+
+---
+
 ### Config Registry — Modular Structure
 
 The registry is split into per-feature module files that merge at the top level. Each module owns its own namespace and can be added, extended, or migrated independently.
