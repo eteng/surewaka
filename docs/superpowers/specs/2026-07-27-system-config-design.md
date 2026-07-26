@@ -63,20 +63,45 @@ export const systemConfig = pgTable('system_config', {
 - `updatedBy` is nullable (null = default value, never explicitly set by a user).
 - Table starts empty. Registry defaults are returned in-code for any missing row.
 
-### Config Registry
+### Config Registry — Modular Structure
 
-File: `packages/shared/src/config/registry.ts`
+The registry is split into per-feature module files that merge at the top level. Each module owns its own namespace and can be added, extended, or migrated independently.
+
+```
+packages/shared/src/config/
+  registry.ts                    ← merges all modules, exports configRegistry + ConfigKey
+  registries/
+    matching.ts                  ← matching.* keys (this spec)
+    pricing.ts                   ← pricing.* keys (when fee_settings migrates)
+    routing.ts                   ← routing.* keys (when intercity routing spec lands)
+```
+
+**Adding a new category in future:** create `registries/<category>.ts`, spread it into `registry.ts` — one import line, zero other changes needed.
+
+---
+
+#### Shared type — `packages/shared/src/config/registry.ts`
 
 ```typescript
-type ConfigEntry<T extends z.ZodTypeAny> = {
+export type ConfigCategory = 'matching' | 'routing' | 'pricing'
+
+export type ConfigEntry<T extends z.ZodTypeAny> = {
   label: string
   description?: string   // optional — omit for self-explanatory fields
-  category: 'matching' | 'routing' | 'pricing'
+  category: ConfigCategory
   schema: T
   default: z.infer<T>
 }
+```
 
-export const configRegistry = {
+---
+
+#### Module — `packages/shared/src/config/registries/matching.ts`
+
+Each module uses a template literal key type to enforce its own namespace at the type level.
+
+```typescript
+export const matchingConfig = {
   'matching.first_mile_dispatch_buffer_min': {
     label: 'First-Mile Dispatch Buffer',
     description: 'Minutes before carrier departure to trigger driver matching (includes 5min matching + 10min driver-to-pickup + 30min Lagos traffic headroom)',
@@ -167,10 +192,42 @@ export const configRegistry = {
       headingBonus:       8,
     },
   },
-} satisfies Record<string, ConfigEntry<z.ZodTypeAny>>
+} satisfies Record<`matching.${string}`, ConfigEntry<z.ZodTypeAny>>
+```
+
+---
+
+#### Future modules (stubs, not implemented in this spec)
+
+`registries/pricing.ts` — populated when `fee_settings` migrates:
+```typescript
+export const pricingConfig = {} satisfies Record<`pricing.${string}`, ConfigEntry<z.ZodTypeAny>>
+```
+
+`registries/routing.ts` — populated when intercity routing spec lands:
+```typescript
+export const routingConfig = {} satisfies Record<`routing.${string}`, ConfigEntry<z.ZodTypeAny>>
+```
+
+---
+
+#### Top-level merge — `packages/shared/src/config/registry.ts`
+
+```typescript
+import { matchingConfig } from './registries/matching'
+import { pricingConfig }  from './registries/pricing'
+import { routingConfig }  from './registries/routing'
+
+export const configRegistry = {
+  ...matchingConfig,
+  ...pricingConfig,
+  ...routingConfig,
+}
 
 export type ConfigKey = keyof typeof configRegistry
 ```
+
+`getConfig()` and the API are unchanged — `ConfigKey` is still `keyof typeof configRegistry`, TypeScript resolves it correctly through the spread.
 
 ---
 
@@ -372,9 +429,13 @@ The admin `fee-settings.tsx` page would then be superseded by the `system-config
 ## Implementation Order
 
 1. Add `surewaka_superadmin` to `UserRole` in `packages/shared/src/types.ts`
-2. DB schema: `system-config.ts` → generate + apply migration
-3. Config registry: `packages/shared/src/config/registry.ts`
-4. Config client: `packages/shared/src/config/client.ts`
+2. DB schema: `packages/db/src/schema/system-config.ts` → generate + apply migration
+3. Config registry:
+   - `packages/shared/src/config/registries/matching.ts` (all matching keys)
+   - `packages/shared/src/config/registries/pricing.ts` (empty stub)
+   - `packages/shared/src/config/registries/routing.ts` (empty stub)
+   - `packages/shared/src/config/registry.ts` (merge + export `ConfigKey`)
+4. Config client: `packages/shared/src/config/client.ts` (`getConfig` + `invalidateConfig`)
 5. API routes: `apps/api/src/routes/admin/system-config.ts` + mount in `index.ts`
-6. Admin UI: hook → renderer component → settings page
+6. Admin UI: `use-system-config.ts` hook → `config-field.tsx` renderer → `system-config.tsx` page → add card to `settings.tsx`
 7. Update driver-matching spec: replace `fee_settings` references with `getConfig(...)` calls
