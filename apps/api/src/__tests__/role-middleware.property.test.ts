@@ -1,5 +1,6 @@
 // Feature: rbac-system
-// Property 1: Role Hierarchy Bypass — surewaka_admin always passes any role check
+// Property 1: Role Hierarchy Bypass — surewaka_admin bypasses all non-superadmin role checks
+// Property 2: Role Hierarchy Bypass — surewaka_superadmin bypasses all role checks
 // Property 12: Access Denial Without Required Roles — users without required roles get 403
 // Validates: Requirements 2.3, 2.4, 8.4, 8.5
 
@@ -12,8 +13,8 @@ import { requireRole } from '../middleware/role';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** All roles except surewaka_admin */
-const NON_ADMIN_ROLES = USER_ROLES.filter((r) => r !== 'surewaka_admin');
+/** All roles except the two bypass roles */
+const NON_ADMIN_ROLES = USER_ROLES.filter((r) => r !== 'surewaka_admin' && r !== 'surewaka_superadmin');
 
 /** Arbitrary for a non-empty subset of roles (used as required roles for the middleware) */
 const requiredRolesArb = fc
@@ -64,10 +65,15 @@ function createTestApp(requiredRoles: UserRole[], user: AuthUser) {
 // ─── Property Tests ──────────────────────────────────────────────────────────
 
 describe('Role Middleware — Property Tests', () => {
-  describe('Property 1: Role Hierarchy Bypass — surewaka_admin always passes any role check', () => {
+  describe('Property 1: Role Hierarchy Bypass — surewaka_admin bypasses all non-superadmin role checks', () => {
+    // Roles that surewaka_admin can bypass (excludes surewaka_superadmin-only routes)
+    const nonSuperAdminRolesArb = fc
+      .subarray([...USER_ROLES.filter((r) => r !== 'surewaka_superadmin')], { minLength: 1 })
+      .map((arr) => arr as UserRole[]);
+
     it('surewaka_admin is granted access regardless of which roles are required', async () => {
       await fc.assert(
-        fc.asyncProperty(requiredRolesArb, async (requiredRoles) => {
+        fc.asyncProperty(nonSuperAdminRolesArb, async (requiredRoles) => {
           // User has surewaka_admin role
           const user = createMockUser(['surewaka_admin']);
           const app = createTestApp(requiredRoles, user);
@@ -86,7 +92,7 @@ describe('Role Middleware — Property Tests', () => {
     it('surewaka_admin with additional roles still bypasses all checks', async () => {
       await fc.assert(
         fc.asyncProperty(
-          requiredRolesArb,
+          nonSuperAdminRolesArb,
           nonAdminRolesArb,
           async (requiredRoles, additionalRoles) => {
             // User has surewaka_admin plus other roles
@@ -106,7 +112,7 @@ describe('Role Middleware — Property Tests', () => {
     it('surewaka_admin bypasses even when required roles are roles they would not normally have', async () => {
       await fc.assert(
         fc.asyncProperty(
-          fc.subarray([...NON_ADMIN_ROLES], { minLength: 1 }).map((arr) => arr as UserRole[]),
+          nonSuperAdminRolesArb,
           async (requiredRoles) => {
             // User ONLY has surewaka_admin — none of the required roles directly
             const user = createMockUser(['surewaka_admin']);
@@ -119,6 +125,29 @@ describe('Role Middleware — Property Tests', () => {
         ),
         { numRuns: 100 },
       );
+    });
+  });
+
+  describe('Property 2: surewaka_superadmin bypasses all role checks', () => {
+    it('surewaka_superadmin is granted access for any required roles including superadmin-only', async () => {
+      await fc.assert(
+        fc.asyncProperty(requiredRolesArb, async (requiredRoles) => {
+          const user = createMockUser(['surewaka_superadmin'] as UserRole[]);
+          const app = createTestApp(requiredRoles, user);
+          const res = await app.request('/test');
+          expect(res.status).toBe(200);
+        }),
+        { numRuns: 100 },
+      );
+    });
+
+    it('surewaka_admin is denied access to surewaka_superadmin-only routes', async () => {
+      const user = createMockUser(['surewaka_admin']);
+      const app = createTestApp(['surewaka_superadmin'] as UserRole[], user);
+      const res = await app.request('/test');
+      expect(res.status).toBe(403);
+      const body = await res.json() as { error: { code: string } };
+      expect(body.error.code).toBe('FORBIDDEN');
     });
   });
 

@@ -29,6 +29,13 @@ export const personas = {
     roles: ['surewaka_admin'],
     role: 'surewaka_admin',
   }),
+  superadmin: (): AuthUser => ({
+    id: 'user-superadmin-id',
+    clerkId: 'clerk_superadmin_123',
+    email: 'superadmin@surewaka.com',
+    roles: ['surewaka_superadmin'],
+    role: 'surewaka_superadmin',
+  }),
   customer: (): AuthUser => ({
     id: 'user-customer-id',
     clerkId: 'clerk_customer_123',
