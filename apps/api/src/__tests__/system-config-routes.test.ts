@@ -10,7 +10,10 @@ vi.mock('@surewaka/db', () => ({
         // Supports: await db.select().from(t)              (buildConfigList — no where/limit)
         //           await db.select().from(t).where().limit()  (GET /:key)
         const chain: {
-          then: (resolve: (v: unknown[]) => unknown, reject?: (e: unknown) => unknown) => Promise<unknown>;
+          then: (
+            resolve: (v: unknown[]) => unknown,
+            reject?: (e: unknown) => unknown,
+          ) => Promise<unknown>;
           catch: (fn: (e: unknown) => unknown) => Promise<unknown>;
           where: ReturnType<typeof vi.fn>;
           limit: ReturnType<typeof vi.fn>;
@@ -27,27 +30,31 @@ vi.mock('@surewaka/db', () => ({
     insert: vi.fn().mockReturnValue({
       values: vi.fn().mockReturnValue({
         onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{
-            key: 'matching.tier1_radius_km',
-            value: 7,
-            updatedBy: 'user-id',
-            updatedAt: new Date('2026-07-27T10:00:00Z'),
-          }]),
+          returning: vi.fn().mockResolvedValue([
+            {
+              key: 'matching.tier1_radius_km',
+              value: 7,
+              updatedBy: 'user-id',
+              updatedAt: new Date('2026-07-27T10:00:00Z'),
+            },
+          ]),
         }),
       }),
     }),
     delete: vi.fn().mockReturnValue({
       where: vi.fn().mockResolvedValue(undefined),
     }),
-    transaction: vi.fn().mockImplementation(async (fn: (tx: unknown) => Promise<void>) => fn({
-      insert: vi.fn().mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          onConflictDoUpdate: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([{}]),
+    transaction: vi.fn().mockImplementation(async (fn: (tx: unknown) => Promise<void>) =>
+      fn({
+        insert: vi.fn().mockReturnValue({
+          values: vi.fn().mockReturnValue({
+            onConflictDoUpdate: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{}]),
+            }),
           }),
         }),
       }),
-    })),
+    ),
   },
   systemConfig: {},
 }));
@@ -76,7 +83,7 @@ describe('GET /api/v1/admin/config', () => {
       headers: { Authorization: 'Bearer tok' },
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { data: Array<{ key: string; value: unknown }> };
+    const body = (await res.json()) as { data: Array<{ key: string; value: unknown }> };
     expect(body.data.length).toBeGreaterThan(0);
     const bufferItem = body.data.find((d) => d.key === 'matching.first_mile_dispatch_buffer_min');
     expect(bufferItem?.value).toBe(45);
@@ -91,7 +98,7 @@ describe('GET /api/v1/admin/config/export', () => {
     });
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('application/json');
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body['matching.first_mile_dispatch_buffer_min']).toBe(45);
     expect(body['matching.tier1_radius_km']).toBe(5);
   });
@@ -104,7 +111,7 @@ describe('GET /api/v1/admin/config/:key', () => {
       headers: { Authorization: 'Bearer tok' },
     });
     expect(res.status).toBe(400);
-    const body = await res.json() as { error: { code: string } };
+    const body = (await res.json()) as { error: { code: string } };
     expect(body.error.code).toBe('UNKNOWN_CONFIG_KEY');
   });
 
@@ -114,7 +121,7 @@ describe('GET /api/v1/admin/config/:key', () => {
       headers: { Authorization: 'Bearer tok' },
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { data: { key: string; value: unknown } };
+    const body = (await res.json()) as { data: { key: string; value: unknown } };
     expect(body.data.key).toBe('matching.tier1_radius_km');
     expect(body.data.value).toBe(5);
   });
@@ -129,7 +136,7 @@ describe('PUT /api/v1/admin/config/:key', () => {
       body: JSON.stringify({ value: 5 }),
     });
     expect(res.status).toBe(400);
-    const body = await res.json() as { error: { code: string } };
+    const body = (await res.json()) as { error: { code: string } };
     expect(body.error.code).toBe('UNKNOWN_CONFIG_KEY');
   });
 
@@ -141,7 +148,7 @@ describe('PUT /api/v1/admin/config/:key', () => {
       body: JSON.stringify({ value: 999 }), // max is 20
     });
     expect(res.status).toBe(400);
-    const body = await res.json() as { error: { code: string } };
+    const body = (await res.json()) as { error: { code: string } };
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 
@@ -153,7 +160,7 @@ describe('PUT /api/v1/admin/config/:key', () => {
       body: JSON.stringify({ value: 7 }),
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { data: { key: string; value: unknown } };
+    const body = (await res.json()) as { data: { key: string; value: unknown } };
     expect(body.data.value).toBe(7);
   });
 });
@@ -175,7 +182,7 @@ describe('POST /api/v1/admin/config/:key/reset', () => {
       headers: { Authorization: 'Bearer tok' },
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { data: { value: unknown } };
+    const body = (await res.json()) as { data: { value: unknown } };
     expect(body.data.value).toBe(5);
   });
 });
@@ -189,7 +196,7 @@ describe('POST /api/v1/admin/config/import', () => {
       body: JSON.stringify({ 'matching.tier1_radius_km': 999 }), // exceeds max
     });
     expect(res.status).toBe(400);
-    const body = await res.json() as { error: { code: string; details: unknown[] } };
+    const body = (await res.json()) as { error: { code: string; details: unknown[] } };
     expect(body.error.code).toBe('VALIDATION_ERROR');
     expect(body.error.details).toHaveLength(1);
   });
@@ -205,7 +212,7 @@ describe('POST /api/v1/admin/config/import', () => {
       }),
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { data: { imported: number; skipped: number } };
+    const body = (await res.json()) as { data: { imported: number; skipped: number } };
     expect(body.data.imported).toBe(1);
     expect(body.data.skipped).toBe(1);
   });

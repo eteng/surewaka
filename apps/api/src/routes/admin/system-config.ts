@@ -50,7 +50,11 @@ systemConfigRoutes.post('/import', requireRole('surewaka_superadmin'), async (c)
   const body = await c.req.json();
   if (typeof body !== 'object' || Array.isArray(body) || body === null) {
     return c.json(
-      { data: null, error: { code: 'VALIDATION_ERROR', message: 'Body must be a flat JSON object' }, meta: null },
+      {
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'Body must be a flat JSON object' },
+        meta: null,
+      },
       400,
     );
   }
@@ -59,7 +63,10 @@ systemConfigRoutes.post('/import', requireRole('surewaka_superadmin'), async (c)
   let skipped = 0;
   for (const [key, value] of Object.entries(body)) {
     const entry = configRegistry[key as keyof typeof configRegistry];
-    if (!entry) { skipped++; continue; }
+    if (!entry) {
+      skipped++;
+      continue;
+    }
     const parsed = entry.schema.safeParse(value);
     if (!parsed.success) {
       errors.push({ key, message: parsed.error.message });
@@ -69,7 +76,11 @@ systemConfigRoutes.post('/import', requireRole('surewaka_superadmin'), async (c)
   }
   if (errors.length > 0) {
     return c.json(
-      { data: null, error: { code: 'VALIDATION_ERROR', message: 'Import validation failed', details: errors }, meta: null },
+      {
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'Import validation failed', details: errors },
+        meta: null,
+      },
       400,
     );
   }
@@ -95,7 +106,11 @@ systemConfigRoutes.get('/:key', requireRole('surewaka_admin'), async (c) => {
   const entry = configRegistry[key as keyof typeof configRegistry];
   if (!entry) {
     return c.json(
-      { data: null, error: { code: 'UNKNOWN_CONFIG_KEY', message: `Unknown config key: ${key}` }, meta: null },
+      {
+        data: null,
+        error: { code: 'UNKNOWN_CONFIG_KEY', message: `Unknown config key: ${key}` },
+        meta: null,
+      },
       400,
     );
   }
@@ -122,7 +137,11 @@ systemConfigRoutes.put('/:key', requireRole('surewaka_superadmin'), async (c) =>
   const entry = configRegistry[key as keyof typeof configRegistry];
   if (!entry) {
     return c.json(
-      { data: null, error: { code: 'UNKNOWN_CONFIG_KEY', message: `Unknown config key: ${key}` }, meta: null },
+      {
+        data: null,
+        error: { code: 'UNKNOWN_CONFIG_KEY', message: `Unknown config key: ${key}` },
+        meta: null,
+      },
       400,
     );
   }
@@ -130,7 +149,11 @@ systemConfigRoutes.put('/:key', requireRole('surewaka_superadmin'), async (c) =>
   const parsed = entry.schema.safeParse(body.value);
   if (!parsed.success) {
     return c.json(
-      { data: null, error: { code: 'VALIDATION_ERROR', message: parsed.error.message }, meta: null },
+      {
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: parsed.error.message },
+        meta: null,
+      },
       400,
     );
   }
@@ -157,7 +180,11 @@ systemConfigRoutes.post('/:key/reset', requireRole('surewaka_superadmin'), async
   const entry = configRegistry[key as keyof typeof configRegistry];
   if (!entry) {
     return c.json(
-      { data: null, error: { code: 'UNKNOWN_CONFIG_KEY', message: `Unknown config key: ${key}` }, meta: null },
+      {
+        data: null,
+        error: { code: 'UNKNOWN_CONFIG_KEY', message: `Unknown config key: ${key}` },
+        meta: null,
+      },
       400,
     );
   }
