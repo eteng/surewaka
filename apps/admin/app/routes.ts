@@ -23,6 +23,7 @@ export default [
     route('settings/fee-settings', 'routes/settings/fee-settings.tsx'),
     route('settings/profile', 'routes/settings/profile.tsx'),
     route('settings/name-changes', 'routes/settings/name-changes.tsx'),
+    route('settings/system-config', 'routes/settings/system-config.tsx'),
     route('notifications', 'routes/notifications.tsx'),
     route('notifications/broadcast', 'routes/notifications.broadcast.tsx'),
     route('disputes', 'routes/disputes.tsx'),

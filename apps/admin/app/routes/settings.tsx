@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { Banknote, Bell, User } from 'lucide-react';
+import { Banknote, Bell, SlidersHorizontal, User } from 'lucide-react';
 import type { Route } from './+types/settings';
 
 export function meta({}: Route.MetaArgs) {
@@ -24,6 +24,12 @@ const SETTINGS_CARDS = [
     icon: User,
     title: 'Profile',
     description: 'Avatar, name, notification preferences',
+  },
+  {
+    to: '/settings/system-config',
+    icon: SlidersHorizontal,
+    title: 'System Config',
+    description: 'Matching engine, routing parameters, operational knobs',
   },
 ];
 
