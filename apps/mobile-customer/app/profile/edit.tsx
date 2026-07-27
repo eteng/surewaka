@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { GENDER_VALUES, GENDER_LABELS } from '@surewaka/shared';
 import type { Gender } from '@surewaka/shared';
 import { useCustomerProfile } from '~/hooks/use-customer-profile';
-import { AvatarPicker } from '~/components/avatar-picker';
+import { AvatarPicker } from '@/components/avatar-picker';
 import { useAvatarPicker } from '~/hooks/use-avatar-picker';
 
 const editSchema = z.object({
