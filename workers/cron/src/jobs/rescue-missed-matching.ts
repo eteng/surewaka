@@ -2,7 +2,8 @@ import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { db, deliveryLegs, deliveries } from '@surewaka/db';
 import { eq, and, lte } from 'drizzle-orm';
-import { getConfig, NIL_UUID } from '@surewaka/shared';
+import { NIL_UUID } from '@surewaka/shared';
+import { getConfig } from '@surewaka/shared/server';
 import type { MatchDriverJobData } from '@surewaka/shared';
 
 const MAX_RESCUE_BATCH = 20;

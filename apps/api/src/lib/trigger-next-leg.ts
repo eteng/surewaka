@@ -1,6 +1,7 @@
 import { and, asc, eq, gt } from 'drizzle-orm';
 import { db, deliveries, deliveryLegs } from '@surewaka/db';
-import { getConfig, BUSINESS_HOUR_START, BUSINESS_HOUR_END, matchDriverJobDataSchema } from '@surewaka/shared';
+import { BUSINESS_HOUR_START, BUSINESS_HOUR_END, matchDriverJobDataSchema } from '@surewaka/shared';
+import { getConfig } from '@surewaka/shared/server';
 import { matchingQueue } from './matching-queue';
 
 /**

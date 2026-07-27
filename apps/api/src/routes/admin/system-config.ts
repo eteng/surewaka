@@ -3,7 +3,8 @@ import { eq } from 'drizzle-orm';
 import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
 import { db, systemConfig } from '@surewaka/db';
-import { configRegistry, invalidateConfig } from '@surewaka/shared';
+import { configRegistry } from '@surewaka/shared';
+import { invalidateConfig } from '@surewaka/shared/server';
 import type { UserRole } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
 

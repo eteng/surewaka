@@ -36,3 +36,18 @@ The process triggered when a driver on an On_Demand_Leg reports, at physical pic
 
 ### Zone
 A named geographic delivery area within a city (e.g., "Lekki" in Lagos). Used for delivery classification, carrier SLA routing, alert context, and analytics heatmaps. Zones are defined by keyword sets and optional bounding boxes. A delivery leg may be "unclassified" (null zone) if the classifier cannot determine a match. The `city` field on a zone represents the metropolitan/operational area, not necessarily an administrative city boundary.
+
+### Driver_Matching
+The process of finding and assigning a verified, available driver to a Delivery_Leg with `actor_type = 'driver'`. One unified system serves all invocation contexts (on-demand intra-city, first-mile/last-mile of surewaka_way, transfer legs). Uses tiered broadcast (expanding radius: 5km → 8km → 12km), scored ranking, and atomic first-accept-wins resolution. Hard timeout of 5 minutes per matching attempt. The unit of matching is always a leg, never a delivery.
+
+### Delivery_Offer
+A time-limited job offer sent to a specific driver for a specific Delivery_Leg. Tracked in the `delivery_offers` table for audit. An offer is `pending` until the driver explicitly accepts, explicitly declines, or the tier timeout expires. A driver can hold at most one active leg at any time; offers are not sent to drivers with an active leg.
+
+### Timed_Dispatch
+The scheduling strategy for triggering Driver_Matching on legs that have a downstream deadline (carrier departure for first-mile/transfer, business hours for last-mile). Matching is not triggered immediately when the leg becomes eligible, but at a computed time: `deadline − legETA − configurable buffer` (default 45 min). Implemented as a BullMQ delayed job with a cron safety net. See [[ADR-010]].
+
+### Self_Drop
+A fallback option offered to the customer when first-mile Driver_Matching fails. The customer physically delivers the package to the carrier's origin park themselves. The first-mile leg is cancelled and its quote amount refunded. The delivery continues with the remaining intercity + last-mile legs.
+
+### Delivery_Completion
+The process by which a driver-operated leg is confirmed as delivered. Requires photo proof (stored in R2) taken by the driver at dropoff. After the driver marks `delivered`, a 30-minute dispute window begins. Escrow for the leg is released to the driver's wallet automatically after the window closes with no dispute.

@@ -23,13 +23,9 @@ vi.mock('../lib/matching-queue', () => ({
   matchingQueue: { add: vi.fn() },
 }));
 
-vi.mock('@surewaka/shared', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@surewaka/shared')>();
-  return {
-    ...actual,
-    getConfig: vi.fn().mockResolvedValue(45),
-  };
-});
+vi.mock('@surewaka/shared/server', () => ({
+  getConfig: vi.fn().mockResolvedValue(45),
+}));
 
 import { getNextBusinessHourStart } from '../lib/trigger-next-leg';
 

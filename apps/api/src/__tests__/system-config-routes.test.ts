@@ -60,10 +60,9 @@ vi.mock('@surewaka/db', () => ({
 }));
 
 vi.mock('drizzle-orm', () => ({ eq: vi.fn() }));
-vi.mock('@surewaka/shared', async () => {
-  const actual = await vi.importActual<typeof import('@surewaka/shared')>('@surewaka/shared');
-  return { ...actual, invalidateConfig: vi.fn() };
-});
+vi.mock('@surewaka/shared/server', () => ({
+  invalidateConfig: vi.fn(),
+}));
 vi.mock('../middleware/auth', () => stubAuthModule(personas.admin()));
 vi.mock('../middleware/role', () => ({
   requireRole: () => vi.fn(async (_c: Context, next: () => Promise<void>) => next()),
