@@ -33,7 +33,9 @@ import adminZoneRoutes from './routes/admin/zones';
 import adminCarrierParksRoutes from './routes/admin/carrier-parks';
 import adminCarrierRoutesRoutes from './routes/admin/carrier-routes';
 import carrierRoutesPublicRoutes from './routes/carrier-routes';
+import deliveryAcceptRoutes from './routes/delivery-accept';
 import driverLocationRoutes from './routes/driver-locations';
+import deliveryLegRoutes from './routes/delivery-legs';
 import opsHubRoutes from './routes/admin/ops-hub';
 import alertRoutes from './routes/admin/alerts';
 import alertSettingsRoutes from './routes/admin/alert-settings';
@@ -43,6 +45,7 @@ import adminCarrierRateRoutes from './routes/admin/carrier-rates';
 import { adminCarrierReconciliations } from './routes/admin/carrier-rates';
 import adminPayoutRoutes from './routes/admin/payouts';
 import adminFinanceRoutes from './routes/admin/finance';
+import adminSystemConfigRoutes from './routes/admin/system-config';
 
 const app = new Hono();
 
@@ -74,6 +77,7 @@ app.route('/api/v1/auth', authRoutes);
 app.route('/api/v1/addresses', addressRoutes);
 app.route('/api/v1/carriers', carrierRoutes);
 app.route('/api/v1/deliveries', deliveryRoutes);
+app.route('/api/v1/deliveries', deliveryAcceptRoutes);
 app.route('/api/v1/notifications', notificationRoutes);
 app.route('/api/v1/profile', profileRoutes);
 app.route('/api/v1/admin/name-change-requests', adminNameChangeRoutes);
@@ -94,6 +98,7 @@ app.route('/api/v1/push-tokens', pushTokenRoutes);
 app.route('/api/v1/admin/broadcast', adminBroadcastRoutes);
 app.route('/api/v1/admin/deliveries', adminDeliveryRoutes);
 app.route('/api/v1/driver/location', driverLocationRoutes);
+app.route('/api/v1/deliveries', deliveryLegRoutes);
 app.route('/api/v1/admin/ops-hub', opsHubRoutes);
 app.route('/api/v1/admin/alerts', alertRoutes);
 app.route('/api/v1/admin/alert-settings', alertSettingsRoutes);
@@ -107,6 +112,7 @@ app.route('/api/v1/admin/carrier-routes', adminCarrierRoutesRoutes);
 app.route('/api/v1/carrier-routes', carrierRoutesPublicRoutes);
 app.route('/api/v1/admin/payouts', adminPayoutRoutes);
 app.route('/api/v1/admin/finance', adminFinanceRoutes);
+app.route('/api/v1/admin/config', adminSystemConfigRoutes);
 app.route('/api/v1/zones', zoneRoutes);
 
 // Start server
