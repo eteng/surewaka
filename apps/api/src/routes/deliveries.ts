@@ -3,6 +3,7 @@ import { eq, and, or, isNull, inArray } from 'drizzle-orm';
 import { db, deliveries, deliveryLegs, users, carriers, carrierRoutes, feeSettings, vehicleTypeRates, quotes, carrierParks } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { requireRole } from '../middleware/role';
+import { requireLegActor } from '../middleware/require-leg-actor';
 import { createDeliverySchema, weightCorrectionRequestSchema, weightCorrectionRespondSchema } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
 import type { FeeSettings, VehicleType, VehicleTypeRates } from '@surewaka/shared';
@@ -17,6 +18,22 @@ type DeliveriesEnv = {
   Variables: {
     user: AuthUser;
     accessToken: string;
+    leg: {
+      id: string;
+      deliveryId: string;
+      actorType: string;
+      actorId: string;
+      legNumber: number;
+      legType: string;
+      status: string;
+      isActive: boolean;
+      systemEtaAt: Date | null;
+      slaHours: number | null;
+      pickupLng: number;
+      pickupLat: number;
+      dropoffLng: number;
+      dropoffLat: number;
+    };
   };
 };
 
@@ -736,13 +753,16 @@ deliveryRoutes.get('/:id', async (c) => {
  * Driver-only. Reports a weight discrepancy at pickup.
  * The leg must be an on-demand leg (actor_type = 'driver') at `arrived_pickup` status.
  *
+ * Authorization: requireLegActor verifies the user is the assigned driver for this leg.
+ *
  * Requirements: 12.1, 12.2
  */
 deliveryRoutes.post(
   '/:id/legs/:legId/weight-correction',
   requireRole('driver'),
+  requireLegActor,
   async (c) => {
-    const user = c.get('user');
+    const leg = c.get('leg') as { id: string; deliveryId: string; actorType: string; status: string };
     const deliveryId = c.req.param('id');
     const legId = c.req.param('legId');
 
@@ -759,43 +779,15 @@ deliveryRoutes.post(
     const { reportedWeightKg } = parsed.data;
 
     try {
-      // 2. Validate the delivery exists
-      const [delivery] = await db
-        .select({ id: deliveries.id })
-        .from(deliveries)
-        .where(eq(deliveries.id, deliveryId));
-
-      if (!delivery) {
-        return c.json(
-          { data: null, error: { code: 'NOT_FOUND', message: 'Delivery not found' }, meta: null },
-          404,
-        );
-      }
-
-      // 3. Validate the leg exists, belongs to this delivery, and is an on-demand leg
-      const [leg] = await db
-        .select({
-          id: deliveryLegs.id,
-          deliveryId: deliveryLegs.deliveryId,
-          actorType: deliveryLegs.actorType,
-          status: deliveryLegs.status,
-        })
-        .from(deliveryLegs)
-        .where(
-          and(
-            eq(deliveryLegs.id, legId),
-            eq(deliveryLegs.deliveryId, deliveryId),
-          ),
-        );
-
-      if (!leg || leg.actorType !== 'driver') {
+      // 2. Validate the leg is an on-demand leg (actor_type = 'driver')
+      if (leg.actorType !== 'driver') {
         return c.json(
           { data: null, error: { code: 'NOT_FOUND', message: 'On-demand leg not found' }, meta: null },
           404,
         );
       }
 
-      // 4. Validate the leg is at `arrived_pickup` status
+      // 3. Validate the leg is at `arrived_pickup` status
       if (leg.status !== 'arrived_pickup') {
         return c.json(
           { data: null, error: { code: 'INVALID_STATUS', message: 'Leg must be at arrived_pickup status to report weight correction' }, meta: null },
