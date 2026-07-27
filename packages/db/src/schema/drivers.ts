@@ -1,4 +1,13 @@
-import { pgTable, uuid, text, timestamp, boolean, real, foreignKey } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  boolean,
+  real,
+  integer,
+  foreignKey,
+} from 'drizzle-orm/pg-core';
 import { vehicleType } from './enums';
 import { users } from './users';
 
@@ -16,6 +25,12 @@ export const drivers = pgTable(
     lat: real(),
     lng: real(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    acceptanceRate: real('acceptance_rate').default(1.0).notNull(),
+    completionRate: real('completion_rate').default(1.0).notNull(),
+    totalOffersReceived: integer('total_offers_received').default(0).notNull(),
+    totalOffersAccepted: integer('total_offers_accepted').default(0).notNull(),
+    totalDeliveriesCompleted: integer('total_deliveries_completed').default(0).notNull(),
+    lastJobCompletedAt: timestamp('last_job_completed_at'),
   },
   (table) => [
     foreignKey({

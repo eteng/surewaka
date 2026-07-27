@@ -93,4 +93,12 @@ export const waitlistUserType = pgEnum('waitlist_user_type', ['sender', 'busines
 
 export const customerTier = pgEnum('customer_tier', ['power', 'regular', 'new', 'dormant']);
 
+export const deliveryOfferStatus = pgEnum('delivery_offer_status', [
+  'pending',
+  'accepted',
+  'declined',
+  'expired',
+  'cancelled',
+]);
+
 export const walletStatus = pgEnum('wallet_status', ['active', 'frozen', 'closed']);

@@ -3,6 +3,7 @@ import { cronQueue, connection } from './queue';
 import type { CronJobName } from './queue';
 import { handleSyncInfraCosts } from './jobs/sync-infra-costs/index';
 import { rescueStaleRouting } from './jobs/rescue-stale-routing';
+import { rescueMissedMatching } from './jobs/rescue-missed-matching';
 
 // Seed repeating jobs — idempotent (BullMQ deduplicates by jobId)
 await cronQueue.add(
@@ -26,6 +27,16 @@ await cronQueue.add(
   },
 );
 
+await cronQueue.add(
+  'rescue-missed-matching',
+  {},
+  {
+    jobId: 'rescue-missed-matching-5min',
+    repeat: { pattern: '*/5 * * * *' },  // Every 5 minutes
+    attempts: 1,
+  },
+);
+
 const worker = new Worker<Record<string, never>, void, CronJobName>(
   'cron',
   async (job) => {
@@ -34,6 +45,8 @@ const worker = new Worker<Record<string, never>, void, CronJobName>(
         return handleSyncInfraCosts();
       case 'rescue-stale-routing':
         return rescueStaleRouting();
+      case 'rescue-missed-matching':
+        return rescueMissedMatching();
       default:
         throw new Error(`Unknown cron job: ${String(job.name)}`);
     }

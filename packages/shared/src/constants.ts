@@ -170,3 +170,37 @@ export const MAX_WEIGHT_CORRECTION_MULTIPLIER = 3;
 export const MIN_WEIGHT_CORRECTION_KG = 0.5;
 export const WEIGHT_CORRECTION_ABUSE_COUNT = 5;
 export const WEIGHT_CORRECTION_ABUSE_WINDOW_DAYS = 7;
+
+
+// ─── Driver Matching ──────────────────────────────────────────────────────────
+
+import type { ScoringWeights } from './types';
+
+export const MATCHING_TIERS = [
+  { tier: 1, radiusKm: 5, maxCandidates: 5, waitSeconds: 30 },
+  { tier: 2, radiusKm: 8, maxCandidates: 10, waitSeconds: 30 },
+  { tier: 3, radiusKm: 12, maxCandidates: 50, waitSeconds: 180 },
+] as const;
+
+export const MATCHING_TOTAL_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+export const MATCHING_STALE_DRIVER_MS = 30 * 1000; // 30 seconds
+export const MATCHING_RESERVATION_TTL_SECONDS = 60;
+export const MATCHING_CLAIM_TTL_SECONDS = 300;
+
+export const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+
+// Business hours for last-mile dispatch (WAT)
+export const BUSINESS_HOUR_START = 7;  // 7am WAT
+export const BUSINESS_HOUR_END = 21;   // 9pm WAT
+
+// Default scoring weights
+export const DEFAULT_SCORING_WEIGHTS: ScoringWeights = {
+  distancePerKm: -10,
+  acceptanceRate: 20,
+  completionRate: 15,
+  highRatingBonus: 10,
+  lowRatingPenalty: -15,
+  idleBonus30min: 10,
+  idleBonus60min: 5,
+  headingBonus: 8,
+};

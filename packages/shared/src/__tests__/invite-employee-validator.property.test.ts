@@ -16,7 +16,10 @@ import { USER_ROLES } from '../constants';
 
 const VALID_ROLES = [...USER_ROLES] as string[];
 const ORG_SCOPED_ROLES = ['carrier_admin', 'carrier_driver'] as const;
-const NON_ORG_SCOPED_ROLES = VALID_ROLES.filter(
+// Roles that the inviteEmployeeSchema actually accepts (excludes surewaka_superadmin — superadmins
+// cannot be invited through the normal employee invitation flow)
+const INVITABLE_ROLES = ['customer', 'driver', 'surewaka_admin', 'carrier_driver', 'carrier_admin', 'support_agent'] as const;
+const NON_ORG_SCOPED_ROLES = INVITABLE_ROLES.filter(
   (r) => r !== 'carrier_admin' && r !== 'carrier_driver',
 );
 
@@ -90,10 +93,10 @@ const nameTooLongArb = fc.stringMatching(/^[a-zA-Z]{101,200}$/);
 
 // ─── Invalid Role Arbitraries ─────────────────────────────────────────────────
 
-/** Random string that is not a valid role */
+/** Random string that is not a valid invitable role */
 const invalidRoleArb = fc
   .string({ minLength: 1, maxLength: 30 })
-  .filter((s) => !VALID_ROLES.includes(s));
+  .filter((s) => !(INVITABLE_ROLES as readonly string[]).includes(s));
 
 // ─── Property Tests ───────────────────────────────────────────────────────────
 

@@ -703,3 +703,59 @@ export type AlertSettings = {
   pushEnabled: boolean;
   pumbleEnabled: boolean;
 };
+
+
+// ─── Driver Matching Types ──────────────────────────────────────────────────
+
+export type DriverMeta = {
+  lastSeen: string;   // unix timestamp ms
+  lat: string;
+  lng: string;
+  status: 'available' | 'busy' | 'offline';
+  vehicleType: 'motorcycle' | 'car' | 'van' | 'truck';
+};
+
+export type NearbyDriver = {
+  driverId: string;
+  distanceKm: number;
+  meta: DriverMeta;
+};
+
+export type DriverCandidate = {
+  driverId: string;
+  distanceKm: number;
+  acceptanceRate: number;    // 0.0–1.0
+  completionRate: number;    // 0.0–1.0
+  rating: number;            // 1.0–5.0
+  lastJobCompletedAt: number; // unix ms
+  headingTowardPickup: boolean;
+};
+
+export type ScoredDriver = DriverCandidate & { score: number };
+
+export type ScoringWeights = {
+  distancePerKm: number;      // default: -10
+  acceptanceRate: number;     // default: +20
+  completionRate: number;     // default: +15
+  highRatingBonus: number;    // default: +10
+  lowRatingPenalty: number;   // default: -15
+  idleBonus30min: number;     // default: +10
+  idleBonus60min: number;     // default: +5
+  headingBonus: number;       // default: +8
+};
+
+export type MatchDriverJobData = {
+  deliveryId: string;
+  legId?: string;
+  legType?: 'first_mile' | 'transfer' | 'last_mile';
+  pickupLng: number;
+  pickupLat: number;
+  dropoffLng?: number;
+  dropoffLat?: number;
+  vehicleType: 'motorcycle' | 'car' | 'van' | 'truck';
+  customerId: string;
+};
+
+export type MatchResult =
+  | { matched: true; driverId: string; tier: number }
+  | { matched: false; reason: 'no_drivers' | 'all_declined' | 'timeout' };

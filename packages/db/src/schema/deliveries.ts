@@ -7,6 +7,7 @@ import {
   integer,
   bigint,
   index,
+  uniqueIndex,
   foreignKey,
   check,
   type AnyPgColumn,
@@ -75,6 +76,11 @@ export const deliveries = pgTable(
       name: 'deliveries_driver_id_drivers_id_fk',
     }),
     // escrowHoldId FK is defined in escrow-holds.ts to avoid circular import
+    uniqueIndex('idx_deliveries_active_driver')
+      .on(table.driverId)
+      .where(
+        sql`driver_id IS NOT NULL AND status IN ('accepted', 'en_route_pickup', 'arrived_pickup', 'picked_up', 'en_route_dropoff', 'arrived_dropoff')`,
+      ),
     check('deliveries_amount_paid_check', sql`amount_paid > 0`),
     check(
       'deliveries_payment_status_check',
