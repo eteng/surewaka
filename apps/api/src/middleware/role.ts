@@ -15,7 +15,8 @@ type RoleEnv = {
  *
  * - Extracts roles from `user.roles` (populated from Clerk publicMetadata)
  * - Defaults to ['customer'] if missing/empty
- * - `surewaka_admin` bypasses all role checks (hierarchy bypass)
+ * - `surewaka_superadmin` bypasses all role checks (top-tier hierarchy)
+ * - `surewaka_admin` bypasses all role checks except `surewaka_superadmin`-only routes
  * - Returns 403 FORBIDDEN when the user lacks required roles
  * - Sets `userRoles` on Hono context for downstream middleware/handlers
  *
@@ -33,8 +34,14 @@ export function requireRole(...roles: UserRole[]) {
 
     c.set('userRoles', userRoles);
 
-    // Hierarchy bypass: surewaka_admin always has access
-    if (userRoles.includes('surewaka_admin')) {
+    // Hierarchy: surewaka_superadmin > surewaka_admin > others
+    // surewaka_superadmin bypasses all role checks
+    if (userRoles.includes('surewaka_superadmin')) {
+      await next();
+      return;
+    }
+    // surewaka_admin bypasses all non-superadmin routes
+    if (userRoles.includes('surewaka_admin') && !roles.includes('surewaka_superadmin')) {
       await next();
       return;
     }

@@ -13,7 +13,7 @@ export const MIN_DELIVERY_PRICE_NGN = 500;
 
 export const VEHICLE_TYPES = ['motorcycle', 'car', 'van', 'truck'] as const;
 export const PACKAGE_CATEGORIES = ['document', 'parcel', 'fragile', 'heavy', 'food'] as const;
-export const USER_ROLES = ['customer', 'driver', 'surewaka_admin', 'carrier_driver', 'carrier_admin', 'support_agent'] as const;
+export const USER_ROLES = ['customer', 'driver', 'surewaka_admin', 'surewaka_superadmin', 'carrier_driver', 'carrier_admin', 'support_agent'] as const;
 
 export const NOTIFICATION_TYPES = [
   'new_user_signup',

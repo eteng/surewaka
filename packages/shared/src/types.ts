@@ -7,7 +7,7 @@ export type { DeliveryStatus, PaymentStatus };
 
 export type PackageCategory = 'document' | 'parcel' | 'fragile' | 'heavy' | 'food';
 
-export type UserRole = 'customer' | 'driver' | 'surewaka_admin' | 'carrier_driver' | 'carrier_admin' | 'support_agent';
+export type UserRole = 'customer' | 'driver' | 'surewaka_admin' | 'surewaka_superadmin' | 'carrier_driver' | 'carrier_admin' | 'support_agent';
 
 export interface User {
   id: string;

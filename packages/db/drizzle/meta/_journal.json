@@ -78,6 +78,13 @@
       "when": 1784651249952,
       "tag": "0010_third_captain_flint",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1785102490406,
+      "tag": "0011_round_dark_beast",
+      "breakpoints": true
     }
   ]
 }
