@@ -5,6 +5,7 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
+    "dev:backend": "turbo dev --filter=@surewaka/api --filter=@surewaka/worker-push --filter=@surewaka/worker-payment --filter=@surewaka/worker-routing --filter=@surewaka/worker-matching --filter=@surewaka/worker-cron --filter=@surewaka/worker-email --filter=@surewaka/worker-agent --filter=@surewaka/alert-engine",
     "lint": "turbo lint",
     "test": "turbo test",
     "clean": "turbo clean",
