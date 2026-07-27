@@ -6,14 +6,17 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsup src/index.ts --format esm",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "@surewaka/db": "workspace:*",
+    "@surewaka/shared": "workspace:*",
     "bullmq": "^5.0.0",
     "ioredis": "^5.4.0"
   },
   "devDependencies": {
+    "fast-check": "^4.9.0",
     "tsup": "^8.3.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",

@@ -27,6 +27,7 @@ export * from './drivers';
 
 // Deliveries & payments
 export * from './deliveries';
+export * from './delivery-offers';
 export * from './delivery-legs';
 export * from './delivery-events';
 export * from './delivery-ratings';

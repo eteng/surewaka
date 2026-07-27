@@ -248,7 +248,16 @@ export const inviteEmployeeSchema = z.object({
   role: z.enum(['customer', 'driver', 'surewaka_admin', 'carrier_driver', 'carrier_admin', 'support_agent']),
   scopeType: z.enum(['carrier']).optional(),
   scopeId: z.string().uuid().optional(),
-});
+}).refine(
+  (data) => {
+    const orgScopedRoles = ['carrier_admin', 'carrier_driver'];
+    if (orgScopedRoles.includes(data.role)) {
+      return data.scopeType != null && data.scopeId != null;
+    }
+    return true;
+  },
+  { message: 'Org-scoped roles require scopeType and scopeId', path: ['scopeType'] },
+);
 
 export const employeeListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -781,3 +790,36 @@ export const updateAlertSettingsSchema = z
   });
 
 export type UpdateAlertSettings = z.infer<typeof updateAlertSettingsSchema>;
+
+// ─── Driver Matching Validators ───────────────────────────────────────────────
+
+/** Location update for matching context (same shape as recordDriverLocationSchema) */
+export const driverLocationUpdateSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  deliveryId: z.string().uuid().optional(),
+});
+
+export type DriverLocationUpdate = z.infer<typeof driverLocationUpdateSchema>;
+
+/** Accept delivery request */
+export const acceptDeliverySchema = z.object({
+  deliveryId: z.string().uuid(),
+});
+
+export type AcceptDelivery = z.infer<typeof acceptDeliverySchema>;
+
+/** Match driver job data validation */
+export const matchDriverJobDataSchema = z.object({
+  deliveryId: z.string().uuid(),
+  legId: z.string().uuid().optional(),
+  legType: z.enum(['first_mile', 'transfer', 'last_mile']).optional(),
+  pickupLng: z.number().min(-180).max(180),
+  pickupLat: z.number().min(-90).max(90),
+  dropoffLng: z.number().min(-180).max(180).optional(),
+  dropoffLat: z.number().min(-90).max(90).optional(),
+  vehicleType: z.enum(['motorcycle', 'car', 'van', 'truck']),
+  customerId: z.string().uuid(),
+});
+
+export type MatchDriverJobDataInput = z.infer<typeof matchDriverJobDataSchema>;

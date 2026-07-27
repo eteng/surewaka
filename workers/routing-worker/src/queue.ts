@@ -1,5 +1,6 @@
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
+import type { MatchDriverJobData } from '@surewaka/shared';
 
 export type RouteDeliveryJobData = {
   deliveryId: string;
@@ -12,3 +13,5 @@ export const connection = new IORedis(process.env.REDIS_URL ?? 'redis://localhos
 });
 
 export const routingQueue = new Queue<RouteDeliveryJobData>('routing', { connection });
+
+export const matchingQueue = new Queue<MatchDriverJobData>('matching', { connection });
