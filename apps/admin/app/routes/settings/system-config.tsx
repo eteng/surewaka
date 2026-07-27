@@ -29,10 +29,21 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export default function SystemConfig() {
   const { user } = useUser();
-  const canWrite = ((user?.publicMetadata?.roles as string[]) ?? []).includes('surewaka_superadmin');
+  const canWrite = ((user?.publicMetadata?.roles as string[]) ?? []).includes(
+    'surewaka_superadmin',
+  );
 
-  const { items, isLoading, error, saving, saveSuccess, saveConfig, resetConfig, exportConfig, importConfig } =
-    useSystemConfig();
+  const {
+    items,
+    isLoading,
+    error,
+    saving,
+    saveSuccess,
+    saveConfig,
+    resetConfig,
+    exportConfig,
+    importConfig,
+  } = useSystemConfig();
 
   const importRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
@@ -96,44 +107,44 @@ export default function SystemConfig() {
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
       <div className="mt-6 space-y-6">
-        {isLoading ? (
-          Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-32 w-full rounded-xl" />
-          ))
-        ) : (
-          Object.entries(grouped).map(([category, keys]) => {
-            if (keys.length === 0) return null;
-            return (
-              <section key={category} className="rounded-xl border border-border bg-card p-6">
-                <h2 className="flex items-center gap-2 text-base font-medium text-foreground">
-                  <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-                  {CATEGORY_LABELS[category] ?? category}
-                </h2>
-                <div className="mt-4 space-y-3">
-                  {keys.map(({ key, entry }) => {
-                    const item = itemMap.get(key);
-                    return (
-                      <ConfigField
-                        key={key}
-                        configKey={key}
-                        label={entry.label}
-                        description={'description' in entry ? (entry.description as string) : undefined}
-                        schema={entry.schema}
-                        value={item?.value ?? entry.default}
-                        updatedAt={item?.updatedAt ?? null}
-                        isSaving={saving === key}
-                        justSaved={saveSuccess === key}
-                        canWrite={canWrite}
-                        onSave={saveConfig}
-                        onReset={resetConfig}
-                      />
-                    );
-                  })}
-                </div>
-              </section>
-            );
-          })
-        )}
+        {isLoading
+          ? Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full rounded-xl" />
+            ))
+          : Object.entries(grouped).map(([category, keys]) => {
+              if (keys.length === 0) return null;
+              return (
+                <section key={category} className="rounded-xl border border-border bg-card p-6">
+                  <h2 className="flex items-center gap-2 text-base font-medium text-foreground">
+                    <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                    {CATEGORY_LABELS[category] ?? category}
+                  </h2>
+                  <div className="mt-4 space-y-3">
+                    {keys.map(({ key, entry }) => {
+                      const item = itemMap.get(key);
+                      return (
+                        <ConfigField
+                          key={key}
+                          configKey={key}
+                          label={entry.label}
+                          description={
+                            'description' in entry ? (entry.description as string) : undefined
+                          }
+                          schema={entry.schema}
+                          value={item?.value ?? entry.default}
+                          updatedAt={item?.updatedAt ?? null}
+                          isSaving={saving === key}
+                          justSaved={saveSuccess === key}
+                          canWrite={canWrite}
+                          onSave={saveConfig}
+                          onReset={resetConfig}
+                        />
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
       </div>
     </div>
   );

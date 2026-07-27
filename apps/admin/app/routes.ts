@@ -12,7 +12,10 @@ export default [
     route('carriers', 'routes/carriers.tsx'),
     route('carriers/:carrierId', 'routes/carriers.$carrierId.tsx'),
     route('carriers/applications', 'routes/carriers.applications.tsx'),
-    route('carriers/applications/:applicationId', 'routes/carriers.applications.$applicationId.tsx'),
+    route(
+      'carriers/applications/:applicationId',
+      'routes/carriers.applications.$applicationId.tsx',
+    ),
     route('users', 'routes/users.tsx'),
     route('users/:userId', 'routes/users.$userId.tsx'),
     route('customers', 'routes/customers.tsx'),
