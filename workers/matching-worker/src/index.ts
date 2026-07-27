@@ -1,6 +1,7 @@
 import { Worker } from 'bullmq';
-import { connection } from './queue';
+import { connection, matchingQueue } from './queue';
 import { db, deliveries } from '@surewaka/db';
+import { startHealthServer } from './health';
 import { eq } from 'drizzle-orm';
 import { enqueuePushFromWorker } from './push-enqueue';
 
@@ -73,6 +74,10 @@ matchingWorker.on('stalled', (jobId) => {
 matchingWorker.on('error', (err) => {
   console.error('[matching-worker] Worker error:', err);
 });
+
+// ─── Health Check ─────────────────────────────────────────────────────────────
+
+startHealthServer(connection, matchingQueue);
 
 // ─── Graceful Shutdown ────────────────────────────────────────────────────────
 
