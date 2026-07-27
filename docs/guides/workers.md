@@ -99,16 +99,71 @@ flyctl machine run . \
 
 ## Running Workers Locally
 
+### Everything with one command
+
 ```bash
-# All workers (via docker compose)
+# 1. Start infrastructure (Postgres + Redis)
 docker compose -f infra/docker/docker-compose.yml up -d
 
-# Individual cron script
-npx tsx workers/cron/compute-customer-segments.ts
-
-# Cron worker (registered jobs)
-pnpm --filter @surewaka/cron dev
+# 2. Start ALL services (apps + API + workers)
+pnpm dev
 ```
+
+`pnpm dev` runs Turborepo which discovers and starts every workspace package that has a `"dev"` script — this includes all workers automatically.
+
+### What starts
+
+| Service | Package | Port | Health Check |
+|---------|---------|------|--------------|
+| API | `@surewaka/api` | 4000 | `GET /health` |
+| Push Worker | `@surewaka/worker-push` | — | `:4001/health` |
+| Payment Worker | `@surewaka/worker-payment` | — | — |
+| Routing Worker | `@surewaka/worker-routing` | — | `:4003/health` |
+| Alert Engine | `@surewaka/alert-engine` | — | — |
+| Agent Worker | `@surewaka/worker-agent` | — | — |
+| Email Worker | `@surewaka/worker-email` | — | — |
+| Cron Worker | `@surewaka/worker-cron` | — | — |
+
+### Running individual workers
+
+```bash
+pnpm --filter @surewaka/worker-push dev
+pnpm --filter @surewaka/worker-payment dev
+pnpm --filter @surewaka/worker-routing dev
+pnpm --filter @surewaka/alert-engine dev
+pnpm --filter @surewaka/worker-agent dev
+pnpm --filter @surewaka/worker-email dev
+pnpm --filter @surewaka/worker-cron dev
+```
+
+### Running standalone cron scripts
+
+```bash
+npx tsx workers/cron/compute-customer-segments.ts
+```
+
+### Verifying everything is healthy
+
+```bash
+# API
+curl http://localhost:4000/health
+
+# Push worker (shows Redis status + queue depth)
+curl http://localhost:4001/health
+
+# Routing worker (shows Redis status + queue depth)
+curl http://localhost:4003/health
+
+# Redis (check queues directly)
+docker compose -f infra/docker/docker-compose.yml exec redis redis-cli KEYS 'bull:*'
+```
+
+### Prerequisites
+
+- Docker running (for Postgres + Redis)
+- `.env.local` populated (copy from `.env.example`)
+- `REDIS_URL=redis://localhost:6379` in `.env.local`
+- `DATABASE_URL` pointing to Neon (or local Postgres if preferred)
 
 ## Monitoring
 

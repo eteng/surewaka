@@ -1,5 +1,6 @@
 {
   "globalDependencies": ["**/.env.*local"],
+  "concurrency": "20",
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
