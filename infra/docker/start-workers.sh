@@ -24,12 +24,18 @@ PID_PUSH=$!
 node workers/alert-engine/dist/index.js &
 PID_ALERT=$!
 
-echo "Workers started: email=$PID_EMAIL payment=$PID_PAYMENT agent=$PID_AGENT cron=$PID_CRON push=$PID_PUSH alert=$PID_ALERT"
+node workers/routing-worker/dist/index.js &
+PID_ROUTING=$!
+
+node workers/matching-worker/dist/index.js &
+PID_MATCHING=$!
+
+echo "Workers started: email=$PID_EMAIL payment=$PID_PAYMENT agent=$PID_AGENT cron=$PID_CRON push=$PID_PUSH alert=$PID_ALERT routing=$PID_ROUTING matching=$PID_MATCHING"
 
 # Wait for any process to exit, then kill remaining
 wait -n
 EXIT_CODE=$?
 
 echo "A worker exited with code $EXIT_CODE — shutting down all workers"
-kill $PID_EMAIL $PID_PAYMENT $PID_AGENT $PID_CRON $PID_PUSH $PID_ALERT 2>/dev/null || true
+kill $PID_EMAIL $PID_PAYMENT $PID_AGENT $PID_CRON $PID_PUSH $PID_ALERT $PID_ROUTING $PID_MATCHING 2>/dev/null || true
 exit $EXIT_CODE

@@ -14,6 +14,8 @@ COPY workers/agent-worker/package.json ./workers/agent-worker/
 COPY workers/cron/package.json ./workers/cron/
 COPY workers/push-worker/package.json ./workers/push-worker/
 COPY workers/alert-engine/package.json ./workers/alert-engine/
+COPY workers/routing-worker/package.json ./workers/routing-worker/
+COPY workers/matching-worker/package.json ./workers/matching-worker/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/db/package.json ./packages/db/
 COPY packages/auth/package.json ./packages/auth/
@@ -52,6 +54,10 @@ COPY --from=builder /app/workers/push-worker/dist ./workers/push-worker/dist
 COPY --from=builder /app/workers/push-worker/package.json ./workers/push-worker/
 COPY --from=builder /app/workers/alert-engine/dist ./workers/alert-engine/dist
 COPY --from=builder /app/workers/alert-engine/package.json ./workers/alert-engine/
+COPY --from=builder /app/workers/routing-worker/dist ./workers/routing-worker/dist
+COPY --from=builder /app/workers/routing-worker/package.json ./workers/routing-worker/
+COPY --from=builder /app/workers/matching-worker/dist ./workers/matching-worker/dist
+COPY --from=builder /app/workers/matching-worker/package.json ./workers/matching-worker/
 
 # Copy shared packages
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist

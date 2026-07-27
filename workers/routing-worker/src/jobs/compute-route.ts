@@ -1,4 +1,5 @@
-import { getConfig, matchDriverJobDataSchema } from '@surewaka/shared';
+import { matchDriverJobDataSchema } from '@surewaka/shared';
+import { getConfig } from '@surewaka/shared/server';
 import { matchingQueue } from '../queue';
 
 /**

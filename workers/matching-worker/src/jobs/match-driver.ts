@@ -1,6 +1,7 @@
 import type { Job } from 'bullmq';
 import type { MatchDriverJobData, MatchResult, DriverCandidate, ScoredDriver } from '@surewaka/shared';
-import { MATCHING_TIERS, MATCHING_TOTAL_TIMEOUT_MS, getConfig } from '@surewaka/shared';
+import { MATCHING_TIERS, MATCHING_TOTAL_TIMEOUT_MS } from '@surewaka/shared';
+import { getConfig } from '@surewaka/shared/server';
 import { createAblyProvider, findNearbyDrivers } from '@surewaka/realtime';
 import { reserveDriver, releaseReservations } from '../lib/reservation';
 import { scoreDrivers } from '../lib/scoring';
