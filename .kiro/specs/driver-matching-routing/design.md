@@ -4,7 +4,7 @@
 
 This system handles real-time driver matching for on-demand deliveries within SureWaka. When a customer confirms a delivery booking (mode: `on_demand`), the platform finds the best available driver nearby, offers them the job through a tiered broadcast strategy, and handles acceptance atomically to prevent double-assignment.
 
-The design separates concerns into three layers: a **location store** (Redis Geospatial) for high-frequency ephemeral GPS data, a **matching worker** (BullMQ job in `workers/routing-worker`) for orchestrating the tiered broadcast algorithm, and an **acceptance handler** (API route) for atomic claim resolution. Ably provides real-time push to customer and driver apps. Postgres stores the audit trail via a new `delivery_offers` table.
+The design separates concerns into three layers: a **location store** (Redis Geospatial) for high-frequency ephemeral GPS data, a **matching worker** (BullMQ job in `workers/matching-worker`) for orchestrating the tiered broadcast algorithm, and an **acceptance handler** (API route) for atomic claim resolution. Ably provides real-time push to customer and driver apps. Postgres stores the audit trail via a new `delivery_offers` table.
 
 ## Architecture
 
@@ -32,7 +32,7 @@ graph TD
     end
 
     subgraph "BullMQ Worker"
-        MW[Matching Worker<br/>workers/routing-worker]
+        MW[Matching Worker<br/>workers/matching-worker]
     end
 
     subgraph "Ably"
@@ -222,7 +222,7 @@ export function getDriverMeta(driverId: string): Promise<DriverMeta | null>;
 
 **Interface**:
 ```typescript
-// workers/routing-worker/src/lib/reservation.ts
+// workers/matching-worker/src/lib/reservation.ts
 
 type ReservationResult = { reserved: true } | { reserved: false; reason: string };
 type ClaimResult = { claimed: true } | { claimed: false; claimedBy: string };
@@ -260,7 +260,7 @@ export function releaseReservations(driverIds: string[]): Promise<void>;
 
 **Interface**:
 ```typescript
-// workers/routing-worker/src/lib/scoring.ts
+// workers/matching-worker/src/lib/scoring.ts
 
 type DriverCandidate = {
   driverId: string;
@@ -306,7 +306,7 @@ type ScoringWeights = {
 
 **Interface**:
 ```typescript
-// workers/routing-worker/src/jobs/match-driver.ts
+// workers/matching-worker/src/jobs/match-driver.ts
 
 type MatchDriverJobData = {
   deliveryId: string;
@@ -559,7 +559,7 @@ sequenceDiagram
 ### Delayed Job Scheduling (at Route Computation Time)
 
 ```typescript
-// workers/routing-worker/src/jobs/compute-route.ts (addition to existing)
+// workers/routing-worker/src/jobs/compute-route.ts (enqueues to matching-worker)
 
 import { getConfig } from '@surewaka/shared/config/client';
 
@@ -1566,8 +1566,8 @@ Key properties to verify:
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
-| `ioredis` | ^5.4.0 | Redis client (already in routing-worker) |
-| `bullmq` | ^5.0.0 | Job queue (already in routing-worker) |
+| `ioredis` | ^5.4.0 | Redis client (in matching-worker and routing-worker) |
+| `bullmq` | ^5.0.0 | Job queue (in matching-worker and routing-worker) |
 | `@surewaka/realtime` | workspace:* | Ably publish/subscribe |
 | `@surewaka/db` | workspace:* | Drizzle ORM + Neon |
 | `@surewaka/shared` | workspace:* | Zod validators, types |
