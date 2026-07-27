@@ -101,7 +101,9 @@ export function ConfigField({
           </SelectTrigger>
           <SelectContent>
             {options.map((opt) => (
-              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+              <SelectItem key={opt} value={opt}>
+                {opt}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -120,7 +122,10 @@ export function ConfigField({
       );
     }
     if (typeName === 'ZodObject') {
-      const shape = (schema as z.ZodObject<z.ZodRawShape>)._def.shape() as Record<string, z.ZodTypeAny>;
+      const shape = (schema as z.ZodObject<z.ZodRawShape>)._def.shape() as Record<
+        string,
+        z.ZodTypeAny
+      >;
       const objValue = (localValue as Record<string, unknown>) ?? {};
       return (
         <div className="space-y-3 pl-4 border-l border-border">
@@ -140,9 +145,7 @@ export function ConfigField({
                   max={constraints.max}
                   value={String(objValue[subKey] ?? '')}
                   disabled={!canWrite || isSaving}
-                  onChange={(e) =>
-                    setLocalValue({ ...objValue, [subKey]: Number(e.target.value) })
-                  }
+                  onChange={(e) => setLocalValue({ ...objValue, [subKey]: Number(e.target.value) })}
                   className="w-24 tabular-nums"
                   aria-label={subKey}
                 />
@@ -152,18 +155,14 @@ export function ConfigField({
         </div>
       );
     }
-    return (
-      <span className="text-xs text-muted-foreground">Unsupported type: {typeName}</span>
-    );
+    return <span className="text-xs text-muted-foreground">Unsupported type: {typeName}</span>;
   };
 
   return (
     <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-4">
       <div className="flex-1 min-w-0">
         <Label className="text-sm font-medium text-foreground">{label}</Label>
-        {description && (
-          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-        )}
+        {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
         <div className="mt-3">{renderControl()}</div>
         {updatedAt && (
           <p className="mt-2 text-xs text-muted-foreground">
@@ -172,9 +171,7 @@ export function ConfigField({
         )}
       </div>
       <div className="flex items-center gap-2 shrink-0 pt-0.5">
-        {justSaved && (
-          <CheckCircle2 className="h-4 w-4 text-green-600" aria-hidden="true" />
-        )}
+        {justSaved && <CheckCircle2 className="h-4 w-4 text-green-600" aria-hidden="true" />}
         {isSaving && (
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />
         )}
