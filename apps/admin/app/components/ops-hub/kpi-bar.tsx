@@ -83,22 +83,24 @@ export function KpiBar({ stats, isLoading, error }: KpiBarProps) {
       />
       <KpiCard
         label="At-Risk Deliveries"
-        value={stats.atRiskDeliveries > 0 ? `⚠ ${stats.atRiskDeliveries} at risk` : '0'}
+        value={stats.atRiskDeliveries.toLocaleString()}
         icon={<AlertTriangle className="h-4 w-4" aria-hidden="true" />}
         isAlert={stats.atRiskDeliveries > 0}
+        subLabel={stats.atRiskDeliveries > 0 ? 'Need attention' : undefined}
       />
       <KpiCard
         label="Open Disputes"
-        value={stats.openDisputes > 0 ? `⚠ ${stats.openDisputes} open` : '0'}
+        value={stats.openDisputes.toLocaleString()}
         icon={<MessageCircleWarning className="h-4 w-4" aria-hidden="true" />}
         isAlert={stats.openDisputes > 0}
+        subLabel={stats.openDisputes > 0 ? 'Awaiting resolution' : undefined}
       />
       <KpiCard
         label="On-Time Rate Today"
         value={stats.onTimeRateToday != null ? `${stats.onTimeRateToday.toFixed(1)}%` : '—'}
         icon={<Clock className="h-4 w-4" aria-hidden="true" />}
         isAlert={stats.onTimeRateToday != null && stats.onTimeRateToday < 80}
-        subLabel={stats.onTimeRateToday != null && stats.onTimeRateToday < 80 ? '⚠ Below 80% target' : undefined}
+        subLabel={stats.onTimeRateToday != null && stats.onTimeRateToday < 80 ? 'Below 80% target' : undefined}
       />
     </div>
   );

@@ -100,7 +100,7 @@ export function AtRiskList({ deliveries, isLoading, onEscalate }: AtRiskListProp
         </div>
       )}
 
-      <div className="rounded-lg border border-border">
+      <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/30">
@@ -127,7 +127,7 @@ export function AtRiskList({ deliveries, isLoading, onEscalate }: AtRiskListProp
               <tr
                 key={delivery.id}
                 className={cn(
-                  'border-b border-border last:border-0 transition-colors',
+                  'border-b border-border last:border-0 cursor-pointer transition-colors',
                   selected.has(delivery.id) ? 'bg-muted/40' : 'hover:bg-muted/20',
                 )}
               >

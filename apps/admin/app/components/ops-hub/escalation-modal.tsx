@@ -10,6 +10,7 @@ import {
 } from '~/components/ui/dialog';
 import { Button } from '~/components/ui/button';
 import { Label } from '~/components/ui/label';
+import { Textarea } from '~/components/ui/textarea';
 import { useAuth } from '@clerk/react';
 import type { EscalationAction } from '@surewaka/shared';
 
@@ -65,14 +66,13 @@ export function EscalationModal({ deliveryId, onClose }: EscalationModalProps) {
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label htmlFor="escalation-note">Note (optional)</Label>
-            <textarea
+            <Textarea
               id="escalation-note"
               placeholder="Add context for this escalation…"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={3}
               maxLength={500}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 

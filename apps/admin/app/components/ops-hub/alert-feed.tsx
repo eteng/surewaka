@@ -148,7 +148,7 @@ export function AlertFeed() {
           <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
             <CheckCircle className="h-8 w-8 text-green-500" aria-hidden="true" />
             <p>No active alerts</p>
-            <p className="text-xs">Alert engine activates in Spec 3</p>
+            <p className="text-xs">All systems operating normally</p>
           </div>
         )}
 
