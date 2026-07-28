@@ -38,8 +38,13 @@ walletRoutes.get('/transactions', async (c) => {
   const user = c.get('user');
   const page = Number(c.req.query('page') ?? '1');
   const pageSize = Math.min(Number(c.req.query('pageSize') ?? '20'), 100);
+  let wallet;
   try {
-    const wallet = await getWalletByUserId(user.id);
+    wallet = await getWalletByUserId(user.id);
+  } catch {
+    return c.json({ data: [], error: null, meta: { page, pageSize } });
+  }
+  try {
     const rows = await db
       .select()
       .from(walletTransactions)
@@ -48,7 +53,8 @@ walletRoutes.get('/transactions', async (c) => {
       .limit(pageSize)
       .offset((page - 1) * pageSize);
     return c.json({ data: rows, error: null, meta: { page, pageSize } });
-  } catch {
+  } catch (err) {
+    console.error('[GET /wallet/transactions]', err);
     return c.json(
       {
         data: null,
@@ -63,7 +69,7 @@ walletRoutes.get('/transactions', async (c) => {
 walletRoutes.get('/dva', async (c) => {
   const user = c.get('user');
   try {
-    const wallet = await getWalletByUserId(user.id);
+    const wallet = await getOrCreateWallet(user.id);
     if (wallet.dvaAccountNo) {
       return c.json({
         data: { bank: wallet.dvaBank, account_number: wallet.dvaAccountNo },
