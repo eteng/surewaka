@@ -79,8 +79,16 @@ export type WaitlistSignup = z.infer<typeof waitlistSignupSchema>;
 
 // ─── Mobile Auth Validators ──────────────────────────────────────────────────
 
+// Accepts real Nigerian numbers, plus Clerk's reserved fictional test-phone range
+// (+1 XXX 555 01XX) so Clerk test accounts keep working - see
+// https://clerk.com/docs/guides/development/testing/test-emails-and-phones
 export const phoneOtpSchema = z.object({
-  phone: z.string().regex(/^\+234\d{10}$/, 'Enter a valid Nigerian phone number (e.g. +2348012345678)'),
+  phone: z
+    .string()
+    .regex(
+      /^(\+234\d{10}|\+1\d{3}55501\d{2})$/,
+      'Enter a valid Nigerian phone number (e.g. +2348012345678)',
+    ),
 });
 
 export const otpVerifySchema = z.object({

@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { phoneOtpSchema } from '@surewaka/shared';
-import { useSignIn } from '@clerk/expo';
+import { useSignIn, useSignUp } from '@clerk/expo';
 
 type FormData = {
   phone: string;
@@ -21,6 +21,7 @@ type FormData = {
 export default function SignInScreen() {
   const router = useRouter();
   const { signIn } = useSignIn();
+  const { signUp } = useSignUp();
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,28 +35,57 @@ export default function SignInScreen() {
   });
 
   const onSubmit = async (data: FormData) => {
-    if (!signIn) return;
+    if (!signIn || !signUp) return;
 
     setSending(true);
     setError(null);
 
     try {
-      // Create a sign-in attempt with phone number and request OTP
-      await signIn.create({
+      // Try signing in an existing user first.
+      const { error: createError } = await (signIn as any).create({
         identifier: data.phone,
       });
 
-      const { error: sendCodeError } = await (signIn as any).phoneCode.sendCode({
+      if (!createError) {
+        const { error: sendCodeError } = await (signIn as any).phoneCode.sendCode({
+          phoneNumber: data.phone,
+        });
+        if (sendCodeError) {
+          setError(sendCodeError.message ?? 'Failed to send OTP. Please try again.');
+          return;
+        }
+
+        router.push({
+          pathname: '/(auth)/verify',
+          params: { phone: data.phone, mode: 'sign-in' },
+        });
+        return;
+      }
+
+      const notFound = (createError as any).errors?.[0]?.code === 'form_identifier_not_found';
+      if (!notFound) {
+        setError(createError.message ?? 'Failed to send OTP. Please try again.');
+        return;
+      }
+
+      // No existing account for this number - fall back to sign-up.
+      const { error: signUpCreateError } = await (signUp as any).create({
         phoneNumber: data.phone,
       });
-      if (sendCodeError) {
-        setError(sendCodeError.message ?? 'Failed to send OTP. Please try again.');
+      if (signUpCreateError) {
+        setError(signUpCreateError.message ?? 'Failed to send OTP. Please try again.');
+        return;
+      }
+
+      const { error: signUpSendError } = await (signUp as any).verifications.sendPhoneCode();
+      if (signUpSendError) {
+        setError(signUpSendError.message ?? 'Failed to send OTP. Please try again.');
         return;
       }
 
       router.push({
         pathname: '/(auth)/verify',
-        params: { phone: data.phone },
+        params: { phone: data.phone, mode: 'sign-up' },
       });
     } catch (err) {
       const message =

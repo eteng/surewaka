@@ -4,7 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { otpVerifySchema } from '@surewaka/shared';
-import { useSignIn, useClerk } from '@clerk/expo';
+import { useSignIn, useSignUp, useClerk } from '@clerk/expo';
 
 type FormData = {
   otp: string;
@@ -12,8 +12,9 @@ type FormData = {
 
 export default function VerifyScreen() {
   const router = useRouter();
-  const { phone } = useLocalSearchParams<{ phone: string }>();
+  const { phone, mode } = useLocalSearchParams<{ phone: string; mode?: string }>();
   const { signIn } = useSignIn();
+  const { signUp } = useSignUp();
   const { setActive } = useClerk();
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,12 +29,29 @@ export default function VerifyScreen() {
   });
 
   const onSubmit = async (data: FormData) => {
-    if (!signIn) return;
+    if (!signIn || !signUp) return;
 
     setVerifying(true);
     setError(null);
 
     try {
+      if (mode === 'sign-up') {
+        const { error: verifyError } = await (signUp as any).verifications.verifyPhoneCode({
+          code: data.otp,
+        });
+
+        if (verifyError) {
+          setError(verifyError.message ?? 'Verification incomplete. Please try again.');
+          return;
+        }
+
+        const { error: finalizeError } = await (signUp as any).finalize();
+        if (finalizeError) {
+          setError(finalizeError.message ?? 'Verification incomplete. Please try again.');
+        }
+        return;
+      }
+
       const { error: verifyError } = await (signIn as any).phoneCode.verifyCode({
         code: data.otp,
       });
