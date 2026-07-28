@@ -7,14 +7,17 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "node": "22.12.0"
+      "node": "22.12.0",
+      "pnpm": "9.15.9"
     },
     "preview": {
       "distribution": "internal",
-      "node": "22.12.0"
+      "node": "22.12.0",
+      "pnpm": "9.15.9"
     },
     "production": {
       "node": "22.12.0",
+      "pnpm": "9.15.9",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.surewaka.com"
       }
