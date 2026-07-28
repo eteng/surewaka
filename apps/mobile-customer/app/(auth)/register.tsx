@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { otpRegisterSchema, type OtpRegister } from '@surewaka/shared';
 import { useAuth } from '@clerk/expo';
 import { createAuthClient, useAuthStore } from '@surewaka/mobile-shared';
+import * as Sentry from '@sentry/react-native';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -41,6 +42,11 @@ export default function RegisterScreen() {
     setSubmitting(false);
 
     if (apiError) {
+      console.error('[Register] Registration failed:', apiError);
+      Sentry.captureException(apiError instanceof Error ? apiError : new Error(JSON.stringify(apiError)), {
+        tags: { app: 'mobile-customer', screen: 'register' },
+        extra: { apiError },
+      });
       setError('Something went wrong. Please try again.');
       return;
     }

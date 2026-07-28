@@ -42,6 +42,10 @@ export default function PickupScreen() {
   const [token, setToken] = useState('');
   const client = createAddressesClient(token);
 
+  // Stabilize getToken — @clerk/expo v4 returns a new reference each render
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [searching, setSearching] = useState(false);
@@ -105,8 +109,8 @@ export default function PickupScreen() {
   }, []);
 
   useEffect(() => {
-    getToken().then((t) => { if (t) setToken(t); });
-  }, [getToken]);
+    getTokenRef.current().then((t) => { if (t) setToken(t); });
+  }, []);
 
   useEffect(() => {
     if (!token) return;

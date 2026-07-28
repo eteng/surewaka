@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/expo';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore, createAuthClient } from '@surewaka/mobile-shared';
@@ -31,8 +31,12 @@ export default function DeliveriesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Stabilize getToken — @clerk/expo v4 returns a new reference each render
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+
   const fetchDeliveries = useCallback(async () => {
-    const token = await getToken();
+    const token = await getTokenRef.current();
     if (!token) return;
 
     const client = createAuthClient(token);
@@ -43,7 +47,7 @@ export default function DeliveriesScreen() {
     }
     setLoading(false);
     setRefreshing(false);
-  }, [getToken]);
+  }, []);
 
   useEffect(() => {
     fetchDeliveries();

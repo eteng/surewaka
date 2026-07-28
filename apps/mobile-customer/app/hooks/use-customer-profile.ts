@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth, useUser } from '@clerk/expo';
 import { apiClient } from '@surewaka/mobile-shared';
 import { toast } from 'sonner-native';
@@ -48,8 +48,13 @@ export function useCustomerProfile(): UseCustomerProfile {
   const [error, setError] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
+  // Stabilize getToken so useCallback deps don't change on every render.
+  // In @clerk/expo v4, useAuth().getToken returns a new reference each render.
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+
   const fetchProfile = useCallback(async () => {
-    const token = await getToken();
+    const token = await getTokenRef.current();
     if (!token) return;
 
     setIsLoading(true);
@@ -87,7 +92,7 @@ export function useCustomerProfile(): UseCustomerProfile {
       avatarUrl: data.avatarUrl,
     });
     setIsLoading(false);
-  }, [getToken]);
+  }, []);
 
   useEffect(() => {
     fetchProfile();
@@ -95,7 +100,7 @@ export function useCustomerProfile(): UseCustomerProfile {
 
   const updateName = useCallback(
     async (name: string): Promise<MutationResult> => {
-      const token = await getToken();
+      const token = await getTokenRef.current();
       if (!token) return { error: 'Not authenticated' };
 
       const response = await apiClient.patch('/api/v1/profile/preferences', { name }, token);
@@ -104,7 +109,7 @@ export function useCustomerProfile(): UseCustomerProfile {
       setProfile((prev) => (prev ? { ...prev, name } : prev));
       return { error: null };
     },
-    [getToken],
+    [],
   );
 
   const updateEmail = useCallback(
@@ -123,7 +128,7 @@ export function useCustomerProfile(): UseCustomerProfile {
 
   const updateGender = useCallback(
     async (gender: Gender | null): Promise<MutationResult> => {
-      const token = await getToken();
+      const token = await getTokenRef.current();
       if (!token) return { error: 'Not authenticated' };
 
       const response = await apiClient.patch('/api/v1/profile/preferences', { gender }, token);
@@ -132,7 +137,7 @@ export function useCustomerProfile(): UseCustomerProfile {
       setProfile((prev) => (prev ? { ...prev, gender } : prev));
       return { error: null };
     },
-    [getToken],
+    [],
   );
 
   const updateNotifications = useCallback(
@@ -141,7 +146,7 @@ export function useCustomerProfile(): UseCustomerProfile {
       notificationSms?: boolean;
       notificationPush?: boolean;
     }): Promise<MutationResult> => {
-      const token = await getToken();
+      const token = await getTokenRef.current();
       if (!token) return { error: 'Not authenticated' };
 
       const response = await apiClient.patch('/api/v1/profile/preferences', prefs, token);
@@ -165,12 +170,12 @@ export function useCustomerProfile(): UseCustomerProfile {
       );
       return { error: null };
     },
-    [getToken],
+    [],
   );
 
   const updateAvatar = useCallback(
     async (localUri: string): Promise<MutationResult> => {
-      const token = await getToken();
+      const token = await getTokenRef.current();
       if (!token) return { error: 'Not authenticated' };
 
       setIsUploadingAvatar(true);
@@ -208,11 +213,11 @@ export function useCustomerProfile(): UseCustomerProfile {
         setIsUploadingAvatar(false);
       }
     },
-    [getToken],
+    [],
   );
 
   const removeAvatar = useCallback(async (): Promise<MutationResult> => {
-    const token = await getToken();
+    const token = await getTokenRef.current();
     if (!token) return { error: 'Not authenticated' };
 
     try {
@@ -232,7 +237,7 @@ export function useCustomerProfile(): UseCustomerProfile {
       toast.error('Failed to remove photo. Please try again.');
       return { error: 'Failed to remove photo. Please try again.' };
     }
-  }, [getToken]);
+  }, []);
 
   return {
     profile,
