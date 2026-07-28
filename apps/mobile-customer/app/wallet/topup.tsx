@@ -54,7 +54,9 @@ export default function TopupScreen() {
       let attempts = 0;
       pollRef.current = setInterval(async () => {
         attempts++;
-        const { data: statusData } = await client.get<{ status: string }>(
+        const pollToken = await getToken();
+        if (!pollToken) return;
+        const { data: statusData } = await createAuthClient(pollToken).get<{ status: string }>(
           `/api/v1/wallet/fund/${data.reference}`,
         );
         if (statusData?.status === 'success') {

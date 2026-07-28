@@ -61,9 +61,11 @@ export function PaymentShortfallSheet({
         void (async () => {
           try {
             attempts++;
+            const pollToken = await getToken();
+            if (!pollToken) return;
             const statusRes = await fetch(
               `${API_URL}/api/v1/wallet/fund/${json.data!.reference}`,
-              { headers: { Authorization: `Bearer ${token}` } },
+              { headers: { Authorization: `Bearer ${pollToken}` } },
             );
             const statusJson = (await statusRes.json()) as { data: { status: string } };
             if (statusJson.data?.status === 'success') {
