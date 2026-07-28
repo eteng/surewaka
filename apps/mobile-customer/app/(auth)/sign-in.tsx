@@ -45,16 +45,12 @@ export default function SignInScreen() {
         identifier: data.phone,
       });
 
-      // Prepare the phone code verification
-      const phoneCodeFactor = ((signIn as any).supportedFirstFactors)?.find(
-        (f: { strategy: string }) => f.strategy === 'phone_code',
-      );
-
-      if (phoneCodeFactor && 'phoneNumberId' in phoneCodeFactor) {
-        await (signIn as any).prepareFirstFactor({
-          strategy: 'phone_code',
-          phoneNumberId: (phoneCodeFactor as { phoneNumberId: string }).phoneNumberId,
-        });
+      const { error: sendCodeError } = await (signIn as any).phoneCode.sendCode({
+        phoneNumber: data.phone,
+      });
+      if (sendCodeError) {
+        setError(sendCodeError.message ?? 'Failed to send OTP. Please try again.');
+        return;
       }
 
       router.push({

@@ -34,13 +34,18 @@ export default function VerifyScreen() {
     setError(null);
 
     try {
-      const result = await (signIn as any).attemptFirstFactor({
-        strategy: 'phone_code',
+      const { error: verifyError } = await (signIn as any).phoneCode.verifyCode({
         code: data.otp,
       });
 
-      if (result.status === 'complete' && result.createdSessionId) {
-        await setActive({ session: result.createdSessionId });
+      if (verifyError) {
+        setError(verifyError.message ?? 'Verification incomplete. Please try again.');
+        return;
+      }
+
+      const sessionId = (signIn as any).createdSessionId;
+      if (sessionId) {
+        await setActive({ session: sessionId });
       } else {
         setError('Verification incomplete. Please try again.');
       }
