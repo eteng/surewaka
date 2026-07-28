@@ -48,22 +48,43 @@ export function CustomerExperienceTab({ params }: Props) {
         {data.updateFrequencyTrend.length === 0 ? (
           <p className="text-sm text-muted-foreground">No data for this period.</p>
         ) : (
-          <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.updateFrequencyTrend}>
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 6]} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => [v, 'Avg updates/delivery']} />
-                <ReferenceLine
-                  y={3}
-                  stroke="#16a34a"
-                  strokeDasharray="4 2"
-                  label={{ value: 'Target: 3', fontSize: 10, fill: '#16a34a' }}
-                />
-                <Line type="monotone" dataKey="value" stroke="#0369a1" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <>
+            <div className="h-44">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data.updateFrequencyTrend}>
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                  <YAxis domain={[0, 6]} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(v: number) => [v, 'Avg updates/delivery']} />
+                  <ReferenceLine
+                    y={3}
+                    stroke="#16a34a"
+                    strokeDasharray="4 2"
+                    label={{ value: 'Target: 3', fontSize: 10, fill: '#16a34a' }}
+                  />
+                  <Line type="monotone" dataKey="value" stroke="#0369a1" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-muted-foreground">View as table</summary>
+              <table className="mt-2 w-full text-xs">
+                <thead>
+                  <tr>
+                    <th className="text-left">Date</th>
+                    <th className="text-right">Avg Updates/Delivery</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.updateFrequencyTrend.map((r) => (
+                    <tr key={r.date}>
+                      <td>{r.date}</td>
+                      <td className="text-right">{r.value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          </>
         )}
       </section>
 
@@ -75,22 +96,43 @@ export function CustomerExperienceTab({ params }: Props) {
         {data.disputeRateTrend.length === 0 ? (
           <p className="text-sm text-muted-foreground">No data for this period.</p>
         ) : (
-          <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.disputeRateTrend}>
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 10]} unit="%" tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => [`${v}%`, 'Dispute Rate']} />
-                <ReferenceLine
-                  y={2}
-                  stroke="#dc2626"
-                  strokeDasharray="4 2"
-                  label={{ value: '2% limit', fontSize: 10, fill: '#dc2626' }}
-                />
-                <Line type="monotone" dataKey="value" stroke="#f59e0b" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <>
+            <div className="h-44">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data.disputeRateTrend}>
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                  <YAxis domain={[0, 10]} unit="%" tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(v: number) => [`${v}%`, 'Dispute Rate']} />
+                  <ReferenceLine
+                    y={2}
+                    stroke="#dc2626"
+                    strokeDasharray="4 2"
+                    label={{ value: '2% limit', fontSize: 10, fill: '#dc2626' }}
+                  />
+                  <Line type="monotone" dataKey="value" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-muted-foreground">View as table</summary>
+              <table className="mt-2 w-full text-xs">
+                <thead>
+                  <tr>
+                    <th className="text-left">Date</th>
+                    <th className="text-right">Dispute Rate %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.disputeRateTrend.map((r) => (
+                    <tr key={r.date}>
+                      <td>{r.date}</td>
+                      <td className="text-right">{r.value}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          </>
         )}
       </section>
 

@@ -496,6 +496,25 @@ export function CarrierPerformanceTab({ params }: Props) {
             </BarChart>
           </ResponsiveContainer>
         </div>
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs text-muted-foreground">View as table</summary>
+          <table className="mt-2 w-full text-xs">
+            <thead>
+              <tr>
+                <th className="text-left">Carrier</th>
+                <th className="text-right">SLA Adherence %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((r) => (
+                <tr key={r.carrierId}>
+                  <td>{r.name}</td>
+                  <td className="text-right">{r.adherencePct}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
       </section>
 
       <section>
@@ -520,6 +539,25 @@ export function CarrierPerformanceTab({ params }: Props) {
             </BarChart>
           </ResponsiveContainer>
         </div>
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs text-muted-foreground">View as table</summary>
+          <table className="mt-2 w-full text-xs">
+            <thead>
+              <tr>
+                <th className="text-left">Carrier</th>
+                <th className="text-right">Fulfillment Rate %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...data.rows].sort((a, b) => b.fulfillmentPct - a.fulfillmentPct).map((r) => (
+                <tr key={r.carrierId}>
+                  <td>{r.name}</td>
+                  <td className="text-right">{r.fulfillmentPct}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
       </section>
 
       <section>
