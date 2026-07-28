@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file=../../.env --env-file=.env src/index.ts",
+    "dev": "concurrently -n api,tunnel -c blue,green \"tsx watch --env-file=../../.env --env-file=.env src/index.ts\" \"bash scripts/dev-webhook-tunnel.sh\"",
     "build": "tsup src/index.ts --format esm --dts",
     "start": "node dist/index.js",
     "lint": "eslint src/",
@@ -21,13 +21,14 @@
     "@surewaka/realtime": "workspace:*",
     "@surewaka/shared": "workspace:*",
     "bullmq": "^5.34.8",
-    "ioredis": "^5.4.0",
     "cloudinary": "^2.5.1",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.6.0",
+    "ioredis": "^5.4.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "concurrently": "^9.2.4",
     "fast-check": "^4.8.0",
     "tsup": "^8.3.0",
     "tsx": "^4.19.0",
