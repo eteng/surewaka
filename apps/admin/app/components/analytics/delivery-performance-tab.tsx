@@ -117,21 +117,42 @@ export function DeliveryPerformanceTab({ params }: Props) {
         {data.volumeByOutcome.length === 0 ? (
           <p className="text-sm text-muted-foreground">No deliveries in this period.</p>
         ) : (
-          <div className="h-40">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.volumeByOutcome} layout="vertical">
-                <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="status" type="category" tick={{ fontSize: 11 }} width={80} />
-                <Tooltip />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                  <LabelList dataKey="count" position="right" style={{ fontSize: 11 }} />
-                  {data.volumeByOutcome.map((entry) => (
-                    <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? '#6b7280'} />
+          <>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.volumeByOutcome} layout="vertical">
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis dataKey="status" type="category" tick={{ fontSize: 11 }} width={80} />
+                  <Tooltip />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                    <LabelList dataKey="count" position="right" style={{ fontSize: 11 }} />
+                    {data.volumeByOutcome.map((entry) => (
+                      <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? '#6b7280'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-muted-foreground">View as table</summary>
+              <table className="mt-2 w-full text-xs">
+                <thead>
+                  <tr>
+                    <th className="text-left">Status</th>
+                    <th className="text-right">Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.volumeByOutcome.map((r) => (
+                    <tr key={r.status}>
+                      <td className="capitalize">{r.status}</td>
+                      <td className="text-right">{r.count}</td>
+                    </tr>
                   ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+                </tbody>
+              </table>
+            </details>
+          </>
         )}
       </section>
 
@@ -172,18 +193,39 @@ export function DeliveryPerformanceTab({ params }: Props) {
         {data.lateDistribution.length === 0 ? (
           <p className="text-sm text-muted-foreground">No late deliveries in this period.</p>
         ) : (
-          <div className="h-40">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.lateDistribution} layout="vertical">
-                <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="bucket" type="category" tick={{ fontSize: 11 }} width={80} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#f59e0b" radius={[0, 4, 4, 0]}>
-                  <LabelList dataKey="count" position="right" style={{ fontSize: 11 }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <>
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.lateDistribution} layout="vertical">
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis dataKey="bucket" type="category" tick={{ fontSize: 11 }} width={80} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#f59e0b" radius={[0, 4, 4, 0]}>
+                    <LabelList dataKey="count" position="right" style={{ fontSize: 11 }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-muted-foreground">View as table</summary>
+              <table className="mt-2 w-full text-xs">
+                <thead>
+                  <tr>
+                    <th className="text-left">Bucket</th>
+                    <th className="text-right">Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.lateDistribution.map((r) => (
+                    <tr key={r.bucket}>
+                      <td>{r.bucket}</td>
+                      <td className="text-right">{r.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          </>
         )}
       </section>
     </div>

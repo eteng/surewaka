@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
 import type { AuthUser } from '@surewaka/auth';
@@ -21,6 +22,24 @@ const analyticsRoutes = new Hono<Env>();
 analyticsRoutes.use('*', requireAuth);
 analyticsRoutes.use('*', requireRole('surewaka_admin'));
 
+const periodSchema = z
+  .object({
+    period: z.enum(['today', 'week', 'month', 'custom']).default('week'),
+    from: z.string().datetime({ offset: true }).optional(),
+    to: z.string().datetime({ offset: true }).optional(),
+  })
+  .refine((d) => d.period !== 'custom' || (d.from != null && d.to != null), {
+    message: 'period=custom requires from and to query params',
+  });
+
+function validatePeriod(c: { req: { query: (k: string) => string | undefined } }) {
+  return periodSchema.safeParse({
+    period: c.req.query('period'),
+    from: c.req.query('from'),
+    to: c.req.query('to'),
+  });
+}
+
 function getPeriod(c: { req: { query: (k: string) => string | undefined } }) {
   const period = c.req.query('period') ?? 'week';
   const from = c.req.query('from');
@@ -29,6 +48,13 @@ function getPeriod(c: { req: { query: (k: string) => string | undefined } }) {
 }
 
 analyticsRoutes.get('/overview', async (c) => {
+  const validation = validatePeriod(c);
+  if (!validation.success) {
+    return c.json(
+      { data: null, error: { code: 'VALIDATION_ERROR', message: validation.error.message }, meta: null },
+      400,
+    );
+  }
   try {
     const { start, end } = getPeriod(c);
     const data = await getOverviewKpis(start, end);
@@ -43,6 +69,13 @@ analyticsRoutes.get('/overview', async (c) => {
 });
 
 analyticsRoutes.get('/delivery-performance', async (c) => {
+  const validation = validatePeriod(c);
+  if (!validation.success) {
+    return c.json(
+      { data: null, error: { code: 'VALIDATION_ERROR', message: validation.error.message }, meta: null },
+      400,
+    );
+  }
   try {
     const { start, end } = getPeriod(c);
     const data = await getDeliveryPerformance(start, end);
@@ -57,6 +90,13 @@ analyticsRoutes.get('/delivery-performance', async (c) => {
 });
 
 analyticsRoutes.get('/driver-performance', async (c) => {
+  const validation = validatePeriod(c);
+  if (!validation.success) {
+    return c.json(
+      { data: null, error: { code: 'VALIDATION_ERROR', message: validation.error.message }, meta: null },
+      400,
+    );
+  }
   try {
     const { start, end } = getPeriod(c);
     const data = await getDriverPerformance(start, end);
@@ -71,6 +111,13 @@ analyticsRoutes.get('/driver-performance', async (c) => {
 });
 
 analyticsRoutes.get('/carrier-performance', async (c) => {
+  const validation = validatePeriod(c);
+  if (!validation.success) {
+    return c.json(
+      { data: null, error: { code: 'VALIDATION_ERROR', message: validation.error.message }, meta: null },
+      400,
+    );
+  }
   try {
     const { start, end } = getPeriod(c);
     const data = await getCarrierPerformance(start, end);
@@ -85,6 +132,13 @@ analyticsRoutes.get('/carrier-performance', async (c) => {
 });
 
 analyticsRoutes.get('/customer-experience', async (c) => {
+  const validation = validatePeriod(c);
+  if (!validation.success) {
+    return c.json(
+      { data: null, error: { code: 'VALIDATION_ERROR', message: validation.error.message }, meta: null },
+      400,
+    );
+  }
   try {
     const { start, end } = getPeriod(c);
     const data = await getCustomerExperience(start, end);
@@ -99,6 +153,13 @@ analyticsRoutes.get('/customer-experience', async (c) => {
 });
 
 analyticsRoutes.get('/root-cause', async (c) => {
+  const validation = validatePeriod(c);
+  if (!validation.success) {
+    return c.json(
+      { data: null, error: { code: 'VALIDATION_ERROR', message: validation.error.message }, meta: null },
+      400,
+    );
+  }
   try {
     const { start, end } = getPeriod(c);
     const data = await getRootCause({

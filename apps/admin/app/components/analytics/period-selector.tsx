@@ -19,7 +19,6 @@ export function PeriodSelector({ value, onChange }: Props) {
         <SelectItem value="today">Today</SelectItem>
         <SelectItem value="week">This Week</SelectItem>
         <SelectItem value="month">This Month</SelectItem>
-        <SelectItem value="custom">Custom</SelectItem>
       </SelectContent>
     </Select>
   );
