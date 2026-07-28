@@ -1,4 +1,4 @@
-import { type Router } from 'expo-router';
+import { type ImperativeRouter } from 'expo-router';
 import { PUSH_DEEP_LINK_MAP } from '@surewaka/shared';
 import type { PushNotificationType } from '@surewaka/shared';
 
@@ -25,7 +25,7 @@ function isValidInternalRoute(url: string): boolean {
  *
  * Requirements: 5.1-5.10
  */
-export function navigateToDeepLink(data: PushNotificationData, router: Router): void {
+export function navigateToDeepLink(data: PushNotificationData, router: ImperativeRouter): void {
   try {
     // Handle broadcast type separately — uses custom deepLink from payload
     if (data.type === 'broadcast') {

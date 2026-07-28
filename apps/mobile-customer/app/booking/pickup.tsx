@@ -250,7 +250,7 @@ export default function PickupScreen() {
     <View className="flex-1 bg-white">
       <Mapbox.MapView
         styleURL={Mapbox.StyleURL.Street}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
         onPress={handleMapPress}
       >
           <Mapbox.Camera

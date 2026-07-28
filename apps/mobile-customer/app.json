@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "scheme": "surewaka",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#16a34a"
-    },
     "ios": {
       "bundleIdentifier": "com.surewaka.customer",
       "supportsTablet": false
@@ -26,6 +21,14 @@
     },
     "owner": "surewaka",
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#16a34a"
+        }
+      ],
       [
         "@sentry/react-native/expo",
         {
@@ -97,7 +100,8 @@
         }
       ],
       "expo-web-browser",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "expo-status-bar"
     ]
   }
 }

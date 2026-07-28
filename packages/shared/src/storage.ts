@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 export type StorageFile = {
   buffer: Buffer;
   mimeType: string;

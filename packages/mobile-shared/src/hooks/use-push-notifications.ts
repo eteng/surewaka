@@ -49,7 +49,7 @@ async function withRetry<T>(
       lastError = error;
       if (attempt < maxAttempts - 1) {
         const delay = baseDelayMs * Math.pow(2, attempt);
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await new Promise<void>((resolve) => setTimeout(() => resolve(), delay));
       }
     }
   }

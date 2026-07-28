@@ -38,7 +38,9 @@
           "color": "#16a34a"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@sentry/react-native",
+      "expo-status-bar"
     ],
     "extra": {
       "router": {},

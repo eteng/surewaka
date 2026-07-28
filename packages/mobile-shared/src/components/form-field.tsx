@@ -26,7 +26,6 @@ export function FormField({ label, error, style, multiline, ...inputProps }: For
           styles.input,
           multiline && styles.inputMultiline,
           error ? styles.inputError : styles.inputDefault,
-          inputProps.style,
         ]}
         placeholderTextColor="#9ca3af"
         textAlignVertical={multiline ? 'top' : 'center'}
