@@ -20,10 +20,5 @@
   },
   "engines": {
     "node": ">=22.0.0"
-  },
-  "pnpm": {
-    "overrides": {
-      "@expo/dom-webview": "57.0.1"
-    }
   }
 }
