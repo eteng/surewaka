@@ -3,6 +3,8 @@ import { AppSidebar } from '~/components/app-sidebar';
 import { AuthGuard } from '~/components/auth-guard';
 import { HeaderUser } from '~/components/header-user';
 import { NotificationBell } from '~/components/notifications/notification-bell';
+import { NotificationsProvider } from '~/components/notifications/notifications-provider';
+import { ProfileProvider } from '~/hooks/use-profile';
 import { ThemeToggle } from '~/components/theme-toggle';
 import {
   Breadcrumb,
@@ -144,46 +146,50 @@ export default function AdminLayout() {
 
   return (
     <AuthGuard>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center justify-between gap-2 px-4 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="-ml-1" />
-              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
-              <Breadcrumb>
-                <BreadcrumbList>
-                  {route.parent && (
-                    <>
-                      <BreadcrumbItem className="hidden md:block">
-                        {route.parentUrl ? (
-                          <BreadcrumbLink href={route.parentUrl}>
-                            {route.parent}
-                          </BreadcrumbLink>
-                        ) : (
-                          <span className="text-muted-foreground">{route.parent}</span>
-                        )}
+      <ProfileProvider>
+        <NotificationsProvider>
+          <SidebarProvider>
+            <AppSidebar />
+            <SidebarInset>
+              <header className="flex h-16 shrink-0 items-center justify-between gap-2 px-4 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+                <div className="flex items-center gap-2">
+                  <SidebarTrigger className="-ml-1" />
+                  <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
+                  <Breadcrumb>
+                    <BreadcrumbList>
+                      {route.parent && (
+                        <>
+                          <BreadcrumbItem className="hidden md:block">
+                            {route.parentUrl ? (
+                              <BreadcrumbLink href={route.parentUrl}>
+                                {route.parent}
+                              </BreadcrumbLink>
+                            ) : (
+                              <span className="text-muted-foreground">{route.parent}</span>
+                            )}
+                          </BreadcrumbItem>
+                          <BreadcrumbSeparator className="hidden md:block" />
+                        </>
+                      )}
+                      <BreadcrumbItem>
+                        <BreadcrumbPage>{route.title}</BreadcrumbPage>
                       </BreadcrumbItem>
-                      <BreadcrumbSeparator className="hidden md:block" />
-                    </>
-                  )}
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>{route.title}</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-            </div>
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-              <NotificationBell />
-              <HeaderUser />
-            </div>
-          </header>
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <Outlet />
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
+                    </BreadcrumbList>
+                  </Breadcrumb>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ThemeToggle />
+                  <NotificationBell />
+                  <HeaderUser />
+                </div>
+              </header>
+              <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+                <Outlet />
+              </div>
+            </SidebarInset>
+          </SidebarProvider>
+        </NotificationsProvider>
+      </ProfileProvider>
     </AuthGuard>
   );
 }

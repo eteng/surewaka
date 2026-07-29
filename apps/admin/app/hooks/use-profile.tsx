@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from '@clerk/react';
 
 export type ProfileResponse = {
@@ -44,7 +44,16 @@ type UseProfileResult = {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
-export function useProfile(): UseProfileResult {
+const ProfileContext = createContext<UseProfileResult | null>(null);
+
+/**
+ * Fetches the current admin's own profile once per session and shares it
+ * via context. Every route previously called useProfile() independently
+ * (mostly just to read `profile.role` for RBAC gating), each firing its
+ * own GET /api/v1/profile on mount — this consolidates that into a single
+ * fetch, mounted once in the layout.
+ */
+export function ProfileProvider({ children }: { children: ReactNode }) {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -297,14 +306,28 @@ export function useProfile(): UseProfileResult {
     }
   }, [getToken, fetchProfile]);
 
-  return {
-    profile,
-    isLoading,
-    error,
-    updatePreferences,
-    uploadAvatar,
-    removeAvatar,
-    submitNameChangeRequest,
-    isUpdating,
-  };
+  return (
+    <ProfileContext.Provider
+      value={{
+        profile,
+        isLoading,
+        error,
+        updatePreferences,
+        uploadAvatar,
+        removeAvatar,
+        submitNameChangeRequest,
+        isUpdating,
+      }}
+    >
+      {children}
+    </ProfileContext.Provider>
+  );
+}
+
+export function useProfile(): UseProfileResult {
+  const ctx = useContext(ProfileContext);
+  if (!ctx) {
+    throw new Error('useProfile must be used within a ProfileProvider');
+  }
+  return ctx;
 }

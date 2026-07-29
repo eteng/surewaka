@@ -11,6 +11,13 @@ import {
   type NotificationData,
   type PaginationMeta,
 } from '@surewaka/shared';
+import { getRealtime, CHANNELS, EVENTS } from '../lib/realtime';
+
+function notifyRecipient(userId: string, type: string): void {
+  getRealtime()
+    .publish(CHANNELS.adminNotifications(userId), EVENTS.notificationCreated, { type })
+    .catch((err) => console.error('[notification-service] realtime publish failed:', err));
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -170,6 +177,10 @@ export async function createNotification(
 
     await db.insert(notifications).values(values);
 
+    for (const admin of adminUsers) {
+      notifyRecipient(admin.userId, type);
+    }
+
     return {
       data: { created: adminUsers.length },
       error: null,
@@ -185,6 +196,8 @@ export async function createNotification(
     message,
     resourceLink: resourceLink ?? null,
   });
+
+  notifyRecipient(userId, type);
 
   return {
     data: { created: 1 },

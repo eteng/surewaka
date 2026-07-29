@@ -25,6 +25,7 @@ export type RealtimeProvider = {
 export const CHANNELS = {
   deliveryTracking: (deliveryId: string) => `delivery:${deliveryId}`,
   driverLocation: (driverId: string) => `driver-location:${driverId}`,
+  adminNotifications: (userId: string) => `admin-notifications:${userId}`,
 } as const;
 
 /**
@@ -33,4 +34,5 @@ export const CHANNELS = {
 export const EVENTS = {
   statusUpdate: 'status-update',
   locationUpdate: 'location-update',
+  notificationCreated: 'notification-created',
 } as const;
