@@ -66,6 +66,7 @@ export function useCustomerProfile(): UseCustomerProfile {
       phone: string;
       email: string | null;
       avatarUrl: string | null;
+      gender: Gender | null;
       notificationEmail: boolean;
       notificationSms: boolean;
       notificationPush: boolean;
@@ -84,7 +85,7 @@ export function useCustomerProfile(): UseCustomerProfile {
       name: data.name,
       phone: data.phone,
       email: data.email,
-      gender: null, // TODO: expose gender in profile API response
+      gender: data.gender,
       notificationEmail: data.notificationEmail,
       notificationSms: data.notificationSms,
       notificationPush: data.notificationPush,
@@ -103,7 +104,7 @@ export function useCustomerProfile(): UseCustomerProfile {
       const token = await getTokenRef.current();
       if (!token) return { error: 'Not authenticated' };
 
-      const response = await apiClient.patch('/api/v1/profile/preferences', { name }, token);
+      const response = await apiClient.patch('/api/v1/profile', { name }, token);
       if (response.error) return { error: 'Failed to update name. Please try again.' };
 
       setProfile((prev) => (prev ? { ...prev, name } : prev));
@@ -131,7 +132,7 @@ export function useCustomerProfile(): UseCustomerProfile {
       const token = await getTokenRef.current();
       if (!token) return { error: 'Not authenticated' };
 
-      const response = await apiClient.patch('/api/v1/profile/preferences', { gender }, token);
+      const response = await apiClient.patch('/api/v1/profile', { gender }, token);
       if (response.error) return { error: 'Failed to update gender. Please try again.' };
 
       setProfile((prev) => (prev ? { ...prev, gender } : prev));
@@ -149,7 +150,7 @@ export function useCustomerProfile(): UseCustomerProfile {
       const token = await getTokenRef.current();
       if (!token) return { error: 'Not authenticated' };
 
-      const response = await apiClient.patch('/api/v1/profile/preferences', prefs, token);
+      const response = await apiClient.patch('/api/v1/profile', prefs, token);
       if (response.error) return { error: 'Failed to update notifications. Please try again.' };
 
       setProfile((prev) =>

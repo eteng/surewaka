@@ -87,7 +87,9 @@ export type AppMetadata = {
   carrier_id?: string;
 };
 
-export type ProfilePreferencesUpdate = {
+export type ProfileUpdate = {
+  name?: string;
+  gender?: 'woman' | 'man' | 'prefer_not_to_disclose' | null;
   notificationEmail?: boolean;
   notificationSms?: boolean;
   notificationPush?: boolean;

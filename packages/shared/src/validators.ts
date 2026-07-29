@@ -218,20 +218,15 @@ export const GENDER_LABELS: Record<Gender, string> = {
   prefer_not_to_disclose: 'Prefer not to disclose',
 };
 
-export const customerProfileUpdateSchema = z.object({
+// ─── Profile ─────────────────────────────────────────────────────────────────
+
+export const profileUpdateSchema = z.object({
   name: z
     .string()
     .min(2, 'Name must be at least 2 characters')
     .refine((v) => v.trim().length > 0, 'Name cannot be whitespace only')
     .optional(),
   gender: z.enum(GENDER_VALUES).nullable().optional(),
-});
-
-export type CustomerProfileUpdate = z.infer<typeof customerProfileUpdateSchema>;
-
-// ─── Profile ─────────────────────────────────────────────────────────────────
-
-export const profilePreferencesUpdateSchema = z.object({
   notificationEmail: z.boolean().optional(),
   notificationSms: z.boolean().optional(),
   notificationPush: z.boolean().optional(),

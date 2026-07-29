@@ -6,7 +6,7 @@
 import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import {
-  profilePreferencesUpdateSchema,
+  profileUpdateSchema,
   avatarFileSchema,
   nameChangeRequestSchema,
 } from '@surewaka/shared';
@@ -57,15 +57,15 @@ profileRoutes.get('/', async (c) => {
 });
 
 /**
- * PATCH /profile — Update notification preferences
- * Body validated with profilePreferencesUpdateSchema
+ * PATCH /profile — Update name, gender, and/or notification preferences
+ * Body validated with profileUpdateSchema
  * Scoped to JWT user ID (Requirement 6.2, 6.3)
  */
 profileRoutes.patch('/', async (c) => {
   const user = c.get('user');
   const body = await c.req.json();
 
-  const parsed = profilePreferencesUpdateSchema.safeParse(body);
+  const parsed = profileUpdateSchema.safeParse(body);
 
   if (!parsed.success) {
     return c.json(
@@ -82,7 +82,7 @@ profileRoutes.patch('/', async (c) => {
   }
 
   try {
-    const result = await profileService.updatePreferences(user.id, parsed.data);
+    const result = await profileService.updateProfile(user.id, parsed.data);
 
     if (result.error) {
       const statusCode = result.error.code === 'NOT_FOUND' ? 404 : 500;

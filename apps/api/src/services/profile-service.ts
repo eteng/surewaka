@@ -9,7 +9,7 @@ import { getClerkClient } from '@surewaka/auth';
 import {
   ALLOWED_AVATAR_TYPES,
   MAX_AVATAR_SIZE_BYTES,
-  type ProfilePreferencesUpdate,
+  type ProfileUpdate,
   type NameChangeRequest,
 } from '@surewaka/shared';
 import { avatarStorage } from '../lib/storage';
@@ -23,6 +23,7 @@ export type ProfileResponse = {
   phone: string;
   role: string;
   avatarUrl: string | null;
+  gender: 'woman' | 'man' | 'prefer_not_to_disclose' | null;
   notificationEmail: boolean;
   notificationSms: boolean;
   notificationPush: boolean;
@@ -110,6 +111,7 @@ export async function getProfile(userId: string): Promise<ServiceResult<ProfileR
     phone: maskPhone(user.phone),
     role: user.role,
     avatarUrl: user.avatarUrl,
+    gender: user.gender as ProfileResponse['gender'],
     notificationEmail: user.notificationEmail,
     notificationSms: user.notificationSms,
     notificationPush: user.notificationPush,
@@ -130,21 +132,29 @@ export async function getProfile(userId: string): Promise<ServiceResult<ProfileR
 }
 
 /**
- * Update notification preferences (partial update).
+ * Update profile fields — name, gender, and notification preferences (partial update).
  * Only updates fields that are provided; unspecified fields remain unchanged.
  * Returns the updated profile.
  */
-export async function updatePreferences(
+export async function updateProfile(
   userId: string,
-  data: ProfilePreferencesUpdate,
+  data: ProfileUpdate,
 ): Promise<ServiceResult<ProfileResponse>> {
   const updateFields: Partial<{
+    name: string;
+    gender: 'woman' | 'man' | 'prefer_not_to_disclose' | null;
     notificationEmail: boolean;
     notificationSms: boolean;
     notificationPush: boolean;
     updatedAt: Date;
   }> = { updatedAt: new Date() };
 
+  if (data.name !== undefined) {
+    updateFields.name = data.name;
+  }
+  if (data.gender !== undefined) {
+    updateFields.gender = data.gender;
+  }
   if (data.notificationEmail !== undefined) {
     updateFields.notificationEmail = data.notificationEmail;
   }
