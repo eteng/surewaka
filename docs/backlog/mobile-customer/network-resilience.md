@@ -25,3 +25,22 @@ Phase 1 (current) covers: connectivity store, NetInfo listener, ConnectivityBann
 - expo-doctor `react-native` duplicate warning is a pnpm monorepo false positive (same version, different virtual store symlinks) — won't affect builds
 - `@react-native-community/netinfo` requires a dev client rebuild (EAS) to function; without it the hook no-ops gracefully
 - Health poller only runs when internet is reachable but backend is down — stops automatically when device goes offline or backend recovers
+
+---
+
+# Booking — Graceful "No Carriers" Handling
+
+When a user books a delivery from a city with no active carrier parks, the app currently shows a generic "booking failed" error. This should be a user-friendly state instead.
+
+## Requirements
+
+- [ ] Detect `No active carrier parks in pickup city` error from routing worker
+- [ ] Show a friendly screen: "We're not available in [city] yet"
+- [ ] Offer CTA: "Notify me when we launch here" (collect interest for expansion planning)
+- [ ] Alternatively suggest the nearest supported city if within reasonable distance
+- [ ] Don't show this as a "failure" — it's an availability gap, not an error
+
+## Related
+
+- Routing worker returns this when `carrier_parks` has no rows matching the pickup city
+- City resolution comes from reverse geocode — may need to map LGAs to nearest hub city (e.g., Biase → Calabar)
