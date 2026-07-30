@@ -2,7 +2,7 @@ import { View, Text, Pressable, Switch, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 import { useTheme } from '@surewaka/mobile-shared';
-import { useCustomerProfile } from '~/hooks/use-customer-profile';
+import { useCustomerProfile } from '@/hooks/use-customer-profile';
 
 export default function SettingsScreen() {
   const router = useRouter();

@@ -5,7 +5,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { GENDER_LABELS } from '@surewaka/shared';
 import { deactivatePushToken } from '@surewaka/mobile-shared';
-import { useCustomerProfile } from '~/hooks/use-customer-profile';
+import { useCustomerProfile } from '@/hooks/use-customer-profile';
 
 type MenuItem = {
   icon: string;

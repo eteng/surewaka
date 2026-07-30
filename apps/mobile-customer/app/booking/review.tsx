@@ -4,7 +4,7 @@ import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, Modal } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useBookingStore, useQuoteExpiry, createAuthClient } from '@surewaka/mobile-shared';
-import { PaymentShortfallSheet } from './payment-shortfall';
+import { PaymentShortfallSheet } from '@/components/payment-shortfall-sheet';
 import type { VehicleType } from '@surewaka/shared';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
