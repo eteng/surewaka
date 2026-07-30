@@ -64,6 +64,43 @@ pnpm --filter @surewaka/mobile-shared exec tsc --noEmit
 pnpm --filter @surewaka/api exec tsc --noEmit
 ```
 
+## Mobile Development (Expo + EAS)
+
+All native builds go through **EAS Build** — never use `npx expo run:android/ios` locally.
+
+```bash
+# Development build (when native deps change — new native module added, SDK upgrade, etc.)
+cd apps/mobile-customer
+eas build --profile development --platform android
+
+# Production build
+eas build --profile production --platform android
+```
+
+**When a new dev client build is required:**
+- Adding a native module (e.g., `@react-native-community/netinfo`, new Expo module)
+- Upgrading Expo SDK
+- Changing `app.json` plugins
+- Modifying `expo-build-properties`
+
+**When a new build is NOT required (JS-only changes):**
+- Adding pure JS/TS packages
+- Changing React components, hooks, stores
+- Updating API client code
+- Modifying shared packages (`packages/mobile-shared`, `packages/shared`)
+
+**Day-to-day development:**
+1. Run `pnpm --filter @surewaka/mobile-customer dev` (starts Metro bundler)
+2. Open the dev client on device (already installed from last EAS build)
+3. JS changes hot-reload instantly — no rebuild needed
+
+**Native module location:** Native modules must be in the **app's** `package.json` (e.g., `apps/mobile-customer/package.json`), not in shared packages. Shared packages can import them at the JS level — Expo autolinking resolves native code from the app's dependency tree.
+
+**OTA Updates (no build needed):**
+```bash
+eas update --branch preview --message "description of changes"
+```
+
 ## Deployment
 
 | Target | Platform | Region | Command |
