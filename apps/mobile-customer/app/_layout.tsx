@@ -1,6 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import '../global.css';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Sentry from '@sentry/react-native';
@@ -38,10 +38,13 @@ function InnerLayout() {
   useNetInfoListener();
 
   // Check profile existence once signed in
+  const wasSignedIn = useRef(false);
+
   useEffect(() => {
     if (!isLoaded) return;
 
     if (isSignedIn) {
+      wasSignedIn.current = true;
       getToken().then((token) => {
         if (token) {
           checkProfile(token);
@@ -51,6 +54,12 @@ function InnerLayout() {
     } else {
       reset();
       setLoading(false);
+      // Only redirect if the user was previously signed in (session revoked/expired)
+      // Don't redirect on cold start (fresh app open, user hasn't signed in yet)
+      if (wasSignedIn.current) {
+        wasSignedIn.current = false;
+        router.replace('/(auth)/sign-in');
+      }
     }
   }, [isLoaded, isSignedIn]);
 
