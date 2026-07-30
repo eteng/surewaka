@@ -113,6 +113,7 @@ const navMain = [
     icon: Settings2,
     items: [
       { title: 'System Config', url: '/settings/system-config' },
+      { title: 'Queues', url: '/queues' },
       { title: 'Alerts', url: '/settings/alerts' },
       { title: 'Profile', url: '/settings/profile' },
       { title: 'Name Changes', url: '/settings/name-changes' },

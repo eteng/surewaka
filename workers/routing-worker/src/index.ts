@@ -2,6 +2,7 @@ import { Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { routingQueue } from './queue';
 import { startHealthServer } from './health';
+import { logger } from './lib/logger';
 
 const connection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
   maxRetriesPerRequest: null,
@@ -21,6 +22,7 @@ const worker = new Worker(
     lockDuration: 120_000,
     stalledInterval: 60_000,
     maxStalledCount: 2,
+    metrics: { maxDataPoints: 60 * 24 }, // 24h of 1-min data points
   },
 );
 
@@ -28,19 +30,61 @@ const worker = new Worker(
 
 worker.on('completed', (job) => {
   const elapsed = Date.now() - (job.processedOn ?? Date.now());
-  console.info(`[routing-worker] Job ${job.id} completed in ${elapsed}ms`);
+  const log = logger.child({ jobId: job.id, deliveryId: job.data?.deliveryId });
+  log.info('Job completed', {
+    durationMs: elapsed,
+    attempts: job.attemptsMade,
+    dataSize: JSON.stringify(job.data).length,
+  });
 });
 
 worker.on('failed', (job, err) => {
-  console.error(`[routing-worker] Job ${job?.id} failed (attempt ${job?.attemptsMade}): ${err.message}`);
+  if (!job) {
+    logger.error('Job failed (unknown job)', { error: err.message });
+    return;
+  }
+  const log = logger.child({ jobId: job.id, deliveryId: job.data?.deliveryId });
+  const maxAttempts = job.opts?.attempts ?? 3;
+  const isLastAttempt = job.attemptsMade >= maxAttempts;
+
+  log.error('Job failed', {
+    attempt: job.attemptsMade,
+    maxAttempts,
+    isLastAttempt,
+    error: err.message,
+    stack: err.stack,
+  });
 });
 
 worker.on('stalled', (jobId) => {
-  console.warn(`[routing-worker] Job ${jobId} stalled`);
+  logger.warn('Job stalled — will be retried', { jobId });
 });
 
 worker.on('error', (err) => {
-  console.error('[routing-worker] Worker error:', err);
+  logger.error('Worker-level error', { error: err.message, stack: err.stack });
+});
+
+worker.on('active', (job) => {
+  const log = logger.child({ jobId: job.id, deliveryId: job.data?.deliveryId });
+  log.info('Job picked up', {
+    attempt: job.attemptsMade + 1,
+    delay: job.delay,
+    waitedMs: job.processedOn ? job.processedOn - job.timestamp : undefined,
+  });
+});
+
+// ─── Redis Events ─────────────────────────────────────────────────────────────
+
+connection.on('error', (err) => {
+  logger.error('Redis connection error', { error: err.message });
+});
+
+connection.on('reconnecting', () => {
+  logger.warn('Redis reconnecting');
+});
+
+connection.on('ready', () => {
+  logger.info('Redis connection ready');
 });
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
@@ -52,10 +96,10 @@ startHealthServer(connection, routingQueue);
 const SHUTDOWN_TIMEOUT_MS = 30_000;
 
 async function shutdown(signal: string) {
-  console.info(`[routing-worker] Received ${signal}, shutting down gracefully...`);
+  logger.info(`Received ${signal}, shutting down gracefully...`);
 
   const forceExit = setTimeout(() => {
-    console.error('[routing-worker] Graceful shutdown timed out, forcing exit');
+    logger.error('Graceful shutdown timed out, forcing exit');
     process.exit(1);
   }, SHUTDOWN_TIMEOUT_MS);
 
@@ -63,10 +107,11 @@ async function shutdown(signal: string) {
     await worker.close();
     await connection.quit();
     clearTimeout(forceExit);
-    console.info('[routing-worker] Shutdown complete');
+    logger.info('Shutdown complete');
     process.exit(0);
   } catch (err) {
-    console.error('[routing-worker] Error during shutdown:', err);
+    const error = err instanceof Error ? err : new Error(String(err));
+    logger.error('Error during shutdown', { error: error.message, stack: error.stack });
     clearTimeout(forceExit);
     process.exit(1);
   }
@@ -75,4 +120,9 @@ async function shutdown(signal: string) {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
-console.log('[routing-worker] Started, listening on "routing" queue');
+logger.info('Started, listening on "routing" queue', {
+  concurrency: 3,
+  lockDuration: 120_000,
+  stalledInterval: 60_000,
+  redisUrl: (process.env.REDIS_URL ?? 'redis://localhost:6379').replace(/\/\/.*@/, '//***@'),
+});

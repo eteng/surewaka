@@ -35,5 +35,7 @@ export default [
     route('finance', 'routes/finance.tsx'),
     route('waitlist', 'routes/waitlist.tsx'),
     route('coverage/zones', 'routes/coverage/zones.tsx'),
+    route('queues', 'routes/queues.tsx'),
+    route('queues/:name', 'routes/queues.$name.tsx'),
   ]),
 ] satisfies RouteConfig;

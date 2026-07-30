@@ -19,6 +19,7 @@ import type { RouteEdge, Park } from '../lib/router';
 import { enqueuePushFromWorker } from '../push-enqueue';
 import type { RouteDeliveryJobData } from '../queue';
 import { getRoadDistanceKm, haversineKm } from '@surewaka/shared';
+import { logger } from '../lib/logger';
 
 const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 const STALE_THRESHOLD_MS = 2 * 60 * 60 * 1000;
@@ -73,20 +74,45 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
   const { deliveryId, bookingTime } = job.data;
   const bookingAt = new Date(bookingTime);
   const now = new Date();
+  const jobStart = Date.now();
+
+  const log = logger.child({ jobId: job.id ?? 'unknown', deliveryId });
+  log.info('Starting route computation', {
+    bookingTime,
+    vehicleType: job.data.vehicleType,
+    attempt: job.attemptsMade + 1,
+  });
 
   // 1. Load delivery — idempotency
-  const [delivery] = await db.select().from(deliveries).where(eq(deliveries.id, deliveryId));
+  const [delivery] = await log.time('db:load-delivery', () =>
+    db.select().from(deliveries).where(eq(deliveries.id, deliveryId)),
+  );
+
   if (!delivery) {
-    console.warn(`[routing-worker] Delivery ${deliveryId} not found`);
+    log.warn('Delivery not found — skipping', { reason: 'NOT_FOUND' });
     return;
   }
   if (delivery.status !== 'pending_routing') {
-    console.info(`[routing-worker] Delivery ${deliveryId} in status ${delivery.status} — skip`);
+    log.info('Delivery not in pending_routing status — skipping', {
+      currentStatus: delivery.status,
+      reason: 'WRONG_STATUS',
+    });
     return;
   }
 
+  log.debug('Delivery loaded', {
+    pickupCity: delivery.pickupCity,
+    dropoffCity: delivery.dropoffCity,
+    customerId: delivery.customerId,
+  });
+
   // 2. Staleness: if job is >2h old, reset and re-enqueue with fresh bookingTime
-  if (now.getTime() - bookingAt.getTime() > STALE_THRESHOLD_MS) {
+  const ageMs = now.getTime() - bookingAt.getTime();
+  if (ageMs > STALE_THRESHOLD_MS) {
+    log.warn('Job is stale — re-enqueueing with fresh bookingTime', {
+      ageMinutes: Math.round(ageMs / 60_000),
+      threshold: '2h',
+    });
     await db.update(deliveries)
       .set({ status: 'pending_routing', updatedAt: now })
       .where(eq(deliveries.id, deliveryId));
@@ -101,22 +127,27 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
 
   try {
     // 3. Load active routes + carrier names
-    const routeRows = await db
-      .select({
-        id: carrierRoutes.id,
-        carrierId: carrierRoutes.carrierId,
-        carrierName: carriers.name,
-        basePriceKobo: carrierRoutes.basePriceKobo,
-        estimatedTransitHrs: carrierRoutes.estimatedTransitHrs,
-        originParkId: carrierRoutes.originParkId,
-        destinationParkId: carrierRoutes.destinationParkId,
-      })
-      .from(carrierRoutes)
-      .innerJoin(carriers, eq(carrierRoutes.carrierId, carriers.id))
-      .where(eq(carrierRoutes.isActive, true));
+    const routeRows = await log.time('db:load-carrier-routes', () =>
+      db
+        .select({
+          id: carrierRoutes.id,
+          carrierId: carrierRoutes.carrierId,
+          carrierName: carriers.name,
+          basePriceKobo: carrierRoutes.basePriceKobo,
+          estimatedTransitHrs: carrierRoutes.estimatedTransitHrs,
+          originParkId: carrierRoutes.originParkId,
+          destinationParkId: carrierRoutes.destinationParkId,
+        })
+        .from(carrierRoutes)
+        .innerJoin(carriers, eq(carrierRoutes.carrierId, carriers.id))
+        .where(eq(carrierRoutes.isActive, true)),
+    );
+
+    log.debug('Carrier routes loaded', { count: routeRows.length });
 
     if (routeRows.length === 0) {
-      await markFailed(deliveryId, delivery.customerId, 'NO_ROUTES');
+      log.warn('No active carrier routes found — marking failed', { reason: 'NO_ROUTES' });
+      await markFailed(deliveryId, delivery.customerId, 'NO_ROUTES', log);
       return;
     }
 
@@ -127,26 +158,37 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
       parkIdSet.add(r.destinationParkId);
     }
     const parkIdList = [...parkIdSet];
-    const parkRows = parkIdList.length > 0
-      ? await db.select().from(carrierParks).where(
-          and(inArray(carrierParks.id, parkIdList), eq(carrierParks.isActive, true)),
-        )
-      : [];
+
+    const parkRows = await log.time('db:load-parks', () =>
+      parkIdList.length > 0
+        ? db.select().from(carrierParks).where(
+            and(inArray(carrierParks.id, parkIdList), eq(carrierParks.isActive, true)),
+          )
+        : Promise.resolve([]),
+      { parkCount: parkIdList.length },
+    );
+
     const parkMap = new Map(parkRows.map((p) => [p.id, p]));
+    log.debug('Parks loaded', { total: parkIdList.length, active: parkRows.length });
 
     // 5. Load active schedules for all routes
     const routeIds = routeRows.map((r) => r.id);
-    const scheduleRows = routeIds.length > 0
-      ? await db.select().from(carrierRouteSchedules).where(
-          and(inArray(carrierRouteSchedules.carrierRouteId, routeIds), eq(carrierRouteSchedules.isActive, true)),
-        )
-      : [];
+    const scheduleRows = await log.time('db:load-schedules', () =>
+      routeIds.length > 0
+        ? db.select().from(carrierRouteSchedules).where(
+            and(inArray(carrierRouteSchedules.carrierRouteId, routeIds), eq(carrierRouteSchedules.isActive, true)),
+          )
+        : Promise.resolve([]),
+      { routeCount: routeIds.length },
+    );
+
     const schedByRoute = new Map<string, typeof scheduleRows>();
     for (const s of scheduleRows) {
       const arr = schedByRoute.get(s.carrierRouteId) ?? [];
       arr.push(s);
       schedByRoute.set(s.carrierRouteId, arr);
     }
+    log.debug('Schedules loaded', { count: scheduleRows.length, routesWithSchedules: schedByRoute.size });
 
     // 6. Build graph edges
     const carrierNameMap = new Map(routeRows.map((r) => [r.carrierId, r.carrierName]));
@@ -175,6 +217,7 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
     }
 
     const graph = buildGraph(edges);
+    log.info('Route graph built', { edges: edges.length, nodes: graph.size });
 
     // 7. Find origin/dest parks by city slug
     const pickupCity = (delivery.pickupCity ?? '').trim().toLowerCase();
@@ -187,8 +230,22 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
       .filter((p) => p.city.trim().toLowerCase() === dropoffCity)
       .map((p) => ({ id: p.id, city: p.city, name: p.name, address: p.address, lat: p.lat, lng: p.lng }));
 
+    log.debug('City park matching', {
+      pickupCity,
+      dropoffCity,
+      originParksFound: originParks.length,
+      destParksFound: destParks.length,
+    });
+
     if (originParks.length === 0 || destParks.length === 0) {
-      await markFailed(deliveryId, delivery.customerId, 'NO_PARKS_IN_CITY');
+      log.warn('No parks found in origin/dest city — marking failed', {
+        reason: 'NO_PARKS_IN_CITY',
+        pickupCity,
+        dropoffCity,
+        originParksFound: originParks.length,
+        destParksFound: destParks.length,
+      });
+      await markFailed(deliveryId, delivery.customerId, 'NO_PARKS_IN_CITY', log);
       return;
     }
 
@@ -205,19 +262,33 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
     }
 
     // 9. Find cheapest route
+    const routeStart = Date.now();
     const path = findCheapestRoute(graph, originParks, destParks, bookingAt, firstMileMinutesPerPark, lastMileMinutesPerPark, 3);
+    log.info('Dijkstra route computation', {
+      durationMs: Date.now() - routeStart,
+      found: !!path,
+      hops: path?.hops.length ?? 0,
+      totalBasePriceKobo: path?.totalBasePriceKobo ?? 0,
+    });
+
     if (!path) {
-      await markFailed(deliveryId, delivery.customerId, 'NO_ROUTE_FOUND');
+      log.warn('No route found by Dijkstra — marking failed', { reason: 'NO_ROUTE_FOUND' });
+      await markFailed(deliveryId, delivery.customerId, 'NO_ROUTE_FOUND', log);
       return;
     }
 
     // 10. Load fee settings + motorcycle multiplier
-    const [settings] = await db.select().from(feeSettings);
+    const [settings] = await log.time('db:load-fee-settings', () =>
+      db.select().from(feeSettings),
+    );
     if (!settings) throw new Error('fee_settings not found');
-    const [motoRow] = await db
-      .select({ multiplier: vehicleTypeRates.multiplier })
-      .from(vehicleTypeRates)
-      .where(eq(vehicleTypeRates.vehicleType, 'motorcycle'));
+
+    const [motoRow] = await log.time('db:load-vehicle-rates', () =>
+      db
+        .select({ multiplier: vehicleTypeRates.multiplier })
+        .from(vehicleTypeRates)
+        .where(eq(vehicleTypeRates.vehicleType, 'motorcycle')),
+    );
     const motoMultiplier = motoRow ? parseFloat(String(motoRow.multiplier)) : 1.0;
     const commissionPct = parseFloat(String(settings.carrierCommissionRatePct));
     const taxPct = parseFloat(String(settings.taxRatePct));
@@ -231,14 +302,24 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
     // 11b. Derive actual first/last mile km from the selected path's park coordinates
     const firstHopOrigin = path.hops[0]!.originPark;
     const lastHopDest = path.hops[path.hops.length - 1]!.destPark;
-    const firstMileDistKm = await getRoadDistanceKm(
-      delivery.pickupLat, delivery.pickupLng,
-      firstHopOrigin.lat, firstHopOrigin.lng,
+
+    const firstMileDistKm = await log.time('api:first-mile-road-distance', () =>
+      getRoadDistanceKm(
+        delivery.pickupLat, delivery.pickupLng,
+        firstHopOrigin.lat, firstHopOrigin.lng,
+      ),
     );
-    const lastMileDistKm = await getRoadDistanceKm(
-      lastHopDest.lat, lastHopDest.lng,
-      delivery.dropoffLat, delivery.dropoffLng,
+    const lastMileDistKm = await log.time('api:last-mile-road-distance', () =>
+      getRoadDistanceKm(
+        lastHopDest.lat, lastHopDest.lng,
+        delivery.dropoffLat, delivery.dropoffLng,
+      ),
     );
+
+    log.debug('Mile distances computed', {
+      firstMileKm: firstMileDistKm.toFixed(2),
+      lastMileKm: lastMileDistKm.toFixed(2),
+    });
 
     // 12. Build ordered leg definitions
     type LegDef = {
@@ -250,12 +331,11 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
       dropoffAddress: string; dropoffLat: number; dropoffLng: number;
       systemEtaAt: Date;
       distanceKm: number;
-      hopIdx?: number; // only set for intercity legs
+      hopIdx?: number;
     };
 
     const legDefs: LegDef[] = [];
 
-    // first_mile: customer address → first origin park
     legDefs.push({
       legType: 'first_mile', actorType: 'driver', actorId: NIL_UUID, carrierId: null,
       pickupAddress: delivery.pickupAddress, pickupLat: delivery.pickupLat, pickupLng: delivery.pickupLng,
@@ -267,7 +347,6 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
     for (let i = 0; i < path.hops.length; i++) {
       const hop = path.hops[i]!;
 
-      // transfer between consecutive hops (driver moves package between parks)
       if (i > 0) {
         const prevHop = path.hops[i - 1]!;
         const transferDist = await getRoadDistanceKm(
@@ -283,7 +362,6 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
         });
       }
 
-      // intercity: carrier transports package between parks
       legDefs.push({
         legType: 'intercity', actorType: 'carrier', actorId: hop.carrierId, carrierId: hop.carrierId,
         pickupAddress: hop.originPark.address, pickupLat: hop.originPark.lat, pickupLng: hop.originPark.lng,
@@ -294,7 +372,6 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
       });
     }
 
-    // last_mile: last dest park → recipient address
     const lastHop = path.hops[path.hops.length - 1]!;
     legDefs.push({
       legType: 'last_mile', actorType: 'driver', actorId: NIL_UUID, carrierId: null,
@@ -304,161 +381,207 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
       distanceKm: lastMileDistKm,
     });
 
+    log.info('Leg definitions built', {
+      totalLegs: legDefs.length,
+      legTypes: legDefs.map((l) => l.legType),
+    });
+
     // 13. Zone classify driver legs (best-effort; null is safe)
+    const zoneStart = Date.now();
     const zonified = await Promise.all(legDefs.map(async (leg) => {
       if (leg.actorType !== 'driver') return { ...leg, pickupZoneId: null, dropoffZoneId: null };
       const pz = await classifyZone(leg.pickupAddress, leg.pickupLat, leg.pickupLng, { skipRemote: true }).catch(() => null);
       const dz = await classifyZone(leg.dropoffAddress, leg.dropoffLat, leg.dropoffLng, { skipRemote: true }).catch(() => null);
       return { ...leg, pickupZoneId: pz?.id ?? null, dropoffZoneId: dz?.id ?? null };
     }));
+    log.info('Zone classification', { durationMs: Date.now() - zoneStart, driverLegs: legDefs.filter((l) => l.actorType === 'driver').length });
 
     // 14. Transaction: insert legs + quotes + update delivery
     let totalKobo = 0;
     const legSummaries: Array<{ legType: string; totalKobo: number }> = [];
 
-    await db.transaction(async (tx) => {
-      for (let i = 0; i < zonified.length; i++) {
-        const leg = zonified[i]!;
+    await log.time('db:transaction-insert-legs-quotes', async () => {
+      await db.transaction(async (tx) => {
+        for (let i = 0; i < zonified.length; i++) {
+          const leg = zonified[i]!;
 
-        const [inserted] = await tx.insert(deliveryLegs).values({
-          deliveryId,
-          legNumber: i + 1,
-          legType: leg.legType,
-          actorType: leg.actorType,
-          actorId: leg.actorId,
-          pickupAddress: leg.pickupAddress,
-          pickupLat: leg.pickupLat,
-          pickupLng: leg.pickupLng,
-          pickupZoneId: leg.pickupZoneId,
-          dropoffAddress: leg.dropoffAddress,
-          dropoffLat: leg.dropoffLat,
-          dropoffLng: leg.dropoffLng,
-          dropoffZoneId: leg.dropoffZoneId,
-          status: 'pending',
-          systemEtaAt: leg.systemEtaAt,
-          isActive: true,
-        }).returning({ id: deliveryLegs.id });
+          const [inserted] = await tx.insert(deliveryLegs).values({
+            deliveryId,
+            legNumber: i + 1,
+            legType: leg.legType,
+            actorType: leg.actorType,
+            actorId: leg.actorId,
+            pickupAddress: leg.pickupAddress,
+            pickupLat: leg.pickupLat,
+            pickupLng: leg.pickupLng,
+            pickupZoneId: leg.pickupZoneId,
+            dropoffAddress: leg.dropoffAddress,
+            dropoffLat: leg.dropoffLat,
+            dropoffLng: leg.dropoffLng,
+            dropoffZoneId: leg.dropoffZoneId,
+            status: 'pending',
+            systemEtaAt: leg.systemEtaAt,
+            isActive: true,
+          }).returning({ id: deliveryLegs.id });
 
-        let qTotalKobo: number;
-        let qLineItems: LineItem[];
-        let qCarrierId: string | null = null;
+          let qTotalKobo: number;
+          let qLineItems: LineItem[];
+          let qCarrierId: string | null = null;
 
-        if (leg.legType === 'intercity') {
-          const cName = carrierNameMap.get(leg.carrierId!) ?? 'Carrier';
-          const result = calcCarrierLeg(
-            path.hops[leg.hopIdx!]!.basePriceKobo,
-            cName,
-            commissionPct,
-            taxPct,
-          );
-          qTotalKobo = result.totalKobo;
-          qLineItems = result.lineItems;
-          qCarrierId = leg.carrierId;
-        } else {
-          const result = calcOnDemandLeg(
-            leg.distanceKm,
-            packageWeight,
-            settings.baseRateKobo,
-            settings.perKgRateKobo,
-            settings.perKmRateKobo,
-            motoMultiplier,
-            taxPct,
-          );
-          qTotalKobo = result.totalKobo;
-          qLineItems = result.lineItems;
+          if (leg.legType === 'intercity') {
+            const cName = carrierNameMap.get(leg.carrierId!) ?? 'Carrier';
+            const result = calcCarrierLeg(
+              path.hops[leg.hopIdx!]!.basePriceKobo,
+              cName,
+              commissionPct,
+              taxPct,
+            );
+            qTotalKobo = result.totalKobo;
+            qLineItems = result.lineItems;
+            qCarrierId = leg.carrierId;
+          } else {
+            const result = calcOnDemandLeg(
+              leg.distanceKm,
+              packageWeight,
+              settings.baseRateKobo,
+              settings.perKgRateKobo,
+              settings.perKmRateKobo,
+              motoMultiplier,
+              taxPct,
+            );
+            qTotalKobo = result.totalKobo;
+            qLineItems = result.lineItems;
+          }
+
+          await tx.insert(quotes).values({
+            deliveryLegId: inserted!.id,
+            deliveryId,
+            carrierId: qCarrierId,
+            lineItems: qLineItems as unknown as Record<string, unknown>[],
+            totalKobo: qTotalKobo,
+            distanceKm: leg.actorType === 'driver' ? leg.distanceKm : null,
+            packageWeightKg: leg.actorType === 'driver' ? packageWeight : null,
+            expiresAt,
+          });
+
+          totalKobo += qTotalKobo;
+          legSummaries.push({ legType: leg.legType, totalKobo: qTotalKobo });
         }
 
-        await tx.insert(quotes).values({
-          deliveryLegId: inserted!.id,
-          deliveryId,
-          carrierId: qCarrierId,
-          lineItems: qLineItems as unknown as Record<string, unknown>[],
-          totalKobo: qTotalKobo,
-          distanceKm: leg.actorType === 'driver' ? leg.distanceKm : null,
-          packageWeightKg: leg.actorType === 'driver' ? packageWeight : null,
-          expiresAt,
-        });
+        await tx.update(deliveries).set({
+          status: 'draft',
+          priceKobo: totalKobo,
+          deliveryMode: 'surewaka_way',
+          cancellationDeadlineAt,
+          systemEtaAt: path.estimatedDeliveryAt,
+          updatedAt: now,
+        }).where(eq(deliveries.id, deliveryId));
+      });
+    }, { legsInserted: zonified.length });
 
-        totalKobo += qTotalKobo;
-        legSummaries.push({ legType: leg.legType, totalKobo: qTotalKobo });
-      }
-
-      await tx.update(deliveries).set({
-        status: 'draft',
-        priceKobo: totalKobo,
-        deliveryMode: 'surewaka_way',
-        cancellationDeadlineAt,
-        systemEtaAt: path.estimatedDeliveryAt,
-        updatedAt: now,
-      }).where(eq(deliveries.id, deliveryId));
+    log.info('Transaction committed', {
+      totalKobo,
+      totalNaira: (totalKobo / 100).toFixed(2),
+      legsInserted: zonified.length,
+      legBreakdown: legSummaries,
     });
 
     // 15. Publish Ably routed event (fire-and-forget; delivery is already draft)
     try {
-      const realtime = createAblyProvider();
-      await realtime.publish(`delivery:${deliveryId}`, 'routed', {
-        deliveryId,
-        compositeTotalKobo: totalKobo,
-        expiresAt: expiresAt.toISOString(),
-        estimatedDeliveryAt: path.estimatedDeliveryAt.toISOString(),
-        cancellationDeadlineAt: cancellationDeadlineAt.toISOString(),
-        legs: legSummaries,
-        hops: path.hops.map((h) => ({
-          carrierId: h.carrierId,
-          carrierName: carrierNameMap.get(h.carrierId) ?? 'Carrier',
-          originParkName: h.originPark.name,
-          destParkName: h.destPark.name,
-          nextDepartureAt: h.nextDeparture.toISOString(),
-          arrivalAt: h.arrivalAtDest.toISOString(),
-        })),
+      await log.time('ably:publish-routed-event', async () => {
+        const realtime = createAblyProvider();
+        await realtime.publish(`delivery:${deliveryId}`, 'routed', {
+          deliveryId,
+          compositeTotalKobo: totalKobo,
+          expiresAt: expiresAt.toISOString(),
+          estimatedDeliveryAt: path.estimatedDeliveryAt.toISOString(),
+          cancellationDeadlineAt: cancellationDeadlineAt.toISOString(),
+          legs: legSummaries,
+          hops: path.hops.map((h) => ({
+            carrierId: h.carrierId,
+            carrierName: carrierNameMap.get(h.carrierId) ?? 'Carrier',
+            originParkName: h.originPark.name,
+            destParkName: h.destPark.name,
+            nextDepartureAt: h.nextDeparture.toISOString(),
+            arrivalAt: h.arrivalAtDest.toISOString(),
+          })),
+        });
+        realtime.close();
       });
-      realtime.close();
     } catch (err) {
-      console.error('[routing-worker] Ably publish error:', err);
+      const error = err instanceof Error ? err : new Error(String(err));
+      log.error('Ably publish failed (non-fatal)', { error: error.message, channel: `delivery:${deliveryId}` });
     }
 
     // 16. Push: "Your route is ready"
-    await enqueuePushFromWorker(delivery.customerId, 'routing-complete', {
-      title: 'Your route is ready!',
-      body: 'Tap to confirm your delivery.',
-      data: {
-        type: 'routing-complete',
-        resourceId: deliveryId,
-        deepLink: `/delivery/${deliveryId}`,
-      },
-    });
-
-    console.info(
-      `[routing-worker] Delivery ${deliveryId} routed: ${path.hops.length} hop(s), ₦${(totalKobo / 100).toFixed(2)}`,
+    await log.time('push:enqueue-routing-complete', () =>
+      enqueuePushFromWorker(delivery.customerId, 'routing-complete', {
+        title: 'Your route is ready!',
+        body: 'Tap to confirm your delivery.',
+        data: {
+          type: 'routing-complete',
+          resourceId: deliveryId,
+          deepLink: `/delivery/${deliveryId}`,
+        },
+      }),
     );
 
+    const totalDurationMs = Date.now() - jobStart;
+    log.info('Route computation complete', {
+      durationMs: totalDurationMs,
+      hops: path.hops.length,
+      totalNaira: (totalKobo / 100).toFixed(2),
+      estimatedDeliveryAt: path.estimatedDeliveryAt.toISOString(),
+      cancellationDeadlineAt: cancellationDeadlineAt.toISOString(),
+      carriers: path.hops.map((h) => carrierNameMap.get(h.carrierId) ?? h.carrierId),
+    });
+
   } catch (err) {
-    // Infrastructure error — re-throw so BullMQ retries
-    console.error(`[routing-worker] Error routing ${deliveryId}:`, err);
+    const totalDurationMs = Date.now() - jobStart;
+    const error = err instanceof Error ? err : new Error(String(err));
+    log.error('Route computation failed — will retry', {
+      durationMs: totalDurationMs,
+      error: error.message,
+      stack: error.stack,
+    });
     throw err;
   }
 }
 
-async function markFailed(deliveryId: string, customerId: string, reason: string): Promise<void> {
-  await db.update(deliveries)
-    .set({ status: 'routing_failed', updatedAt: new Date() })
-    .where(eq(deliveries.id, deliveryId));
+async function markFailed(
+  deliveryId: string,
+  customerId: string,
+  reason: string,
+  log: InstanceType<typeof import('../lib/logger').WorkerLogger>,
+): Promise<void> {
+  await log.time('db:mark-delivery-failed', () =>
+    db.update(deliveries)
+      .set({ status: 'routing_failed', updatedAt: new Date() })
+      .where(eq(deliveries.id, deliveryId)),
+  );
 
   try {
-    const realtime = createAblyProvider();
-    await realtime.publish(`delivery:${deliveryId}`, 'routing_failed', { deliveryId, reason });
-    realtime.close();
+    await log.time('ably:publish-routing-failed', async () => {
+      const realtime = createAblyProvider();
+      await realtime.publish(`delivery:${deliveryId}`, 'routing_failed', { deliveryId, reason });
+      realtime.close();
+    });
   } catch (err) {
-    console.error('[routing-worker] Ably publish error (routing_failed):', err);
+    const error = err instanceof Error ? err : new Error(String(err));
+    log.error('Ably publish failed (routing_failed)', { error: error.message });
   }
 
-  await enqueuePushFromWorker(customerId, 'routing-failed', {
-    title: 'Route not found',
-    body: "We couldn't find a route for your delivery. Tap to choose a carrier manually.",
-    data: {
-      type: 'routing-failed',
-      resourceId: deliveryId,
-      deepLink: `/deliveries`,
-    },
-  });
+  await log.time('push:enqueue-routing-failed', () =>
+    enqueuePushFromWorker(customerId, 'routing-failed', {
+      title: 'Route not found',
+      body: "We couldn't find a route for your delivery. Tap to choose a carrier manually.",
+      data: {
+        type: 'routing-failed',
+        resourceId: deliveryId,
+        deepLink: `/deliveries`,
+      },
+    }),
+  );
+
+  log.warn('Delivery marked as routing_failed', { reason });
 }
