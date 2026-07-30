@@ -69,8 +69,20 @@ export async function syncAvatarMetadata(
   avatarUrl: string | null,
 ): Promise<void> {
   try {
+    // Look up clerkId from internal userId — Clerk API requires the Clerk user ID
+    const [user] = await db
+      .select({ clerkId: users.clerkId })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user?.clerkId) {
+      console.error('[ProfileService] Cannot sync avatar — no clerkId for user:', userId);
+      return;
+    }
+
     const clerk = getClerkClient();
-    await clerk.users.updateUserMetadata(userId, {
+    await clerk.users.updateUserMetadata(user.clerkId, {
       publicMetadata: { avatar_url: avatarUrl },
     });
   } catch (err) {
