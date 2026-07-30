@@ -5,6 +5,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { cors } from 'hono/cors';
 import { requestLogger } from './middleware/logging';
+import { maintenanceMode } from './middleware/maintenance';
 import authRoutes from './routes/auth';
 import addressRoutes from './routes/addresses';
 import carrierRoutes from './routes/carriers';
@@ -53,14 +54,25 @@ const app = new Hono();
 app.use('*', requestLogger);
 app.use('*', cors({
   origin: '*',
-  allowHeaders: ['Authorization', 'Content-Type'],
+  allowHeaders: ['Authorization', 'Content-Type', 'X-App-Source'],
   allowMethods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   exposeHeaders: ['Content-Length'],
   maxAge: 86400,
 }));
+app.use('*', maintenanceMode);
 
 // Health check
-app.get('/health', (c) => c.json({ status: 'ok', service: 'surewaka-api' }));
+app.get('/health', (c) => {
+  if (process.env.MAINTENANCE_MODE === 'true') {
+    return c.json({
+      status: 'maintenance',
+      service: 'surewaka-api',
+      message: process.env.MAINTENANCE_MESSAGE || 'Scheduled maintenance in progress.',
+      eta: process.env.MAINTENANCE_ETA || null,
+    }, 503);
+  }
+  return c.json({ status: 'ok', service: 'surewaka-api' });
+});
 
 // Swagger UI — dev only
 if (process.env.NODE_ENV !== 'production') {
