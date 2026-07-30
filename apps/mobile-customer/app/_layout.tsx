@@ -1,6 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import '../global.css';
 import { useEffect, useRef } from 'react';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Sentry from '@sentry/react-native';
@@ -86,6 +87,16 @@ function InnerLayout() {
 
   if (!isLoaded) {
     return null;
+  }
+
+  // Show loading screen while checking profile after sign-in
+  if (isSignedIn && profileExists === null) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
+        <ActivityIndicator size="large" color="#16a34a" />
+        <Text style={{ marginTop: 16, fontSize: 16, color: '#6b7280' }}>Setting up your account...</Text>
+      </View>
+    );
   }
 
   return (
