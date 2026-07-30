@@ -88,3 +88,61 @@ export async function reverseGeocode(lat: number, lon: number): Promise<Location
     address: result.address,
   };
 }
+
+/**
+ * Normalize a city name from LocationIQ address fields to match carrier park city values.
+ *
+ * LocationIQ returns inconsistent city representations for Nigerian locations:
+ * - Abuja: no `city` field, falls back to county "Abuja Municipal Area Council" or state "FCT"
+ * - Lagos: sometimes "Ikeja" (LGA) instead of "Lagos"
+ * - Port Harcourt: sometimes "Obio-Akpor" (LGA)
+ *
+ * This function maps known variants to the canonical city name used in carrier_parks.
+ */
+const CITY_NORMALIZATION_MAP: Record<string, string> = {
+  // Abuja variants
+  'abuja municipal area council': 'Abuja',
+  'abuja municipal': 'Abuja',
+  'federal capital territory': 'Abuja',
+  'fct': 'Abuja',
+  'abuja': 'Abuja',
+  // Lagos variants
+  'lagos': 'Lagos',
+  'ikeja': 'Lagos',
+  'eti-osa': 'Lagos',
+  'lagos island': 'Lagos',
+  'lagos mainland': 'Lagos',
+  'surulere': 'Lagos',
+  'alimosho': 'Lagos',
+  'kosofe': 'Lagos',
+  'mushin': 'Lagos',
+  'oshodi-isolo': 'Lagos',
+  'agege': 'Lagos',
+  'ifako-ijaiye': 'Lagos',
+  'ajeromi-ifelodun': 'Lagos',
+  'somolu': 'Lagos',
+  'apapa': 'Lagos',
+  'amuwo-odofin': 'Lagos',
+  'ojo': 'Lagos',
+  'badagry': 'Lagos',
+  'ibeju-lekki': 'Lagos',
+  'epe': 'Lagos',
+  'ikorodu': 'Lagos',
+  // Port Harcourt variants
+  'port harcourt': 'Port Harcourt',
+  'obio-akpor': 'Port Harcourt',
+  'obio/akpor': 'Port Harcourt',
+  'rivers': 'Port Harcourt',
+  // Ibadan variants
+  'ibadan': 'Ibadan',
+  'ibadan north': 'Ibadan',
+  'ibadan south-west': 'Ibadan',
+  'ibadan south-east': 'Ibadan',
+  'ibadan north-east': 'Ibadan',
+  'ibadan north-west': 'Ibadan',
+};
+
+export function normalizeCity(rawCity: string): string {
+  const key = rawCity.trim().toLowerCase();
+  return CITY_NORMALIZATION_MAP[key] ?? rawCity;
+}

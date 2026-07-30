@@ -22,6 +22,7 @@ import {
   useBookingStore,
   searchAddress,
   reverseGeocode,
+  normalizeCity,
   createAddressesClient,
 
 } from '@surewaka/mobile-shared';
@@ -140,7 +141,7 @@ export default function DropoffScreen() {
     const lon = parseFloat(suggestion.lon);
     setSelectedCoords([lon, lat]);
     setSelectedAddress(suggestion.display_name);
-    setSelectedCity(suggestion.address?.city ?? suggestion.address?.town ?? suggestion.address?.suburb ?? suggestion.address?.county ?? '');
+    setSelectedCity(normalizeCity(suggestion.address?.city ?? suggestion.address?.town ?? suggestion.address?.suburb ?? suggestion.address?.county ?? ''));
     setSelectedState(suggestion.address?.state ?? '');
     setSavedLabel(null);
     setQuery('');
@@ -151,7 +152,7 @@ export default function DropoffScreen() {
   const selectSavedAddress = useCallback((address: SavedAddress) => {
     setSelectedCoords([address.lng, address.lat]);
     setSelectedAddress(address.address_text);
-    setSelectedCity(address.city);
+    setSelectedCity(normalizeCity(address.city));
     setSelectedState(address.state);
     setSavedLabel(null);
     setShowSuggestions(false);
@@ -160,7 +161,7 @@ export default function DropoffScreen() {
   const selectRecentLocation = useCallback((recent: RecentLocation) => {
     setSelectedCoords([recent.lng, recent.lat]);
     setSelectedAddress(recent.address_text);
-    setSelectedCity(recent.city);
+    setSelectedCity(normalizeCity(recent.city));
     setSelectedState(recent.state);
     setSavedLabel(null);
     setShowSuggestions(false);
@@ -175,7 +176,7 @@ export default function DropoffScreen() {
       const address = await reverseGeocode(coords[1], coords[0]);
       if (address) {
         setSelectedAddress(address.display_name);
-        setSelectedCity(address.address?.city ?? address.address?.town ?? address.address?.suburb ?? address.address?.county ?? '');
+        setSelectedCity(normalizeCity(address.address?.city ?? address.address?.town ?? address.address?.suburb ?? address.address?.county ?? ''));
         setSelectedState(address.address?.state ?? '');
       }
     },
