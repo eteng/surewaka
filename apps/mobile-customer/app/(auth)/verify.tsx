@@ -49,6 +49,7 @@ export default function VerifyScreen() {
         if (finalizeError) {
           setError(finalizeError.message ?? 'Verification incomplete. Please try again.');
         }
+        // On success, keep spinner — _layout.tsx will navigate after profile check
         return;
       }
 
@@ -64,6 +65,9 @@ export default function VerifyScreen() {
       const sessionId = (signIn as any).createdSessionId;
       if (sessionId) {
         await setActive({ session: sessionId });
+        // Don't setVerifying(false) — keep spinner until _layout.tsx navigates away.
+        // The profile check + redirect happens in _layout.tsx after isSignedIn flips.
+        return;
       } else {
         setError('Verification incomplete. Please try again.');
       }
@@ -72,7 +76,10 @@ export default function VerifyScreen() {
         err instanceof Error ? err.message : 'Failed to verify OTP. Please try again.';
       setError(message);
     } finally {
-      setVerifying(false);
+      // Only re-enable button if we didn't successfully activate a session
+      if (!(signIn as any).createdSessionId) {
+        setVerifying(false);
+      }
     }
   };
 
