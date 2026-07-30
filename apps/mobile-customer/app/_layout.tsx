@@ -8,15 +8,17 @@ import Constants from 'expo-constants';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';
 import { ClerkProvider, useAuth, useUser } from '@clerk/expo';
-import { ThemeProvider, tokenCache, useAuthStore, usePushNotifications, NotificationBanner, consumeDeferredDeepLink, navigateToDeepLink } from '@surewaka/mobile-shared';
+import { ThemeProvider, tokenCache, useAuthStore, usePushNotifications, NotificationBanner, ConnectivityBanner, MaintenanceScreen, useNetInfoListener, consumeDeferredDeepLink, navigateToDeepLink } from '@surewaka/mobile-shared';
 
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
+const FORCE_SENTRY = process.env.EXPO_PUBLIC_FORCE_SENTRY === 'true';
+
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-  enabled: !__DEV__,
-  debug: false,
-  tracesSampleRate: 0.2,
+  enabled: !__DEV__ || FORCE_SENTRY,
+  debug: FORCE_SENTRY,
+  tracesSampleRate: __DEV__ ? 1.0 : 0.2,
   environment: __DEV__ ? 'development' : 'production',
   release: Constants.expoConfig?.version,
   integrations: [Sentry.reactNativeTracingIntegration()],
@@ -31,6 +33,9 @@ function InnerLayout() {
   const setLoading = useAuthStore((s) => s.setLoading);
   const reset = useAuthStore((s) => s.reset);
   const { banner, dismissBanner, onBannerTap } = usePushNotifications({ app: 'customer' });
+
+  // Initialize network connectivity monitoring
+  useNetInfoListener();
 
   // Check profile existence once signed in
   useEffect(() => {
@@ -81,10 +86,21 @@ function InnerLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="booking" />
-        <Stack.Screen name="tracking" />
-        <Stack.Screen name="profile" />
-        <Stack.Screen name="delivery" />
-        <Stack.Screen name="driver" />
+        <Stack.Screen name="tracking/[id]" />
+        <Stack.Screen name="tracking/details/[id]" />
+        <Stack.Screen name="profile/address-edit" />
+        <Stack.Screen name="profile/addresses" />
+        <Stack.Screen name="profile/edit" />
+        <Stack.Screen name="profile/help" />
+        <Stack.Screen name="profile/history" />
+        <Stack.Screen name="profile/payments" />
+        <Stack.Screen name="profile/settings" />
+        <Stack.Screen name="delivery/weight-correction" />
+        <Stack.Screen name="delivery/[id]/dispute" />
+        <Stack.Screen name="delivery/[id]/rate" />
+        <Stack.Screen name="delivery/[id]/receipt" />
+        <Stack.Screen name="driver/[id]" />
+        <Stack.Screen name="wallet" />
       </Stack>
       <NotificationBanner
         visible={!!banner}
@@ -104,6 +120,8 @@ function RootLayout() {
         <ThemeProvider>
           <StatusBar style="auto" />
           <InnerLayout />
+          <ConnectivityBanner />
+          <MaintenanceScreen />
           <Toaster position="bottom-center" richColors />
         </ThemeProvider>
       </GestureHandlerRootView>
