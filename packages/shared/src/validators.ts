@@ -52,6 +52,7 @@ export const createDeliverySchema = z.object({
 
 export const otpRegisterSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  role: z.enum(['customer', 'driver']).optional(),
 });
 export type OtpRegister = z.infer<typeof otpRegisterSchema>;
 

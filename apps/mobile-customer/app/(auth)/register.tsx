@@ -37,7 +37,7 @@ export default function RegisterScreen() {
     }
 
     const client = createAuthClient(token);
-    const { error: apiError } = await client.post('/api/v1/auth/register', { name: data.name });
+    const { error: apiError } = await client.post('/api/v1/auth/register', { name: data.name, role: 'customer' });
 
     setSubmitting(false);
 

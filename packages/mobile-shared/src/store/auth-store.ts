@@ -30,10 +30,28 @@ export const useAuthStore = create<AuthState>((set) => ({
   checkProfile: async (token: string) => {
     try {
       const response = await apiClient.get<{ id: string }>('/api/v1/profile', token);
+
+      if (response.error) {
+        if (response.error.category === 'not_found' || response.error.code === 'PROFILE_REQUIRED') {
+          // API confirmed: user has no profile row → redirect to register
+          set({ profileExists: false, loading: false });
+        } else {
+          // Network/timeout/server error — can't determine state
+          set({ profileExists: null, loading: false });
+          if (response.error.category === 'server') {
+            Sentry.captureMessage(`checkProfile failed: ${response.error.code}`, {
+              level: 'warning',
+              extra: { errorMessage: response.error.message },
+            });
+          }
+        }
+        return;
+      }
+
       set({ profileExists: response.data !== null, loading: false });
-    } catch {
-      // Network error or 401 — assume profile doesn't exist yet
-      set({ profileExists: false, loading: false });
+    } catch (error) {
+      set({ profileExists: null, loading: false });
+      Sentry.captureException(error, { tags: { context: 'checkProfile' } });
     }
   },
 

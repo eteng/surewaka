@@ -27,6 +27,30 @@ const authRoutes = new Hono<RegisterEnv>();
  * Creates a new UUID-keyed row in the users table with the Clerk ID stored
  * in the clerk_id column for future lookups.
  */
+/**
+ * POST /api/v1/auth/register
+ *
+ * Called after first Clerk sign-in to create the internal user profile.
+ * Uses requireClerkAuth (not requireAuth) because the user doesn't have
+ * a DB row yet — only a valid Clerk session.
+ *
+ * Role assignment:
+ * - Derived from X-App-Source header (defense in depth)
+ * - Validated against SELF_ASSIGNABLE_ROLES allowlist
+ * - Only 'customer' and 'driver' can be self-assigned
+ * - Admin/staff roles require the /register-employee flow with pre-set Clerk metadata
+ */
+
+/** Roles that can be self-assigned during registration. Never add privileged roles here. */
+const SELF_ASSIGNABLE_ROLES = ['customer', 'driver'] as const;
+type SelfAssignableRole = (typeof SELF_ASSIGNABLE_ROLES)[number];
+
+/** Maps app source header to the expected role for that app. */
+const APP_SOURCE_ROLE_MAP: Record<string, SelfAssignableRole> = {
+  'mobile-customer': 'customer',
+  'mobile-driver': 'driver',
+};
+
 authRoutes.post('/register', requireClerkAuth, async (c) => {
   const clerkId = c.get('clerkId');
   const phone = c.get('clerkPhone');
@@ -52,6 +76,28 @@ authRoutes.post('/register', requireClerkAuth, async (c) => {
     );
   }
 
+  // Determine role: prefer X-App-Source header, fallback to body, default to customer
+  const appSource = c.req.header('X-App-Source');
+  const roleFromHeader = appSource ? APP_SOURCE_ROLE_MAP[appSource] : undefined;
+  const roleFromBody = parsed.data.role;
+  const role: SelfAssignableRole = roleFromHeader ?? (roleFromBody as SelfAssignableRole) ?? 'customer';
+
+  // Final guard: ensure role is in the allowlist (defense in depth)
+  if (!SELF_ASSIGNABLE_ROLES.includes(role)) {
+    return c.json(
+      { data: null, error: { code: 'INVALID_ROLE', message: 'Role cannot be self-assigned' }, meta: null },
+      403,
+    );
+  }
+
+  // Conflict check: if X-App-Source says 'customer' but body says 'driver', reject
+  if (roleFromHeader && roleFromBody && roleFromHeader !== roleFromBody) {
+    return c.json(
+      { data: null, error: { code: 'ROLE_MISMATCH', message: 'Role does not match application context' }, meta: null },
+      400,
+    );
+  }
+
   // Insert new user with clerk_id — UUID is auto-generated
   const [user] = await db
     .insert(users)
@@ -60,7 +106,7 @@ authRoutes.post('/register', requireClerkAuth, async (c) => {
       name: parsed.data.name,
       phone,
       email: c.get('clerkEmail') ?? null,
-      role: 'customer',
+      role,
       verified: false,
     })
     .onConflictDoNothing()
@@ -74,6 +120,36 @@ authRoutes.post('/register', requireClerkAuth, async (c) => {
   if (!existing) {
     return c.json(
       { data: null, error: { code: 'INTERNAL_ERROR', message: 'Failed to provision user' }, meta: null },
+      500,
+    );
+  }
+
+  // Create user_roles row
+  await db
+    .insert(userRoles)
+    .values({
+      userId: existing.id,
+      role,
+      assignedBy: existing.id,
+      isActive: true,
+    })
+    .onConflictDoNothing();
+
+  // Sync role to Clerk publicMetadata for JWT-based role checks.
+  // If this fails, the DB has the role but the token won't — log and fail the request
+  // so the client retries (idempotent via onConflictDoNothing above).
+  try {
+    const clerk = getClerkClient();
+    await clerk.users.updateUserMetadata(clerkId, {
+      publicMetadata: { roles: [role] },
+    });
+  } catch (metaError) {
+    console.error('[Register] Failed to sync role to Clerk metadata:', metaError);
+    // Roll back: delete the user_roles row so state is consistent on retry
+    // The users row is kept (idempotent on next attempt via onConflictDoNothing)
+    await db.delete(userRoles).where(eq(userRoles.userId, existing.id));
+    return c.json(
+      { data: null, error: { code: 'INTERNAL_ERROR', message: 'Failed to complete registration. Please try again.' }, meta: null },
       500,
     );
   }
