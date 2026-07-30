@@ -71,7 +71,6 @@ function AuthGate() {
 
   useNetInfoListener();
   usePushNotifications({ app: 'customer' });
-  useSessionWatchdog(isSignedIn, getToken, signOut); // handles UC5
 
   // Trigger profile check when signed in
   useEffect(() => {
@@ -213,38 +212,31 @@ function BrandedSplash() {
 
 ---
 
-## Session Watchdog — Handles UC5 (Revocation)
+## Session Revocation Handling — Hooks into Clerk's Existing Refresh
 
-A custom hook that periodically validates the session and calls `signOut()` if dead:
+Clerk already refreshes tokens every ~60s. When a session is revoked, their internal
+refresh throws "No session was found" as an unhandled promise rejection. We:
+
+1. **Suppress the crash** via `ErrorUtils.setGlobalHandler` — catch the specific error
+2. **Let Clerk update state** — it flips `isSignedIn = false` on its own cycle
+3. **React to the state change** — existing `wasSignedIn` guard redirects to sign-in
+
+No polling. No watchdog timer. Zero extra network calls.
 
 ```tsx
-// packages/mobile-shared/src/hooks/use-session-watchdog.ts
-
-export function useSessionWatchdog(
-  isSignedIn: boolean,
-  getToken: () => Promise<string | null>,
-  signOut: () => Promise<void>,
-) {
-  useEffect(() => {
-    if (!isSignedIn) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const token = await getToken();
-        if (!token) {
-          await signOut().catch(() => {});
-        }
-      } catch {
-        await signOut().catch(() => {});
-      }
-    }, 30_000); // Check every 30s
-
-    return () => clearInterval(interval);
-  }, [isSignedIn, getToken, signOut]);
-}
+// Module-level in _layout.tsx (after Sentry.init)
+const _originalErrorHandler = ErrorUtils.getGlobalHandler();
+ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+  if (!isFatal && error?.message?.includes('No session was found')) {
+    console.warn('[Auth] Clerk session revoked — awaiting state update');
+    return;
+  }
+  _originalErrorHandler(error, isFatal);
+});
 ```
 
-This catches Clerk's "No session found" before it becomes an unhandled rejection.
+Additionally, our `getToken().catch()` calls `signOut()` to accelerate the state flip
+when WE detect the failure (instead of waiting for Clerk's next cycle).
 
 ---
 
@@ -335,5 +327,4 @@ User on (tabs) → watchdog getToken() throws → signOut()
 2. Refactor `_layout.tsx` to minimal AuthGate (always render Stack)
 3. Update `(auth)/_layout.tsx` with dynamic initialRouteName
 4. Add AsyncStorage cache to auth-store
-5. Add useSessionWatchdog hook
-6. Test all 9 use cases from the testing matrix
+5. Test all 9 use cases from the testing matrix

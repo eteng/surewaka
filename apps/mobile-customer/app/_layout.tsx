@@ -1,6 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import '../global.css';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Sentry from '@sentry/react-native';
@@ -22,21 +22,21 @@ Sentry.init({
   environment: __DEV__ ? 'development' : 'production',
   release: Constants.expoConfig?.version,
   integrations: [Sentry.reactNativeTracingIntegration()],
+  beforeSend(event) {
+    // Drop Clerk session-not-found errors — expected during revocation
+    const message = event.exception?.values?.[0]?.value ?? '';
+    if (message.includes('No session was found')) return null;
+    return event;
+  },
 });
 
 // Suppress Clerk's internal "No session was found" unhandled promise rejection.
 // When a user/session is deleted from Clerk dashboard, their background token
 // refresh throws. Clerk will update isSignedIn=false on its own — we just prevent
-// the error from crashing the app.
-const _originalErrorHandler = ErrorUtils.getGlobalHandler();
-ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
-  if (!isFatal && error?.message?.includes('No session was found')) {
-    // Expected during session revocation — Clerk will flip isSignedIn shortly
-    console.warn('[Auth] Clerk session revoked — awaiting state update');
-    return;
-  }
-  _originalErrorHandler(error, isFatal);
-});
+// the error from showing as a red screen / LogBox error in dev.
+// In production, Sentry's beforeSend filter drops these events.
+import { LogBox } from 'react-native';
+LogBox.ignoreLogs(['No session was found']);
 
 function InnerLayout() {
   const router = useRouter();
@@ -52,20 +52,17 @@ function InnerLayout() {
   useNetInfoListener();
 
   // Check profile existence once signed in
-  const wasSignedIn = useRef(false);
-
   useEffect(() => {
     if (!isLoaded) return;
 
     if (isSignedIn) {
-      wasSignedIn.current = true;
       getToken()
         .then((token) => {
           if (token) {
             checkProfile(token);
             Sentry.setUser({ id: user?.id, email: user?.primaryEmailAddress?.emailAddress });
           } else {
-            // Token is null — session was revoked but isSignedIn hasn't flipped yet
+            // Token null — session was revoked, force clean state
             signOut().catch(() => {});
           }
         })
@@ -76,12 +73,6 @@ function InnerLayout() {
     } else {
       reset();
       setLoading(false);
-      // Only redirect if the user was previously signed in (session revoked/expired)
-      // Don't redirect on cold start (fresh app open, user hasn't signed in yet)
-      if (wasSignedIn.current) {
-        wasSignedIn.current = false;
-        router.replace('/(auth)/sign-in');
-      }
     }
   }, [isLoaded, isSignedIn]);
 
