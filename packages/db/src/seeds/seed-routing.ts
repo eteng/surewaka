@@ -240,25 +240,172 @@ async function seedGigLogistics() {
   console.log(`\n  Schedules: ${totalInserted} inserted, ${totalSkipped} skipped.`);
 }
 
-async function seedSecondCarrier() {
-  // Try to find a second intercity-capable carrier from the seeded set.
-  // Red Star Express is a well-known Nigerian intercity carrier.
+async function seedRedStarExpress() {
   const carrier = await findCarrierBySlug('red-star-express');
   if (!carrier) {
-    console.log('\n  info  No second carrier found (red-star-express not seeded) — skipping.');
+    console.log('\n  info  Red Star Express not found — skipping.');
     return;
   }
-  console.log(`\n  carrier  ${carrier.name} found — no intercity parks/routes defined for this carrier in this seed.`);
-  console.log('           Add specific park/route/schedule data here when ready.');
+
+  console.log(`\n  carrier  ${carrier.name} (${carrier.id})`);
+
+  console.log('\n  Inserting parks...');
+
+  const lagosId = await upsertPark({
+    carrierId: carrier.id,
+    city: 'Lagos',
+    name: 'Red Star Express Lagos, Jibowu',
+    address: '10 Ikorodu Road, Jibowu, Yaba, Lagos',
+    lat: 6.5122,
+    lng: 3.3745,
+  });
+  console.log(`    park  Lagos   → ${lagosId}`);
+
+  const abujaId = await upsertPark({
+    carrierId: carrier.id,
+    city: 'Abuja',
+    name: 'Red Star Express Abuja, Wuse',
+    address: 'Plot 238 Wuse Zone 5, Abuja',
+    lat: 9.0579,
+    lng: 7.4951,
+  });
+  console.log(`    park  Abuja   → ${abujaId}`);
+
+  const phId = await upsertPark({
+    carrierId: carrier.id,
+    city: 'Port Harcourt',
+    name: 'Red Star Express PH, Rumuomasi',
+    address: '55 Aba Road, Rumuomasi, Port Harcourt',
+    lat: 4.8225,
+    lng: 7.0132,
+  });
+  console.log(`    park  PH      → ${phId}`);
+
+  const ibadanId = await upsertPark({
+    carrierId: carrier.id,
+    city: 'Ibadan',
+    name: 'Red Star Express Ibadan, Challenge',
+    address: 'Challenge Bus Stop, Ring Road, Ibadan',
+    lat: 7.3598,
+    lng: 3.8731,
+  });
+  console.log(`    park  Ibadan  → ${ibadanId}`);
+
+  console.log('\n  Inserting routes...');
+
+  const lagosAbujaId = await upsertRoute({ carrierId: carrier.id, originParkId: lagosId, destinationParkId: abujaId, basePriceKobo: 2200000, estimatedTransitHrs: 7, maxWeightKg: 30 });
+  const abujaLagosId = await upsertRoute({ carrierId: carrier.id, originParkId: abujaId, destinationParkId: lagosId, basePriceKobo: 2200000, estimatedTransitHrs: 7, maxWeightKg: 30 });
+  const lagosIbadanId = await upsertRoute({ carrierId: carrier.id, originParkId: lagosId, destinationParkId: ibadanId, basePriceKobo: 800000, estimatedTransitHrs: 2, maxWeightKg: 30 });
+  const ibadanLagosId = await upsertRoute({ carrierId: carrier.id, originParkId: ibadanId, destinationParkId: lagosId, basePriceKobo: 800000, estimatedTransitHrs: 2, maxWeightKg: 30 });
+  const lagosPHId = await upsertRoute({ carrierId: carrier.id, originParkId: lagosId, destinationParkId: phId, basePriceKobo: 1800000, estimatedTransitHrs: 6, maxWeightKg: 30 });
+  const phLagosId = await upsertRoute({ carrierId: carrier.id, originParkId: phId, destinationParkId: lagosId, basePriceKobo: 1800000, estimatedTransitHrs: 6, maxWeightKg: 30 });
+
+  console.log(`    route  Lagos ↔ Abuja         ₦22,000`);
+  console.log(`    route  Lagos ↔ Ibadan        ₦8,000`);
+  console.log(`    route  Lagos ↔ Port Harcourt ₦18,000`);
+
+  console.log('\n  Inserting schedules (07:00 + 15:00 WAT daily)...');
+  const DAILY = [
+    { hour: 7, minute: 0, daysOfWeek: [] as number[] },
+    { hour: 15, minute: 0, daysOfWeek: [] as number[] },
+  ];
+  for (const routeId of [lagosAbujaId, abujaLagosId, lagosIbadanId, ibadanLagosId, lagosPHId, phLagosId]) {
+    await seedSchedules(routeId, DAILY);
+  }
+  console.log('    Done (12 schedules)');
+}
+
+async function seedKwikDelivery() {
+  const carrier = await findCarrierBySlug('kwik-delivery');
+  if (!carrier) {
+    console.log('\n  info  Kwik Delivery not found — skipping.');
+    return;
+  }
+
+  console.log(`\n  carrier  ${carrier.name} (${carrier.id})`);
+  console.log('\n  Inserting parks (intra-Lagos hubs)...');
+
+  const yabaParkId = await upsertPark({ carrierId: carrier.id, city: 'Lagos', name: 'Kwik Hub Yaba', address: '45 Herbert Macaulay Way, Yaba, Lagos', lat: 6.5095, lng: 3.3731 });
+  const lekkiParkId = await upsertPark({ carrierId: carrier.id, city: 'Lagos', name: 'Kwik Hub Lekki Phase 1', address: '12 Admiralty Way, Lekki Phase 1, Lagos', lat: 6.4488, lng: 3.4730 });
+  const ikejaParkId = await upsertPark({ carrierId: carrier.id, city: 'Lagos', name: 'Kwik Hub Ikeja', address: '20 Allen Avenue, Ikeja, Lagos', lat: 6.5970, lng: 3.3515 });
+  const viParkId = await upsertPark({ carrierId: carrier.id, city: 'Lagos', name: 'Kwik Hub Victoria Island', address: '8 Kofo Abayomi Street, Victoria Island, Lagos', lat: 6.4281, lng: 3.4219 });
+  const sururlereParkId = await upsertPark({ carrierId: carrier.id, city: 'Lagos', name: 'Kwik Hub Surulere', address: '15 Adeniran Ogunsanya Street, Surulere, Lagos', lat: 6.4969, lng: 3.3574 });
+
+  console.log(`    5 parks created/verified`);
+
+  console.log('\n  Inserting intra-Lagos routes...');
+
+  const routes: [string, string, string, string, number, number][] = [
+    ['Yaba', 'Lekki', yabaParkId, lekkiParkId, 250000, 1.5],
+    ['Lekki', 'Yaba', lekkiParkId, yabaParkId, 250000, 1.5],
+    ['Yaba', 'Ikeja', yabaParkId, ikejaParkId, 180000, 1],
+    ['Ikeja', 'Yaba', ikejaParkId, yabaParkId, 180000, 1],
+    ['Ikeja', 'Lekki', ikejaParkId, lekkiParkId, 350000, 2],
+    ['Lekki', 'Ikeja', lekkiParkId, ikejaParkId, 350000, 2],
+    ['Yaba', 'VI', yabaParkId, viParkId, 200000, 1],
+    ['VI', 'Yaba', viParkId, yabaParkId, 200000, 1],
+    ['VI', 'Lekki', viParkId, lekkiParkId, 150000, 0.5],
+    ['Lekki', 'VI', lekkiParkId, viParkId, 150000, 0.5],
+    ['Surulere', 'Yaba', sururlereParkId, yabaParkId, 150000, 0.5],
+    ['Yaba', 'Surulere', yabaParkId, sururlereParkId, 150000, 0.5],
+    ['Surulere', 'Ikeja', sururlereParkId, ikejaParkId, 200000, 1],
+    ['Ikeja', 'Surulere', ikejaParkId, sururlereParkId, 200000, 1],
+    ['Surulere', 'VI', sururlereParkId, viParkId, 250000, 1.5],
+    ['VI', 'Surulere', viParkId, sururlereParkId, 250000, 1.5],
+  ];
+
+  for (const [origin, dest, originId, destId, price, hrs] of routes) {
+    await upsertRoute({ carrierId: carrier.id, originParkId: originId, destinationParkId: destId, basePriceKobo: price, estimatedTransitHrs: hrs, maxWeightKg: 20 });
+    console.log(`    route  ${origin.padEnd(10)} → ${dest.padEnd(10)} ₦${(price / 100).toLocaleString()}`);
+  }
+
+  console.log('  (No schedules — Kwik is on-demand last-mile)');
+}
+
+async function seedSendbox() {
+  const carrier = await findCarrierBySlug('sendbox');
+  if (!carrier) {
+    console.log('\n  info  Sendbox not found — skipping.');
+    return;
+  }
+
+  console.log(`\n  carrier  ${carrier.name} (${carrier.id})`);
+  console.log('\n  Inserting parks...');
+
+  const gbagadaId = await upsertPark({ carrierId: carrier.id, city: 'Lagos', name: 'Sendbox Hub Gbagada', address: '22 Diya Street, Gbagada, Lagos', lat: 6.5523, lng: 3.3892 });
+  const lekkiId = await upsertPark({ carrierId: carrier.id, city: 'Lagos', name: 'Sendbox Hub Lekki', address: '3 Fola Osibo Street, Lekki Phase 1, Lagos', lat: 6.4512, lng: 3.4718 });
+  const abujaId = await upsertPark({ carrierId: carrier.id, city: 'Abuja', name: 'Sendbox Hub Garki', address: 'Area 11, Garki, Abuja', lat: 9.0227, lng: 7.4842 });
+
+  console.log(`    3 parks created/verified`);
+  console.log('\n  Inserting routes...');
+
+  // Intra-Lagos
+  await upsertRoute({ carrierId: carrier.id, originParkId: gbagadaId, destinationParkId: lekkiId, basePriceKobo: 200000, estimatedTransitHrs: 1, maxWeightKg: 25 });
+  await upsertRoute({ carrierId: carrier.id, originParkId: lekkiId, destinationParkId: gbagadaId, basePriceKobo: 200000, estimatedTransitHrs: 1, maxWeightKg: 25 });
+  console.log(`    route  Gbagada ↔ Lekki       ₦2,000`);
+
+  // Lagos ↔ Abuja
+  const lagosAbujaId = await upsertRoute({ carrierId: carrier.id, originParkId: gbagadaId, destinationParkId: abujaId, basePriceKobo: 1500000, estimatedTransitHrs: 8, maxWeightKg: 25 });
+  const abujaLagosId = await upsertRoute({ carrierId: carrier.id, originParkId: abujaId, destinationParkId: gbagadaId, basePriceKobo: 1500000, estimatedTransitHrs: 8, maxWeightKg: 25 });
+  console.log(`    route  Lagos ↔ Abuja         ₦15,000`);
+
+  console.log('\n  Inserting schedules (09:00 WAT Mon–Sat)...');
+  const MON_TO_SAT = [1, 2, 3, 4, 5, 6];
+  const SCHEDULES = [{ hour: 9, minute: 0, daysOfWeek: MON_TO_SAT }];
+  await seedSchedules(lagosAbujaId, SCHEDULES);
+  await seedSchedules(abujaLagosId, SCHEDULES);
+  console.log('    Done (2 schedules)');
 }
 
 async function main() {
   console.log('Seeding carrier routing data (parks, routes, schedules)...');
 
   await seedGigLogistics();
-  await seedSecondCarrier();
+  await seedRedStarExpress();
+  await seedKwikDelivery();
+  await seedSendbox();
 
-  console.log('\nDone.');
+  console.log('\n✅ Done — all carriers seeded.');
 }
 
 main().catch((err) => {
