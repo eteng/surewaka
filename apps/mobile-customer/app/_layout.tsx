@@ -24,6 +24,20 @@ Sentry.init({
   integrations: [Sentry.reactNativeTracingIntegration()],
 });
 
+// Suppress Clerk's internal "No session was found" unhandled promise rejection.
+// When a user/session is deleted from Clerk dashboard, their background token
+// refresh throws. Clerk will update isSignedIn=false on its own — we just prevent
+// the error from crashing the app.
+const _originalErrorHandler = ErrorUtils.getGlobalHandler();
+ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+  if (!isFatal && error?.message?.includes('No session was found')) {
+    // Expected during session revocation — Clerk will flip isSignedIn shortly
+    console.warn('[Auth] Clerk session revoked — awaiting state update');
+    return;
+  }
+  _originalErrorHandler(error, isFatal);
+});
+
 function InnerLayout() {
   const router = useRouter();
   const { isSignedIn, isLoaded, getToken, signOut } = useAuth();
