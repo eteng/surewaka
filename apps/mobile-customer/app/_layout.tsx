@@ -1,7 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import '../global.css';
 import { useEffect, useRef } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Sentry from '@sentry/react-native';
@@ -27,7 +26,7 @@ Sentry.init({
 
 function InnerLayout() {
   const router = useRouter();
-  const { isSignedIn, isLoaded, getToken } = useAuth();
+  const { isSignedIn, isLoaded, getToken, signOut } = useAuth();
   const { user } = useUser();
   const profileExists = useAuthStore((s) => s.profileExists);
   const checkProfile = useAuthStore((s) => s.checkProfile);
@@ -46,12 +45,20 @@ function InnerLayout() {
 
     if (isSignedIn) {
       wasSignedIn.current = true;
-      getToken().then((token) => {
-        if (token) {
-          checkProfile(token);
-          Sentry.setUser({ id: user?.id, email: user?.primaryEmailAddress?.emailAddress });
-        }
-      });
+      getToken()
+        .then((token) => {
+          if (token) {
+            checkProfile(token);
+            Sentry.setUser({ id: user?.id, email: user?.primaryEmailAddress?.emailAddress });
+          } else {
+            // Token is null — session was revoked but isSignedIn hasn't flipped yet
+            signOut().catch(() => {});
+          }
+        })
+        .catch(() => {
+          // Session invalid (deleted user, revoked session) — force sign out
+          signOut().catch(() => {});
+        });
     } else {
       reset();
       setLoading(false);
@@ -87,16 +94,6 @@ function InnerLayout() {
 
   if (!isLoaded) {
     return null;
-  }
-
-  // Show loading screen while checking profile after sign-in
-  if (isSignedIn && profileExists === null) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
-        <ActivityIndicator size="large" color="#16a34a" />
-        <Text style={{ marginTop: 16, fontSize: 16, color: '#6b7280' }}>Setting up your account...</Text>
-      </View>
-    );
   }
 
   return (
