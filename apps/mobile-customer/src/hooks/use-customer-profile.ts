@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth, useUser } from '@clerk/expo';
 import { apiClient } from '@surewaka/mobile-shared';
 import { toast } from 'sonner-native';
+import * as Sentry from '@sentry/react-native';
 import type { Gender } from '@surewaka/shared';
 
 
@@ -182,22 +183,30 @@ export function useCustomerProfile(): UseCustomerProfile {
       setIsUploadingAvatar(true);
 
       try {
-        const mimeType = "image/jpeg";
+        // Convert local URI to blob (required for RN 0.86+ new architecture)
+        const fileResponse = await fetch(localUri);
+        const rawBlob = await fileResponse.blob();
+        // Re-create blob with correct MIME type (fetch from local URI loses it)
+        const blob = new Blob([rawBlob], { type: 'image/jpeg', lastModified: Date.now() });
 
         const formData = new FormData();
-        formData.append('avatar', {
-          uri: localUri,
-          type: mimeType,
-          name: 'avatar.jpg',
-        } as unknown as Blob);
+        (formData as any).append('avatar', blob, 'avatar.jpg');
 
         const res = await fetch(`${API_URL}/api/v1/profile/avatar`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           body: formData,
         });
 
         if (!res.ok) {
+          const errorBody = await res.text().catch(() => 'no body');
+          console.error('[Avatar] Upload failed:', res.status, errorBody);
+          Sentry.captureMessage(`Avatar upload failed: ${res.status}`, {
+            level: 'warning',
+            extra: { status: res.status, body: errorBody },
+          });
           toast.error('Upload failed. Check your connection and try again.');
           return { error: 'Upload failed. Check your connection and try again.' };
         }
@@ -207,7 +216,11 @@ export function useCustomerProfile(): UseCustomerProfile {
 
         setProfile((prev) => (prev ? { ...prev, avatarUrl } : prev));
         return { error: null };
-      } catch {
+      } catch (err) {
+        console.error('[Avatar] Exception during upload:', err);
+        Sentry.captureException(err, {
+          tags: { context: 'avatar-upload' },
+        });
         toast.error('Failed to process image. Please try again.');
         return { error: 'Failed to process image. Please try again.' };
       } finally {
