@@ -17,6 +17,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Mapbox from '@rnmapbox/maps';
+import { Ionicons } from '@expo/vector-icons';
 import {
   useBookingStore,
   searchAddress,
@@ -340,7 +341,7 @@ export default function DropoffScreen() {
           {showAutoComplete && (
             <FlatList
               data={suggestions}
-              keyExtractor={(item) => item.place_id}
+              keyExtractor={(item, index) => `${item.place_id}-${index}`}
               keyboardShouldPersistTaps="always"
               style={{ maxHeight: 200 }}
               renderItem={({ item }) => (
@@ -370,9 +371,12 @@ export default function DropoffScreen() {
               {savedAddresses.length < ADDRESS_CAP && (
                 <View>
                   {savedLabel ? (
-                    <Text className="text-xs text-green-600 font-medium">
-                      Saved as {savedLabel} ✓
-                    </Text>
+                    <View className="flex-row items-center gap-1">
+                      <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
+                      <Text className="text-xs text-green-600 font-medium">
+                        Saved as {savedLabel}
+                      </Text>
+                    </View>
                   ) : (
                     <ScrollView
                       horizontal
