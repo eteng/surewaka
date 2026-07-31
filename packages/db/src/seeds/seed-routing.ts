@@ -19,6 +19,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { neon } from '@neondatabase/serverless';
+import { latLngToCell } from 'h3-js';
 import { carriers } from '../schema/carriers';
 import { carrierParks } from '../schema/carrier-parks';
 import { carrierRoutes } from '../schema/carrier-routes';
@@ -46,6 +47,9 @@ async function findCarrierBySlug(slug: string) {
   return rows[0] ?? null;
 }
 
+/** H3 resolution 7 ≈ 5.16 km² per hex — good for intra-city matching */
+const H3_RESOLUTION = 7;
+
 // Returns the inserted or existing park ID.
 async function upsertPark(park: {
   carrierId: string;
@@ -55,17 +59,27 @@ async function upsertPark(park: {
   lat: number;
   lng: number;
 }): Promise<string> {
-  // Insert, silently skip if (carrierId, name) already exists.
-  await db.insert(carrierParks).values(park).onConflictDoNothing();
+  const h3Index = latLngToCell(park.lat, park.lng, H3_RESOLUTION);
+
+  // Insert with h3_index, silently skip if (carrierId, name) already exists.
+  await db.insert(carrierParks).values({ ...park, h3Index }).onConflictDoNothing();
 
   // Fetch the row to get its id (whether just inserted or pre-existing).
   const rows = await db
-    .select({ id: carrierParks.id })
+    .select({ id: carrierParks.id, h3Index: carrierParks.h3Index })
     .from(carrierParks)
     .where(and(eq(carrierParks.carrierId, park.carrierId), eq(carrierParks.name, park.name)))
     .limit(1);
 
   if (!rows[0]) throw new Error(`Failed to upsert park: ${park.name}`);
+
+  // Backfill h3_index if the park already existed with an empty value
+  if (!rows[0].h3Index || rows[0].h3Index === '') {
+    await db.update(carrierParks)
+      .set({ h3Index, updatedAt: new Date() })
+      .where(eq(carrierParks.id, rows[0].id));
+  }
+
   return rows[0].id;
 }
 

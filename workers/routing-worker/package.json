@@ -14,6 +14,7 @@
     "@surewaka/realtime": "workspace:*",
     "@surewaka/shared": "workspace:*",
     "bullmq": "^5.0.0",
+    "h3-js": "^4.5.0",
     "ioredis": "^5.4.0"
   },
   "devDependencies": {

@@ -22,6 +22,7 @@ export const carrierParks = pgTable(
     address: text('address').notNull(),
     lat: real('lat').notNull(),
     lng: real('lng').notNull(),
+    h3Index: text('h3_index').notNull().default(''),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -35,6 +36,9 @@ export const carrierParks = pgTable(
     unique('carrier_parks_carrier_id_name_unique').on(table.carrierId, table.name),
     index('idx_carrier_parks_city_active')
       .on(table.city)
+      .where(sql`is_active = true`),
+    index('idx_carrier_parks_h3_index_active')
+      .on(table.h3Index)
       .where(sql`is_active = true`),
   ],
 );

@@ -1,4 +1,5 @@
 import type { Job } from 'bullmq';
+import { latLngToCell, gridDisk } from 'h3-js';
 import {
   db,
   deliveries,
@@ -219,33 +220,41 @@ export async function handleRouteDelivery(job: Job<RouteDeliveryJobData>): Promi
     const graph = buildGraph(edges);
     log.info('Route graph built', { edges: edges.length, nodes: graph.size });
 
-    // 7. Find origin/dest parks by city slug
-    const pickupCity = (delivery.pickupCity ?? '').trim().toLowerCase();
-    const dropoffCity = (delivery.dropoffCity ?? '').trim().toLowerCase();
+    // 7. Find origin/dest parks by H3 hexagonal proximity
+    //    Resolution 7 ≈ 5.16 km² per hex. k-ring 2 covers ~15km radius.
+    const H3_RESOLUTION = 7;
+    const K_RING_SIZE = 2;
+
+    const pickupH3 = latLngToCell(delivery.pickupLat, delivery.pickupLng, H3_RESOLUTION);
+    const dropoffH3 = latLngToCell(delivery.dropoffLat, delivery.dropoffLng, H3_RESOLUTION);
+    const pickupHexes = new Set(gridDisk(pickupH3, K_RING_SIZE));
+    const dropoffHexes = new Set(gridDisk(dropoffH3, K_RING_SIZE));
 
     const originParks: Park[] = parkRows
-      .filter((p) => p.city.trim().toLowerCase() === pickupCity)
+      .filter((p) => p.h3Index && pickupHexes.has(p.h3Index))
       .map((p) => ({ id: p.id, city: p.city, name: p.name, address: p.address, lat: p.lat, lng: p.lng }));
     const destParks: Park[] = parkRows
-      .filter((p) => p.city.trim().toLowerCase() === dropoffCity)
+      .filter((p) => p.h3Index && dropoffHexes.has(p.h3Index))
       .map((p) => ({ id: p.id, city: p.city, name: p.name, address: p.address, lat: p.lat, lng: p.lng }));
 
-    log.debug('City park matching', {
-      pickupCity,
-      dropoffCity,
+    log.debug('H3 park matching', {
+      pickupH3,
+      dropoffH3,
+      pickupHexCount: pickupHexes.size,
+      dropoffHexCount: dropoffHexes.size,
       originParksFound: originParks.length,
       destParksFound: destParks.length,
     });
 
     if (originParks.length === 0 || destParks.length === 0) {
-      log.warn('No parks found in origin/dest city — marking failed', {
-        reason: 'NO_PARKS_IN_CITY',
-        pickupCity,
-        dropoffCity,
+      log.warn('No parks found near pickup/dropoff — marking failed', {
+        reason: 'NO_PARKS_IN_RANGE',
+        pickupH3,
+        dropoffH3,
         originParksFound: originParks.length,
         destParksFound: destParks.length,
       });
-      await markFailed(deliveryId, delivery.customerId, 'NO_PARKS_IN_CITY', log);
+      await markFailed(deliveryId, delivery.customerId, 'NO_PARKS_IN_RANGE', log);
       return;
     }
 

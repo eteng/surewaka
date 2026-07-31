@@ -1,0 +1,2 @@
+ALTER TABLE "carrier_parks" ADD COLUMN "h3_index" text DEFAULT '' NOT NULL;--> statement-breakpoint
+CREATE INDEX "idx_carrier_parks_h3_index_active" ON "carrier_parks" USING btree ("h3_index") WHERE is_active = true;
