@@ -1,6 +1,7 @@
 import { View, Text, TextInput, Pressable, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -164,7 +165,7 @@ export default function PackageScreen() {
                 </View>
                 {isSelected && (
                   <View className="h-5 w-5 rounded-full bg-primary items-center justify-center">
-                    <Text className="text-white text-xs font-bold">✓</Text>
+                    <Ionicons name="checkmark" size={14} color="#fff" />
                   </View>
                 )}
               </Pressable>

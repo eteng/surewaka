@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useBookingStore, createAuthClient } from '@surewaka/mobile-shared';
 
@@ -33,8 +33,13 @@ const LEG_LABELS: Record<string, string> = {
 export default function ConfirmRoutedScreen() {
   const { bottom } = useSafeAreaInsets();
   const router = useRouter();
+  const navigation = useNavigation();
   const { getToken } = useAuth();
   const resetBooking = useBookingStore((s) => s.reset);
+  const pickup = useBookingStore((s) => s.pickup);
+  const dropoff = useBookingStore((s) => s.dropoff);
+  const packageDetails = useBookingStore((s) => s.packageDetails);
+  const recipientDetails = useBookingStore((s) => s.recipientDetails);
 
   const { deliveryId, compositeTotalKobo, expiresAt, estimatedDeliveryAt } =
     useLocalSearchParams<{
@@ -46,6 +51,42 @@ export default function ConfirmRoutedScreen() {
 
   const totalKobo = parseInt(compositeTotalKobo ?? '0', 10);
   const [confirming, setConfirming] = useState(false);
+
+  // Tracks whether the booking completed successfully so back-navigation guard below
+  // doesn't prompt to discard a delivery that's already been confirmed.
+  const confirmedRef = useRef(false);
+
+  // Intercept back navigation (gesture, hardware back, header back, or the Cancel button
+  // below — all route through this) so the already-created delivery draft isn't abandoned
+  // without cancelling it and without the user meaning to leave.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (confirmedRef.current) return;
+
+      e.preventDefault();
+      Alert.alert(
+        'Discard this route?',
+        'Going back will cancel this delivery request. You can rebook anytime.',
+        [
+          { text: 'Keep this route', style: 'cancel' },
+          {
+            text: 'Discard',
+            style: 'destructive',
+            onPress: async () => {
+              const token = await getToken();
+              if (token && deliveryId) {
+                createAuthClient(token)
+                  .post(`/api/v1/deliveries/${deliveryId}/cancel`, {})
+                  .catch(() => {});
+              }
+              navigation.dispatch(e.data.action);
+            },
+          },
+        ],
+      );
+    });
+    return unsubscribe;
+  }, [navigation, deliveryId, getToken]);
 
   const handleConfirm = async () => {
     const token = await getToken();
@@ -93,7 +134,9 @@ export default function ConfirmRoutedScreen() {
 
       if (!confirmRes.ok) {
         if (confirmJson.error?.code === 'QUOTE_EXPIRED' && confirmJson.error.reroutingStarted) {
-          // Route expired and worker re-routing has started — send back to waiting screen
+          // Route expired and worker re-routing has started — send back to waiting screen.
+          // This is app-driven, not a user "back" action, so bypass the discard guard.
+          confirmedRef.current = true;
           router.replace({
             pathname: '/booking/routing-pending',
             params: { deliveryId: deliveryId ?? '' },
@@ -105,6 +148,7 @@ export default function ConfirmRoutedScreen() {
         return;
       }
 
+      confirmedRef.current = true; // prevent the back guard from cancelling this delivery
       resetBooking();
       router.replace({ pathname: '/booking/confirmed', params: { deliveryId } });
     } catch {
@@ -122,6 +166,47 @@ export default function ConfirmRoutedScreen() {
       <Text className="text-base text-gray-500 mb-6">
         SureWaka found the best intercity path for your delivery.
       </Text>
+
+      <View className="bg-gray-50 rounded-xl p-4 mb-4">
+        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">
+          Pickup
+        </Text>
+        <Text className="text-base text-gray-900">
+          {pickup?.address ?? '—'}
+        </Text>
+        <Text className="text-sm text-gray-500">{pickup?.city ?? '—'}</Text>
+      </View>
+
+      <View className="bg-gray-50 rounded-xl p-4 mb-4">
+        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">
+          Drop-off
+        </Text>
+        <Text className="text-base text-gray-900">
+          {dropoff?.address ?? '—'}
+        </Text>
+        <Text className="text-sm text-gray-500">{dropoff?.city ?? '—'}</Text>
+      </View>
+
+      <View className="bg-gray-50 rounded-xl p-4 mb-4">
+        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">
+          Package
+        </Text>
+        <Text className="text-base text-gray-900">
+          {packageDetails?.description ?? '—'}
+        </Text>
+        <Text className="text-sm text-gray-500">
+          {packageDetails?.weight}kg · {packageDetails?.category}
+        </Text>
+      </View>
+
+      <View className="bg-gray-50 rounded-xl p-4 mb-4">
+        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">Recipient</Text>
+        <Text className="text-base text-gray-900">{recipientDetails?.recipientName ?? '—'}</Text>
+        <Text className="text-sm text-gray-500">{recipientDetails?.recipientPhone ?? '—'}</Text>
+        {recipientDetails?.deliveryNotes && (
+          <Text className="text-sm text-gray-400 mt-1 italic">"{recipientDetails.deliveryNotes}"</Text>
+        )}
+      </View>
 
       {estimatedDeliveryAt ? (
         <View className="bg-emerald-50 rounded-xl p-4 mb-4 border border-emerald-200">

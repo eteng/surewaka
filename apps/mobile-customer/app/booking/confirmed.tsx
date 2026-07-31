@@ -1,5 +1,6 @@
 import { View, Text, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useBookingStore } from '@surewaka/mobile-shared';
 
 export default function ConfirmedScreen() {
@@ -19,7 +20,7 @@ export default function ConfirmedScreen() {
   return (
     <View className="flex-1 bg-white items-center justify-center px-8">
       <View className="w-24 h-24 rounded-full bg-primary-light items-center justify-center mb-6">
-        <Text className="text-4xl">✓</Text>
+        <Ionicons name="checkmark" size={48} color="#16a34a" />
       </View>
 
       <Text className="text-2xl font-bold text-gray-900 text-center mb-3">

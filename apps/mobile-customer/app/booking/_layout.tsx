@@ -17,7 +17,9 @@ export default function BookingLayout() {
         headerStyle: { backgroundColor: '#16a34a' },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: 'bold' },
-        headerLeft: () => null,
+        // Chevron-only back button — step titles are long ("Step 1 of 7: Pickup")
+        // and would otherwise render as cluttered back-button labels on iOS.
+        headerBackButtonDisplayMode: 'minimal',
       }}
     >
       <Stack.Screen

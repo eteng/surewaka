@@ -2,6 +2,7 @@ import { useAuth } from '@clerk/expo';
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useBookingStore, apiClient } from '@surewaka/mobile-shared';
 import type { LineItem } from '@surewaka/shared';
 
@@ -337,7 +338,7 @@ export default function CarriersScreen() {
                 We find the cheapest intercity path for you
               </Text>
             </View>
-            <Text className="text-2xl">✨</Text>
+            <Ionicons name="sparkles" size={24} color="#047857" />
           </View>
         </Pressable>
       )}

@@ -2,7 +2,7 @@ import { useAuth } from '@clerk/expo';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import { useBookingStore, useQuoteExpiry, createAuthClient } from '@surewaka/mobile-shared';
 import { PaymentShortfallSheet } from '@/components/payment-shortfall-sheet';
 import type { VehicleType } from '@surewaka/shared';
@@ -48,6 +48,7 @@ function formatKoboToNaira(kobo: number): string {
 export default function ReviewScreen() {
   const { bottom } = useSafeAreaInsets();
   const router = useRouter();
+  const navigation = useNavigation();
   const pickup = useBookingStore((s) => s.pickup);
   const dropoff = useBookingStore((s) => s.dropoff);
   const packageDetails = useBookingStore((s) => s.packageDetails);
@@ -95,6 +96,31 @@ export default function ReviewScreen() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Intercept back navigation (gesture, hardware back, header back) so a delivery
+  // draft that's already been created isn't silently cancelled by an accidental swipe.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (confirmedRef.current) return;
+      const { deliveryId: id } = useBookingStore.getState();
+      if (!id) return; // no draft created yet — nothing to lose
+
+      e.preventDefault();
+      Alert.alert(
+        'Discard this delivery?',
+        'Going back will cancel this delivery request. You can rebook anytime.',
+        [
+          { text: 'Keep reviewing', style: 'cancel' },
+          {
+            text: 'Discard',
+            style: 'destructive',
+            onPress: () => navigation.dispatch(e.data.action),
+          },
+        ],
+      );
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   /**
    * Refreshes the quote by calling the re-quote endpoint.
