@@ -77,3 +77,4 @@ export * from './cost-snapshots';
 
 // System config
 export * from './system-config';
+export * from './coverage-gaps';

@@ -3,6 +3,7 @@ import { db, deliveries, driverLocations, drivers } from '@surewaka/db';
 import { and, eq } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth';
 import { recordDriverLocationSchema } from '@surewaka/shared';
+import { getH3Cell, H3_RESOLUTION } from '@surewaka/shared';
 import { initLocationStore, updateDriverLocation } from '@surewaka/realtime';
 import type { AuthUser } from '@surewaka/auth';
 import { getRedis } from '../lib/redis';
@@ -113,6 +114,13 @@ driverLocationRoutes.post('/', async (c) => {
     { status: 'available', vehicleType: driver.vehicleType },
     { deliveryId: parsed.data.deliveryId },
   );
+
+  // Update driver's H3 cell + coordinates in Postgres (for density queries)
+  const h3Index = getH3Cell(parsed.data.lat, parsed.data.lng, H3_RESOLUTION);
+  await db
+    .update(drivers)
+    .set({ lat: parsed.data.lat, lng: parsed.data.lng, h3Index })
+    .where(eq(drivers.id, driver.id));
 
   // Postgres audit trail (when there's an active delivery)
   if (parsed.data.deliveryId) {

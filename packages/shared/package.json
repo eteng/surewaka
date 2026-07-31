@@ -17,6 +17,7 @@
   "dependencies": {
     "@surewaka/db": "workspace:*",
     "drizzle-orm": "^0.45.2",
+    "h3-js": "^4.5.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {

@@ -4,6 +4,7 @@ import type { CronJobName } from './queue';
 import { handleSyncInfraCosts } from './jobs/sync-infra-costs/index';
 import { rescueStaleRouting } from './jobs/rescue-stale-routing';
 import { rescueMissedMatching } from './jobs/rescue-missed-matching';
+import { computeCoverageGaps } from './jobs/compute-coverage-gaps';
 
 // Seed repeating jobs — idempotent (BullMQ deduplicates by jobId)
 await cronQueue.add(
@@ -37,6 +38,17 @@ await cronQueue.add(
   },
 );
 
+await cronQueue.add(
+  'compute-coverage-gaps',
+  {},
+  {
+    jobId: 'compute-coverage-gaps-6h',
+    repeat: { pattern: '0 */6 * * *' },  // Every 6 hours
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 30000 },
+  },
+);
+
 const worker = new Worker<Record<string, never>, void, CronJobName>(
   'cron',
   async (job) => {
@@ -47,6 +59,8 @@ const worker = new Worker<Record<string, never>, void, CronJobName>(
         return rescueStaleRouting();
       case 'rescue-missed-matching':
         return rescueMissedMatching();
+      case 'compute-coverage-gaps':
+        return computeCoverageGaps();
       default:
         throw new Error(`Unknown cron job: ${String(job.name)}`);
     }

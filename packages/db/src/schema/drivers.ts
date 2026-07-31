@@ -6,8 +6,10 @@ import {
   boolean,
   real,
   integer,
+  index,
   foreignKey,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { vehicleType } from './enums';
 import { users } from './users';
 
@@ -24,6 +26,7 @@ export const drivers = pgTable(
     available: boolean().default(false).notNull(),
     lat: real(),
     lng: real(),
+    h3Index: text('h3_index'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     acceptanceRate: real('acceptance_rate').default(1.0).notNull(),
     completionRate: real('completion_rate').default(1.0).notNull(),
@@ -38,5 +41,8 @@ export const drivers = pgTable(
       foreignColumns: [users.id],
       name: 'drivers_user_id_users_id_fk',
     }),
+    index('idx_drivers_h3_available')
+      .on(table.h3Index)
+      .where(sql`available = true AND h3_index IS NOT NULL`),
   ],
 );

@@ -48,6 +48,9 @@ import adminPayoutRoutes from './routes/admin/payouts';
 import adminFinanceRoutes from './routes/admin/finance';
 import adminSystemConfigRoutes from './routes/admin/system-config';
 import adminQueueRoutes from './routes/admin/queues';
+import adminCoverageGapRoutes from './routes/admin/coverage-gaps';
+import adminDriverDensityRoutes from './routes/admin/driver-density';
+import adminCoverageMapRoutes from './routes/admin/coverage-map';
 
 const app = new Hono();
 
@@ -127,6 +130,9 @@ app.route('/api/v1/admin/payouts', adminPayoutRoutes);
 app.route('/api/v1/admin/finance', adminFinanceRoutes);
 app.route('/api/v1/admin/config', adminSystemConfigRoutes);
 app.route('/api/v1/admin/queues', adminQueueRoutes);
+app.route('/api/v1/admin/coverage-gaps', adminCoverageGapRoutes);
+app.route('/api/v1/admin/driver-density', adminDriverDensityRoutes);
+app.route('/api/v1/admin/coverage-map', adminCoverageMapRoutes);
 app.route('/api/v1/zones', zoneRoutes);
 
 // Start server
