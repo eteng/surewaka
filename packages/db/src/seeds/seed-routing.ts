@@ -14,27 +14,13 @@
  * City values match the zones table exactly (title case: 'Lagos', 'Abuja', 'Port Harcourt').
  */
 
-import { config } from 'dotenv';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { neon } from '@neondatabase/serverless';
+import { db } from './db';
 import { latLngToCell } from 'h3-js';
 import { carriers } from '../schema/carriers';
 import { carrierParks } from '../schema/carrier-parks';
 import { carrierRoutes } from '../schema/carrier-routes';
 import { carrierRouteSchedules } from '../schema/carrier-route-schedules';
 import { eq, and } from 'drizzle-orm';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-config({ path: resolve(__dirname, '../../../../.env') });
-
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error('DATABASE_URL must be set in root .env');
-
-const db = drizzle(neon(connectionString));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

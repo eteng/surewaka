@@ -10,23 +10,9 @@
  * Safe to run multiple times — skips carriers that already exist by slug.
  */
 
-import { config } from 'dotenv';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { neon } from '@neondatabase/serverless';
+import { db } from './db';
 import { carriers } from '../schema/carriers';
 import { eq } from 'drizzle-orm';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-config({ path: resolve(__dirname, '../../../../.env') });
-
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error('DATABASE_URL must be set in root .env');
-
-const db = drizzle(neon(connectionString));
 
 // Base prices in kobo (smallest Naira unit). These represent starting prices
 // for a standard Lagos intra-city package delivery.
