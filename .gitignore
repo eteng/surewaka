@@ -35,6 +35,7 @@ Thumbs.db
 
 # Testing
 coverage/
+!apps/admin/app/routes/coverage/
 .playwright-mcp/
 
 # Supabase local state
