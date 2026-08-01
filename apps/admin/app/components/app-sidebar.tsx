@@ -94,8 +94,9 @@ const navMain = [
     icon: MapPin,
     items: [
       { title: 'Zones', url: '/coverage/zones' },
-      { title: 'Service Areas', url: '/coverage/service-areas' },
-      { title: 'Pricing Regions', url: '/coverage/pricing-regions' },
+      { title: 'Coverage Map', url: '/coverage/map' },
+      { title: 'Coverage Gaps', url: '/coverage/gaps' },
+      { title: 'Driver Density', url: '/coverage/density' },
     ],
   },
   {
