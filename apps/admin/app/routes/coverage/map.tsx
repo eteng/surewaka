@@ -1,32 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/react';
-import { AlertCircle, Map, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { Skeleton } from '~/components/ui/skeleton';
 import { Badge } from '~/components/ui/badge';
+import { CoverageHexMap, type CoverageGeoJSON } from '~/components/coverage/coverage-hex-map';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-
-type CoverageFeature = {
-  type: 'Feature';
-  properties: {
-    h3Index: string;
-    parkCount: number;
-    demandCount: number;
-    driverCount: number;
-    center: { lat: number; lng: number };
-    type: 'covered' | 'gap' | 'active';
-  };
-  geometry: {
-    type: 'Polygon';
-    coordinates: number[][][];
-  };
-};
-
-type CoverageGeoJSON = {
-  type: 'FeatureCollection';
-  features: CoverageFeature[];
-};
 
 export default function CoverageMapRoute() {
   const { getToken } = useAuth();
@@ -127,16 +107,12 @@ export default function CoverageMapRoute() {
             </div>
           </div>
 
-          <div className="rounded-lg border bg-muted/50 p-8 text-center">
-            <Map className="mx-auto h-12 w-12 text-muted-foreground" />
-            <p className="mt-4 text-sm text-muted-foreground">
-              Map visualization coming soon. GeoJSON data available via API.
-            </p>
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <Badge variant="secondary">{data.features.length} total features</Badge>
-              <Badge variant="outline">H3 Resolution 7</Badge>
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">{data.features.length} total features</Badge>
+            <Badge variant="outline">H3 Resolution 7</Badge>
           </div>
+
+          <CoverageHexMap data={data} isLoading={isLoading} />
 
           <details className="rounded-lg border p-4">
             <summary className="cursor-pointer text-sm font-medium">
