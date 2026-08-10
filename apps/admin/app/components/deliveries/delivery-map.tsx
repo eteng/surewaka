@@ -176,9 +176,15 @@ export function DeliveryMap({ data, isLoading, highlightedDeliveryId }: Delivery
     let cancelled = false;
     async function checkMapAvailability() {
       try {
-        // Dynamic import with variable to prevent bundler resolution errors
-        const pkg = 'react-map-gl';
-        await import(/* @vite-ignore */ pkg);
+        // Literal specifier (not a variable) so Vite can statically analyze,
+        // pre-bundle, and rewrite this import during dev — a variable +
+        // @vite-ignore leaves the bare specifier unresolvable by the browser
+        // and always fails, regardless of whether the package is installed.
+        // `react-map-gl`/`mapbox-gl` are real dependencies of this app (see
+        // package.json), so there's no "package might not exist" case to
+        // guard against here; the try/catch stays as defensive fallback only.
+        // Must use the `/mapbox` subpath — the package has no root `.` export.
+        await import('react-map-gl/mapbox');
         if (!cancelled) setMapAvailable(true);
       } catch {
         if (!cancelled) setMapAvailable(false);
@@ -473,8 +479,8 @@ function MapRenderer({
     let cancelled = false;
     async function loadMap() {
       try {
-        const pkg = 'react-map-gl';
-        const reactMapGl = await import(/* @vite-ignore */ pkg);
+        // See checkMapAvailability above — literal specifier, not a variable.
+        const reactMapGl = await import('react-map-gl/mapbox');
         if (!cancelled) {
           setMapComponents({
             Map: reactMapGl.Map as unknown as React.ComponentType<Record<string, unknown>>,
