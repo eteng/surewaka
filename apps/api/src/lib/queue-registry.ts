@@ -9,6 +9,7 @@
 
 import { Queue, QueueEvents } from 'bullmq';
 import IORedis from 'ioredis';
+import { PUSH_QUEUE_NAME, PUSH_BROADCAST_QUEUE_NAME } from '@surewaka/shared';
 
 // ─── Connection ───────────────────────────────────────────────────────────────
 
@@ -22,7 +23,14 @@ const connection = new IORedis(redisUrl, {
 
 // ─── Queue Definitions ────────────────────────────────────────────────────────
 
-export type QueueName = 'routing' | 'matching' | 'payment' | 'push';
+export type QueueName =
+  | 'routing'
+  | 'matching'
+  | 'payment'
+  | 'ledger'
+  | 'cron'
+  | typeof PUSH_QUEUE_NAME
+  | typeof PUSH_BROADCAST_QUEUE_NAME;
 
 export type QueueMeta = {
   name: QueueName;
@@ -34,7 +42,10 @@ export const QUEUE_META: QueueMeta[] = [
   { name: 'routing', displayName: 'Routing', description: 'Route computation for SureWaka Way deliveries' },
   { name: 'matching', displayName: 'Matching', description: 'Driver matching (tiered broadcast algorithm)' },
   { name: 'payment', displayName: 'Payment', description: 'Escrow holds, releases, refunds, payouts' },
-  { name: 'push', displayName: 'Push Notifications', description: 'Expo push notification delivery' },
+  { name: 'ledger', displayName: 'Ledger', description: 'Finance ledger event writes (commission, fees, reversals)' },
+  { name: 'cron', displayName: 'Cron', description: 'Scheduled maintenance jobs' },
+  { name: PUSH_QUEUE_NAME, displayName: 'Push Notifications', description: 'Expo push notification delivery (transactional)' },
+  { name: PUSH_BROADCAST_QUEUE_NAME, displayName: 'Push Broadcasts', description: 'Expo push notification delivery (admin broadcasts)' },
 ];
 
 // ─── Queue Instances ──────────────────────────────────────────────────────────
