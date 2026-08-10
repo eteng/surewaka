@@ -10,12 +10,12 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 type CoverageFeature = {
   type: 'Feature';
   properties: {
-    layer: 'park' | 'driver' | 'gap';
-    name?: string;
-    carrierId?: string;
-    driverId?: string;
-    count?: number;
-    gap_count?: number;
+    h3Index: string;
+    parkCount: number;
+    demandCount: number;
+    driverCount: number;
+    center: { lat: number; lng: number };
+    type: 'covered' | 'gap' | 'active';
   };
   geometry: {
     type: 'Polygon';
@@ -56,9 +56,11 @@ export default function CoverageMapRoute() {
     fetchData();
   }, [fetchData]);
 
-  const parkCount = data?.features.filter((f) => f.properties.layer === 'park').length ?? 0;
-  const driverCount = data?.features.filter((f) => f.properties.layer === 'driver').length ?? 0;
-  const gapCount = data?.features.filter((f) => f.properties.layer === 'gap').length ?? 0;
+  const parkCount = data?.features.filter((f) => f.properties.parkCount > 0).length ?? 0;
+  const driverCount = data?.features.filter((f) => f.properties.driverCount > 0).length ?? 0;
+  const gapCount =
+    data?.features.filter((f) => f.properties.demandCount > 0 && f.properties.parkCount === 0)
+      .length ?? 0;
 
   return (
     <div className="space-y-6">
