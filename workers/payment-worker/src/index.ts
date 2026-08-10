@@ -41,7 +41,7 @@ const worker = new Worker<PaymentJobData, void, PaymentJobName>(
         throw new Error(`Unknown job name: ${String(job.name)}`);
     }
   },
-  { connection, concurrency: 5 },
+  { connection, concurrency: 5, metrics: { maxDataPoints: 60 * 24 } }, // 24h of 1-min data points
 );
 
 worker.on('completed', (job) => console.log(`✅ Job ${job.id} (${job.name}) completed`));
@@ -57,7 +57,7 @@ const ledgerWorker = new Worker<LedgerEvent>('ledger', async (job) => {
     sourceType: job.data.sourceType,
     occurredAt: new Date(),
   }).onConflictDoNothing();
-}, { connection, concurrency: 2 });
+}, { connection, concurrency: 2, metrics: { maxDataPoints: 60 * 24 } }); // 24h of 1-min data points
 
 ledgerWorker.on('failed', (job, err) => console.error(`[LedgerWorker] Job ${job?.id} failed:`, err));
 

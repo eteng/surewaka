@@ -52,6 +52,7 @@ const transactionalWorker = new Worker<PushJobData>(
   {
     connection,
     concurrency: transactionalConcurrency,
+    metrics: { maxDataPoints: 60 * 24 }, // 24h of 1-min data points
   },
 );
 
@@ -61,6 +62,7 @@ const broadcastWorker = new Worker<BroadcastChunkJobData>(
   {
     connection,
     concurrency: 2, // Lower to avoid starving transactional jobs
+    metrics: { maxDataPoints: 60 * 24 }, // 24h of 1-min data points
   },
 );
 

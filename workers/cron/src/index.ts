@@ -65,7 +65,7 @@ const worker = new Worker<Record<string, never>, void, CronJobName>(
         throw new Error(`Unknown cron job: ${String(job.name)}`);
     }
   },
-  { connection, concurrency: 1 },
+  { connection, concurrency: 1, metrics: { maxDataPoints: 60 * 24 } }, // 24h of 1-min data points
 );
 
 worker.on('completed', (job) => console.log(`✅ Cron job ${job.name} completed`));
