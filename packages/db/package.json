@@ -17,6 +17,7 @@
     "seed:fee-settings": "tsx src/seeds/seed-fee-settings.ts",
     "seed:carriers": "tsx src/seeds/seed-carriers.ts",
     "seed:zones": "tsx src/scripts/seed-zones.ts",
+    "backfill:carrier-park-h3": "tsx src/scripts/backfill-carrier-park-h3.ts",
     "seed:vehicle-type-rates": "tsx src/seeds/seed-vehicle-type-rates.ts",
     "seed:finance": "tsx src/seeds/seed-finance.ts",
     "seed:routing": "tsx src/seeds/seed-routing.ts"

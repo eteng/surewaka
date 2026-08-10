@@ -7,7 +7,7 @@ import { db, carrierParks } from '@surewaka/db';
 import { eq } from 'drizzle-orm';
 import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
-import { createCarrierParkSchema, updateCarrierParkSchema } from '@surewaka/shared';
+import { createCarrierParkSchema, updateCarrierParkSchema, getH3Cell, H3_RESOLUTION } from '@surewaka/shared';
 
 const adminCarrierParks = new Hono();
 
@@ -35,6 +35,7 @@ adminCarrierParks.post('/', async (c) => {
       address: parsed.data.address,
       lat: parsed.data.lat,
       lng: parsed.data.lng,
+      h3Index: getH3Cell(parsed.data.lat, parsed.data.lng, H3_RESOLUTION),
     }).returning();
 
     return c.json({ data: park, error: null, meta: null }, 201);
@@ -83,6 +84,28 @@ adminCarrierParks.patch('/:id', async (c) => {
     if (updates.lat !== undefined) setValues.lat = updates.lat;
     if (updates.lng !== undefined) setValues.lng = updates.lng;
     if (updates.isActive !== undefined) setValues.isActive = updates.isActive;
+
+    // h3Index is derived from lat/lng — recompute from the *effective* final
+    // coordinates whenever either changes, since a PATCH may carry only one
+    // of the two (updateCarrierParkSchema is a .partial()).
+    if (updates.lat !== undefined || updates.lng !== undefined) {
+      const [existing] = await db
+        .select({ lat: carrierParks.lat, lng: carrierParks.lng })
+        .from(carrierParks)
+        .where(eq(carrierParks.id, id))
+        .limit(1);
+
+      if (!existing) {
+        return c.json(
+          { data: null, error: { code: 'NOT_FOUND', message: 'Carrier park not found' }, meta: null },
+          404,
+        );
+      }
+
+      const lat = updates.lat ?? existing.lat;
+      const lng = updates.lng ?? existing.lng;
+      setValues.h3Index = getH3Cell(lat, lng, H3_RESOLUTION);
+    }
 
     const [updated] = await db.update(carrierParks)
       .set(setValues)
