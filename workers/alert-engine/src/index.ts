@@ -6,6 +6,7 @@ import { alerts } from '@surewaka/db';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { EvaluationResult } from './types';
 import type { AlertSeverity } from '@surewaka/shared';
+import { startHealthServer, recordTickStart, recordTickSuccess, recordTickError } from './health';
 
 import { evaluate as evalDriverSilent } from './rules/driver-silent';
 import { evaluate as evalLegOverdue } from './rules/leg-overdue';
@@ -162,13 +163,27 @@ async function runTick(): Promise<void> {
 
 console.log('[alert-engine] starting — poll interval: 60s');
 
+startHealthServer(POLL_INTERVAL_MS);
+
+async function tick(): Promise<void> {
+  tickRunning = true;
+  recordTickStart();
+  try {
+    await runTick();
+    recordTickSuccess();
+  } catch (err) {
+    recordTickError(err);
+    throw err;
+  } finally {
+    tickRunning = false;
+  }
+}
+
 // Run immediately on start, then every 60s
-tickRunning = true;
-runTick().finally(() => { tickRunning = false; });
+tick().catch((err) => console.error('[alert-engine] tick failed:', err));
 const timer = setInterval(() => {
   if (tickRunning) return;
-  tickRunning = true;
-  runTick().finally(() => { tickRunning = false; });
+  tick().catch((err) => console.error('[alert-engine] tick failed:', err));
 }, POLL_INTERVAL_MS);
 
 process.on('SIGTERM', () => {

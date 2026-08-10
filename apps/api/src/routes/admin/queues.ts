@@ -26,6 +26,7 @@ import {
   QUEUE_META,
   type QueueName,
 } from '../../lib/queue-registry';
+import { getWorkerHealth } from '../../lib/worker-registry';
 
 type QueueEnv = {
   Variables: {
@@ -159,6 +160,23 @@ queueRoutes.get('/metrics', async (c) => {
     const error = err instanceof Error ? err : new Error(String(err));
     return c.json(
       { data: null, error: { code: 'METRICS_ERROR', message: error.message }, meta: null },
+      500,
+    );
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GET /workers — Non-queue worker state: health-endpoint workers + known stubs
+// ═══════════════════════════════════════════════════════════════════════════════
+
+queueRoutes.get('/workers', async (c) => {
+  try {
+    const workers = await getWorkerHealth();
+    return c.json({ data: workers, error: null, meta: null });
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    return c.json(
+      { data: null, error: { code: 'WORKER_HEALTH_ERROR', message: error.message }, meta: null },
       500,
     );
   }
