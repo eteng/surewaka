@@ -1,17 +1,17 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Link } from 'react-router';
+import { useNavigate } from 'react-router';
+import { Pause, Play, RefreshCw, Search, Server, XCircle } from 'lucide-react';
 import {
-  Activity,
-  AlertTriangle,
-  ChevronRight,
-  Pause,
-  Play,
-  RefreshCw,
-  Search,
-  Server,
-  XCircle,
-} from 'lucide-react';
-import { Badge } from '~/components/ui/badge';
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  CartesianGrid,
+} from 'recharts';
+import { cn } from '~/lib/utils';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Skeleton } from '~/components/ui/skeleton';
@@ -30,7 +30,16 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table';
-import { useQueues, useQueueActions, useQueueSSE, type SSEEvent, type QueueInfo } from '~/hooks/use-queues';
+import {
+  useQueues,
+  useQueueActions,
+  useQueueSSE,
+  useWorkerHealth,
+  type SSEEvent,
+  type QueueInfo,
+  type WorkerHealth,
+  type WorkerStatus,
+} from '~/hooks/use-queues';
 import { useAuth } from '@clerk/react';
 import type { Route } from './+types/queues';
 
@@ -60,6 +69,25 @@ type MetricsData = {
     totalFailed: number;
   }>;
 };
+
+// ─── Loading Skeleton ─────────────────────────────────────────────────────────
+
+function LoadingSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="mt-2 h-4 w-64" />
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+      </div>
+      <Skeleton className="h-24 rounded-xl" />
+      <Skeleton className="h-64 rounded-xl" />
+      <Skeleton className="h-80 rounded-xl" />
+    </div>
+  );
+}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -115,92 +143,89 @@ export default function QueuesOverview() {
     return queues.filter((q) => q.displayName.toLowerCase().includes(search.toLowerCase()));
   }, [queues, search]);
 
-  if (isLoading) return <PageSkeleton />;
+  if (isLoading) return <LoadingSkeleton />;
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
-        <XCircle className="h-8 w-8 text-destructive" />
-        <p className="text-sm text-muted-foreground">{error}</p>
+      <div className="flex flex-col items-center justify-center rounded-lg border py-16">
+        <XCircle className="mb-2 h-6 w-6 text-destructive" />
+        <p className="mb-4 text-sm text-muted-foreground">{error}</p>
         <Button variant="outline" size="sm" onClick={refetch}>Retry</Button>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col gap-0 bg-background">
-      {/* ─── Metrics Bar (dark panel) ─────────────────────────────────── */}
-      <div className="border-b bg-muted/50 px-6 py-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Redis Instance */}
-          <div className="rounded-lg border border bg-card px-4 py-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Server className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">Redis instance</span>
-            </div>
-            <div className="grid grid-cols-4 gap-3">
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase">Version</p>
-                <p className="text-sm font-bold text-foreground">{metrics?.redis.version ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase">Connections</p>
-                <p className="text-sm font-bold text-foreground">{metrics?.redis.connections ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase">CPU</p>
-                <p className="text-sm font-bold text-foreground">{metrics?.redis.usedCpuSys ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase">Memory</p>
-                <p className="text-sm font-bold text-foreground">{metrics?.redis.usedMemoryHuman ?? '—'}</p>
-              </div>
-            </div>
-          </div>
+    <div className="flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Queues</h1>
+          <p className="text-sm text-muted-foreground">Monitor all registered BullMQ queues</p>
+        </div>
+        <Select value={period} onValueChange={(v) => setPeriod(v as 'day' | 'month')}>
+          <SelectTrigger className="w-[130px] h-9 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="day">Last day</SelectItem>
+            <SelectItem value="month">Last month</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-          {/* Throughput */}
-          <div className="rounded-lg border border bg-card px-4 py-3">
-            <p className="text-xs text-muted-foreground mb-1">Throughput</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-foreground">{metrics?.throughputPerMin ?? 0}</span>
-              <span className="text-xs text-muted-foreground">jobs/min</span>
-              {/* Mini sparkline using inline SVG */}
-              <SparkLine data={metrics?.queues[0]?.completed.slice(0, 30) ?? []} className="ml-auto" />
+      {/* ─── Metrics Cards ───────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {/* Redis Instance */}
+        <div className="rounded-xl border bg-card p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Server className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+            <span className="text-sm text-muted-foreground">Redis instance</span>
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            <div>
+              <p className="text-[10px] uppercase text-muted-foreground">Version</p>
+              <p className="text-sm font-bold tabular-nums">{metrics?.redis.version ?? '—'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase text-muted-foreground">Connections</p>
+              <p className="text-sm font-bold tabular-nums">{metrics?.redis.connections ?? '—'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase text-muted-foreground">CPU</p>
+              <p className="text-sm font-bold tabular-nums">{metrics?.redis.usedCpuSys ?? '—'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase text-muted-foreground">Memory</p>
+              <p className="text-sm font-bold tabular-nums">{metrics?.redis.usedMemoryHuman ?? '—'}</p>
             </div>
           </div>
+        </div>
 
-          {/* Fail Rate */}
-          <div className="rounded-lg border border bg-card px-4 py-3">
-            <p className="text-xs text-muted-foreground mb-1">Fail rate</p>
-            <div className="flex items-baseline gap-2">
-              <span className={`text-2xl font-bold ${metrics && metrics.failRate > 5 ? 'text-destructive' : 'text-foreground'}`}>
-                {metrics?.failRate ?? 0}%
-              </span>
-              <span className="text-xs text-muted-foreground">
-                ({metrics?.totalJobs7d.toLocaleString() ?? 0} jobs past 7 days)
-              </span>
-            </div>
-          </div>
+        {/* Throughput */}
+        <div className="rounded-xl border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Throughput</p>
+          <p className="mt-1 text-xl font-bold tabular-nums lg:text-2xl">
+            {metrics?.throughputPerMin ?? 0}
+            <span className="ml-1.5 text-xs font-normal text-muted-foreground">jobs/min</span>
+          </p>
+        </div>
+
+        {/* Fail Rate */}
+        <div className="rounded-xl border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Fail rate</p>
+          <p className={cn('mt-1 text-xl font-bold tabular-nums lg:text-2xl', metrics && metrics.failRate > 5 && 'text-red-600 dark:text-red-400')}>
+            {metrics?.failRate ?? 0}%
+          </p>
+          <p className={cn('mt-0.5 text-xs', metrics && metrics.failRate > 5 ? 'text-red-500' : 'text-muted-foreground')}>
+            {metrics?.totalJobs7d.toLocaleString() ?? 0} jobs past 7 days
+          </p>
         </div>
       </div>
 
-      {/* ─── Content Area ─────────────────────────────────────────────── */}
-      <div className="flex-1 px-6 py-6 space-y-6">
-        {/* Period selector */}
-        <div className="flex justify-end">
-          <Select value={period} onValueChange={(v) => setPeriod(v as 'day' | 'month')}>
-            <SelectTrigger className="w-[130px] h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="day">Last day</SelectItem>
-              <SelectItem value="month">Last month</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* ─── Aggregate Stats Row ────────────────────────────────────── */}
-        <div className="grid grid-cols-3 sm:grid-cols-7 gap-4 border-b pb-6">
+      {/* ─── Aggregate Stats ─────────────────────────────────────────── */}
+      <div className="rounded-xl border bg-card p-5">
+        <div className="grid grid-cols-3 gap-4 sm:grid-cols-7">
           <StatCell label="Total" value={stats.total} dot="bg-muted-foreground" />
           <StatCell label="Waiting" value={stats.waiting} dot="bg-amber-500" />
           <StatCell label="Active" value={stats.active} dot="bg-blue-500" />
@@ -209,127 +234,151 @@ export default function QueuesOverview() {
           <StatCell label="Delayed" value={stats.delayed} dot="bg-purple-500" />
           <StatCell label="Paused" value={stats.paused} dot="bg-muted-foreground/50" />
         </div>
+      </div>
 
-        {/* ─── Time-Series Chart ──────────────────────────────────────── */}
-        {metrics && <TimeSeriesChart metrics={metrics} period={period} />}
+      {/* ─── Time-Series Chart ──────────────────────────────────────── */}
+      {metrics && <ThroughputChart metrics={metrics} />}
 
-        {/* ─── Queue Table ────────────────────────────────────────────── */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-semibold">Queues</h2>
-              <p className="text-xs text-muted-foreground">
-                Monitor all registered BullMQ queues
-              </p>
-            </div>
-            <div className="relative w-64">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Search"
-                className="pl-8 h-9 text-sm"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+      {/* ─── Queue Table ────────────────────────────────────────────── */}
+      <section className="rounded-xl border bg-card">
+        <div className="flex items-center justify-between gap-3 border-b p-4">
+          <h2 className="text-sm font-semibold">Queues</h2>
+          <div className="relative w-64">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+            <Input
+              placeholder="Search"
+              className="pl-8 h-9 text-sm"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search queues"
+            />
           </div>
+        </div>
 
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-xs font-medium">Queue</TableHead>
-                  <TableHead className="text-xs font-medium text-right">Total</TableHead>
-                  <TableHead className="text-xs font-medium text-right">Active</TableHead>
-                  <TableHead className="text-xs font-medium text-right">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                      Failed
-                    </span>
-                  </TableHead>
-                  <TableHead className="text-xs font-medium text-right">Completed</TableHead>
-                  <TableHead className="text-xs font-medium text-right">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      Workers
-                    </span>
-                  </TableHead>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Queue</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Active</TableHead>
+                <TableHead className="text-right">Failed</TableHead>
+                <TableHead className="text-right">Completed</TableHead>
+                <TableHead className="text-right">Workers</TableHead>
+                <TableHead className="w-10 text-right sr-only">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredQueues.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
+                    No queues match "{search}".
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredQueues.map((queue) => (
+              ) : (
+                filteredQueues.map((queue) => (
                   <QueueRow
                     key={queue.name}
                     queue={queue}
                     onPause={() => pauseQueue(queue.name).then(() => refetch())}
                     onResume={() => resumeQueue(queue.name).then(() => refetch())}
                   />
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
+      </section>
 
-        {/* SSE Status */}
-        {lastEvent && (
-          <div className="text-xs text-muted-foreground flex items-center gap-1.5 pt-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-            </span>
-            Connected — live
-          </div>
-        )}
-      </div>
+      {/* ─── Workers ─────────────────────────────────────────────────── */}
+      <WorkersSection />
+
+      {/* SSE Status */}
+      {lastEvent && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+          </span>
+          Connected — live
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── Queue Table Row ──────────────────────────────────────────────────────────
 
+const PAUSED_BADGE = 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
+
 function QueueRow({ queue, onPause, onResume }: { queue: QueueInfo; onPause: () => void; onResume: () => void }) {
+  const navigate = useNavigate();
   const total = queue.counts.active + queue.counts.waiting + queue.counts.failed + queue.counts.delayed + queue.counts.completed;
+  const goToQueue = () => navigate(`/queues/${queue.name}`);
 
   return (
-    <TableRow className="cursor-pointer group">
+    <TableRow
+      className="cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      onClick={goToQueue}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          goToQueue();
+        }
+      }}
+      tabIndex={0}
+      role="row"
+      aria-label={`Queue: ${queue.displayName}`}
+    >
       <TableCell>
-        <Link to={`/queues/${queue.name}`} className="flex items-center gap-2">
-          <span className="font-medium text-sm group-hover:text-primary transition-colors">
-            {queue.displayName}
-          </span>
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm">{queue.displayName}</span>
           {queue.isPaused && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-yellow-600 border-yellow-300">
-              Paused
-            </Badge>
+            <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', PAUSED_BADGE)}>Paused</span>
           )}
-        </Link>
+        </div>
       </TableCell>
-      <TableCell className="text-right font-mono text-sm">{total.toLocaleString()}</TableCell>
-      <TableCell className="text-right font-mono text-sm">{queue.counts.active}</TableCell>
-      <TableCell className="text-right font-mono text-sm">
-        <span className={queue.counts.failed > 0 ? 'text-red-500 font-semibold' : ''}>
+      <TableCell className="text-right font-mono text-sm tabular-nums">{total.toLocaleString()}</TableCell>
+      <TableCell className="text-right font-mono text-sm tabular-nums">{queue.counts.active}</TableCell>
+      <TableCell className="text-right font-mono text-sm tabular-nums">
+        <span className={queue.counts.failed > 0 ? 'font-semibold text-red-600 dark:text-red-400' : ''}>
           {queue.counts.failed}
         </span>
       </TableCell>
-      <TableCell className="text-right font-mono text-sm">{queue.counts.completed.toLocaleString()}</TableCell>
+      <TableCell className="text-right font-mono text-sm tabular-nums">{queue.counts.completed.toLocaleString()}</TableCell>
       <TableCell className="text-right">
         <WorkerDots count={queue.workers.count} />
+      </TableCell>
+      <TableCell className="text-right">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          aria-label={queue.isPaused ? `Resume ${queue.displayName}` : `Pause ${queue.displayName}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            queue.isPaused ? onResume() : onPause();
+          }}
+        >
+          {queue.isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+        </Button>
       </TableCell>
     </TableRow>
   );
 }
 
-// ─── Worker Dots (Kuue-style) ─────────────────────────────────────────────────
+// ─── Worker Dots ──────────────────────────────────────────────────────────────
 
 function WorkerDots({ count }: { count: number }) {
   if (count === 0) {
     return <span className="text-xs text-muted-foreground">—</span>;
   }
   return (
-    <div className="flex items-center justify-end gap-0.5">
+    <div className="flex items-center justify-end gap-0.5" aria-label={`${count} workers online`}>
       {Array.from({ length: Math.min(count, 10) }).map((_, i) => (
-        <span key={i} className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+        <span key={i} className="inline-block h-2 w-2 rounded-full bg-green-500" />
       ))}
-      {count > 10 && <span className="text-[10px] text-muted-foreground ml-1">+{count - 10}</span>}
+      {count > 10 && <span className="ml-1 text-[10px] text-muted-foreground">+{count - 10}</span>}
     </div>
   );
 }
@@ -339,8 +388,8 @@ function WorkerDots({ count }: { count: number }) {
 function StatCell({ label, value, dot }: { label: string; value: number; dot: string }) {
   return (
     <div>
-      <div className="flex items-center gap-1.5 mb-1">
-        <span className={`h-2 w-2 rounded-full ${dot}`} />
+      <div className="mb-1 flex items-center gap-1.5">
+        <span className={cn('h-2 w-2 rounded-full', dot)} aria-hidden="true" />
         <span className="text-xs text-muted-foreground">{label}</span>
       </div>
       <p className="text-2xl font-bold tabular-nums">{value.toLocaleString()}</p>
@@ -348,135 +397,131 @@ function StatCell({ label, value, dot }: { label: string; value: number; dot: st
   );
 }
 
-// ─── SparkLine (inline SVG) ───────────────────────────────────────────────────
+// ─── Workers Section ──────────────────────────────────────────────────────────
 
-function SparkLine({ data, className }: { data: number[]; className?: string }) {
-  if (data.length < 2) return null;
-  const max = Math.max(...data, 1);
-  const width = 60;
-  const height = 20;
-  const points = data.map((v, i) => `${(i / (data.length - 1)) * width},${height - (v / max) * height}`).join(' ');
+const WORKER_STATUS_STYLES: Record<WorkerStatus, string> = {
+  ok: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  degraded: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+  unhealthy: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  unreachable: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  stub: 'bg-muted text-muted-foreground',
+};
+
+const WORKER_STATUS_LABELS: Record<WorkerStatus, string> = {
+  ok: 'Healthy',
+  degraded: 'Degraded',
+  unhealthy: 'Unhealthy',
+  unreachable: 'Unreachable',
+  stub: 'Not wired up',
+};
+
+function WorkersSection() {
+  const { workers, isLoading, error, refetch } = useWorkerHealth();
 
   return (
-    <svg width={width} height={height} className={className} aria-hidden="true">
-      <polyline fill="none" stroke="currentColor" strokeWidth="1.5" className="text-primary" points={points} />
-    </svg>
+    <section className="rounded-xl border bg-card">
+      <div className="flex items-center justify-between gap-3 border-b p-4">
+        <div>
+          <h2 className="text-sm font-semibold">Workers</h2>
+          <p className="text-xs text-muted-foreground">Processes and stub functions outside the BullMQ queues above</p>
+        </div>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={refetch} aria-label="Refresh worker status">
+          <RefreshCw className="h-3 w-3" />
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3 p-4">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center gap-3 py-10">
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button variant="outline" size="sm" onClick={refetch}>Retry</Button>
+        </div>
+      ) : (
+        <ul className="divide-y">
+          {workers.map((w) => <WorkerRow key={w.name} worker={w} />)}
+        </ul>
+      )}
+    </section>
   );
 }
 
-// ─── Time-Series Chart (SVG) ──────────────────────────────────────────────────
-
-function TimeSeriesChart({ metrics, period }: { metrics: MetricsData; period: string }) {
-  // Aggregate all queues' data into per-status time series
-  const maxPoints = period === 'day' ? 48 : 60; // Downsample: 48 points for day (30-min buckets), 60 for month
-
-  const aggregate = useCallback((data: number[], bucketSize: number) => {
-    const result: number[] = [];
-    for (let i = 0; i < data.length; i += bucketSize) {
-      const bucket = data.slice(i, i + bucketSize);
-      result.push(bucket.reduce((s, v) => s + v, 0));
-    }
-    return result.slice(0, maxPoints).reverse(); // Reverse so time flows left→right
-  }, [maxPoints]);
-
-  const bucketSize = period === 'day' ? 30 : 60 * 24; // 30-min or 1-day buckets
-
-  // Sum across all queues
-  const completedSeries = useMemo(() => {
-    const maxLen = Math.max(...metrics.queues.map((q) => q.completed.length));
-    const summed = new Array(maxLen).fill(0);
-    for (const q of metrics.queues) {
-      for (let i = 0; i < q.completed.length; i++) summed[i] += q.completed[i];
-    }
-    return aggregate(summed, bucketSize);
-  }, [metrics, aggregate, bucketSize]);
-
-  const failedSeries = useMemo(() => {
-    const maxLen = Math.max(...metrics.queues.map((q) => q.failed.length));
-    const summed = new Array(maxLen).fill(0);
-    for (const q of metrics.queues) {
-      for (let i = 0; i < q.failed.length; i++) summed[i] += q.failed[i];
-    }
-    return aggregate(summed, bucketSize);
-  }, [metrics, aggregate, bucketSize]);
-
-  const allValues = [...completedSeries, ...failedSeries];
-  const max = Math.max(...allValues, 1);
-  const W = 700;
-  const H = 180;
-  const PAD = 30;
-
-  function toPath(series: number[]): string {
-    if (series.length === 0) return '';
-    return series.map((v, i) => {
-      const x = PAD + (i / Math.max(series.length - 1, 1)) * (W - PAD * 2);
-      const y = H - PAD - (v / max) * (H - PAD * 2);
-      return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-    }).join(' ');
-  }
-
-  // Y-axis labels
-  const yLabels = [0, Math.round(max / 2), max];
+function WorkerRow({ worker }: { worker: WorkerHealth }) {
+  const detail = worker.detail;
 
   return (
-    <div className="border rounded-lg p-4 bg-muted/30">
-      {/* Legend */}
-      <div className="flex items-center justify-end gap-4 mb-3 text-xs">
-        <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 bg-emerald-400 rounded" /> Completed
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 bg-red-400 rounded" /> Failed
-        </span>
+    <li className="flex items-center justify-between gap-4 px-4 py-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">{worker.displayName}</span>
+          <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', WORKER_STATUS_STYLES[worker.status])}>
+            {WORKER_STATUS_LABELS[worker.status]}
+          </span>
+        </div>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          {worker.status === 'stub' && typeof detail?.note === 'string'
+            ? detail.note
+            : worker.status === 'unreachable'
+              ? (worker.error ?? 'Health check failed')
+              : typeof detail?.msSinceLastTick === 'number'
+                ? `Last tick ${formatRelativeMs(detail.msSinceLastTick)} ago`
+                : 'No tick recorded yet'}
+        </p>
+        {worker.status !== 'stub' && typeof detail?.lastError === 'string' && (
+          <p className="mt-0.5 truncate text-xs text-red-600 dark:text-red-400">{detail.lastError}</p>
+        )}
       </div>
-
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[180px]" aria-label="Job throughput chart">
-        {/* Grid lines */}
-        {yLabels.map((v) => {
-          const y = H - PAD - (v / max) * (H - PAD * 2);
-          return (
-            <g key={v}>
-              <line x1={PAD} y1={y} x2={W - PAD} y2={y} className="stroke-border" strokeWidth="0.5" />
-              <text x={PAD - 6} y={y + 3} className="fill-muted-foreground text-[9px]" textAnchor="end">
-                {v.toLocaleString()}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Completed line */}
-        <path d={toPath(completedSeries)} fill="none" className="stroke-emerald-400" strokeWidth="1.5" strokeLinejoin="round" />
-        {/* Failed line */}
-        <path d={toPath(failedSeries)} fill="none" className="stroke-red-400" strokeWidth="1.5" strokeLinejoin="round" />
-      </svg>
-    </div>
+    </li>
   );
 }
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+function formatRelativeMs(ms: number): string {
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  return `${hours}h`;
+}
 
-function PageSkeleton() {
+// ─── Throughput Chart ─────────────────────────────────────────────────────────
+
+function ThroughputChart({ metrics }: { metrics: MetricsData }) {
+  const chartData = useMemo(() => {
+    const maxLen = Math.max(...metrics.queues.map((q) => q.completed.length), 0);
+    const points: Array<{ i: number; completed: number; failed: number }> = [];
+    for (let i = 0; i < maxLen; i++) {
+      const completed = metrics.queues.reduce((s, q) => s + (q.completed[i] ?? 0), 0);
+      const failed = metrics.queues.reduce((s, q) => s + (q.failed[i] ?? 0), 0);
+      points.push({ i, completed, failed });
+    }
+    return points.reverse();
+  }, [metrics]);
+
   return (
-    <div className="flex h-full flex-col gap-0 bg-background">
-      <div className="border-b bg-muted/50 px-6 py-4">
-        <div className="grid grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-20 rounded-lg bg-primary" />
-          ))}
+    <section className="rounded-xl border bg-card p-5" aria-label="Job throughput over time">
+      <h3 className="text-sm font-semibold">Job Throughput</h3>
+      {chartData.length < 2 ? (
+        <div className="flex h-52 items-center justify-center">
+          <p className="text-sm text-muted-foreground">No throughput data yet.</p>
         </div>
-      </div>
-      <div className="flex-1 px-6 py-6 space-y-6">
-        <div className="grid grid-cols-7 gap-4">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} className="space-y-2">
-              <Skeleton className="h-3 w-12" />
-              <Skeleton className="h-8 w-16" />
-            </div>
-          ))}
+      ) : (
+        <div role="img" aria-label="Line chart showing completed and failed jobs over time">
+          <ResponsiveContainer width="100%" height={220} className="mt-4">
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.1} />
+              <XAxis dataKey="i" tick={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip />
+              <Legend />
+              <Line dataKey="completed" name="Completed" stroke="#16a34a" strokeWidth={2} dot={false} />
+              <Line dataKey="failed" name="Failed" stroke="#ef4444" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
-        <Skeleton className="h-[200px] w-full rounded-lg" />
-        <Skeleton className="h-[200px] w-full rounded-lg" />
-      </div>
-    </div>
+      )}
+    </section>
   );
 }

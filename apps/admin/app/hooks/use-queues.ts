@@ -65,6 +65,17 @@ export type SSEEvent = {
   returnvalue?: string;
 };
 
+export type WorkerStatus = 'ok' | 'degraded' | 'unhealthy' | 'unreachable' | 'stub';
+
+export type WorkerHealth = {
+  name: string;
+  displayName: string;
+  status: WorkerStatus;
+  detail: Record<string, unknown> | null;
+  checkedAt: string;
+  error: string | null;
+};
+
 // ─── Auth Header Helper ───────────────────────────────────────────────────────
 
 function authHeaders(token: string | null): HeadersInit {
@@ -101,6 +112,38 @@ export function useQueues() {
   }, [fetchQueues]);
 
   return { queues, isLoading, error, refetch: fetchQueues };
+}
+
+// ─── useWorkerHealth — non-queue worker state (health-endpoint + stub) ────────
+
+export function useWorkerHealth() {
+  const { getToken } = useAuth();
+  const [workers, setWorkers] = useState<WorkerHealth[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchWorkers = useCallback(async () => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/api/v1/admin/queues/workers`, {
+        headers: authHeaders(token),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await res.json() as { data: WorkerHealth[] };
+      setWorkers(body.data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load worker status');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => {
+    fetchWorkers();
+  }, [fetchWorkers]);
+
+  return { workers, isLoading, error, refetch: fetchWorkers };
 }
 
 // ─── useQueueJobs — paginated jobs by status ──────────────────────────────────
