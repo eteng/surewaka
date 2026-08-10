@@ -9,7 +9,7 @@ import type { Queue } from 'bullmq';
 export function startHealthServer(
   redis: IORedis,
   queue: Queue,
-  port: number = Number(process.env.HEALTH_PORT) || 4003,
+  port: number = Number(process.env.ROUTING_WORKER_HEALTH_PORT) || 4003,
 ): void {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     if (req.url !== '/health' || req.method !== 'GET') {
