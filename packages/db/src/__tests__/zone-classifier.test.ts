@@ -78,7 +78,7 @@ describe('zone-classifier', () => {
 
       const result = await classifyZone('123 Lekki Phase 1, Lagos', 6.45, 3.47);
 
-      expect(result).toEqual({ id: 'zone-lekki', name: 'Lekki' });
+      expect(result).toEqual({ id: 'zone-lekki', name: 'Lekki', city: 'Lagos' });
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -95,7 +95,7 @@ describe('zone-classifier', () => {
       const result = await classifyZone('No matching text here', 6.45, 3.47);
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ id: 'zone-lekki', name: 'Lekki' });
+      expect(result).toEqual({ id: 'zone-lekki', name: 'Lekki', city: 'Lagos' });
     });
   });
 
@@ -112,7 +112,7 @@ describe('zone-classifier', () => {
       // "victoria island" (16 chars) is longer than "vi" (2 chars)
       const result = await classifyZone('Deliver to victoria island area', 6.43, 3.42);
 
-      expect(result).toEqual({ id: 'zone-island', name: 'Island' });
+      expect(result).toEqual({ id: 'zone-island', name: 'Island', city: 'Lagos' });
     });
 
     it('breaks ties by earliest index in address text', async () => {
@@ -124,7 +124,7 @@ describe('zone-classifier', () => {
       const result = await classifyZone('yaba street near ikeja bus stop', 6.5, 3.37);
 
       // "yaba" (4 chars) vs "ikeja" (5 chars) - ikeja is longer, so it wins
-      expect(result).toEqual({ id: 'zone-a', name: 'ZoneA' });
+      expect(result).toEqual({ id: 'zone-a', name: 'ZoneA', city: 'Lagos' });
     });
 
     it('breaks ties by earliest index when keywords have same length', async () => {
@@ -137,7 +137,7 @@ describe('zone-classifier', () => {
       const result = await classifyZone('fghij is before abcde here', 6.5, 3.37);
 
       // Same length → earliest index wins → "fghij" at index 0
-      expect(result).toEqual({ id: 'zone-b', name: 'ZoneB' });
+      expect(result).toEqual({ id: 'zone-b', name: 'ZoneB', city: 'Lagos' });
     });
   });
 
@@ -157,7 +157,7 @@ describe('zone-classifier', () => {
       // Point (6.45, 3.47) is inside the box
       const result = await classifyZone('Lekki Phase 1', 6.45, 3.47);
 
-      expect(result).toEqual({ id: 'zone-lekki', name: 'Lekki' });
+      expect(result).toEqual({ id: 'zone-lekki', name: 'Lekki', city: 'Lagos' });
     });
 
     it('skips a zone when the point is outside its bounding box', async () => {
@@ -193,7 +193,7 @@ describe('zone-classifier', () => {
       // Any coordinate should pass since there's no bbox
       const result = await classifyZone('Deliver to mainland area', 99.0, 99.0);
 
-      expect(result).toEqual({ id: 'zone-mainland', name: 'Mainland' });
+      expect(result).toEqual({ id: 'zone-mainland', name: 'Mainland', city: 'Lagos' });
     });
   });
 
@@ -249,11 +249,11 @@ describe('zone-classifier', () => {
       // First call populates cache
       mockWhere.mockResolvedValueOnce([zoneV1]);
       const result1 = await classifyZone('alpha street', 6.5, 3.4, { skipRemote: true });
-      expect(result1).toEqual({ id: 'zone-a', name: 'ZoneA' });
+      expect(result1).toEqual({ id: 'zone-a', name: 'ZoneA', city: 'Lagos' });
 
       // Second call uses cache (no new DB call)
       const result2 = await classifyZone('alpha street', 6.5, 3.4, { skipRemote: true });
-      expect(result2).toEqual({ id: 'zone-a', name: 'ZoneA' });
+      expect(result2).toEqual({ id: 'zone-a', name: 'ZoneA', city: 'Lagos' });
       expect(mockWhere).toHaveBeenCalledTimes(1);
 
       // Invalidate cache
@@ -262,7 +262,7 @@ describe('zone-classifier', () => {
       // Third call fetches from DB again with updated data
       mockWhere.mockResolvedValueOnce([zoneV2]);
       const result3 = await classifyZone('alpha street', 6.5, 3.4, { skipRemote: true });
-      expect(result3).toEqual({ id: 'zone-b', name: 'ZoneB' });
+      expect(result3).toEqual({ id: 'zone-b', name: 'ZoneB', city: 'Lagos' });
       expect(mockWhere).toHaveBeenCalledTimes(2);
     });
   });
@@ -285,7 +285,7 @@ describe('zone-classifier', () => {
 
       const result = await classifyZone('deliver to lekki', 6.45, 3.47, { skipRemote: true });
 
-      expect(result).toEqual({ id: 'zone-lekki', name: 'Lekki' });
+      expect(result).toEqual({ id: 'zone-lekki', name: 'Lekki', city: 'Lagos' });
       expect(mockFetch).not.toHaveBeenCalled();
     });
   });

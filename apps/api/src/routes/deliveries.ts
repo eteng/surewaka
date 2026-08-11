@@ -13,6 +13,7 @@ import { computeOnDemandQuote, computeCarrierQuote } from '../lib/fee-engine';
 import { respondToCorrection, reportDiscrepancy } from '../services/weight-correction-service';
 import { getRoadDistanceKm } from '@surewaka/shared';
 import { enqueueRouteDelivery } from '../lib/routing-queue';
+import { classifyZone } from '../lib/zone-classifier';
 
 type DeliveriesEnv = {
   Variables: {
@@ -68,25 +69,42 @@ deliveryRoutes.post('/', async (c) => {
   parsed.data.dropoff.city = parsed.data.dropoff.city.trim().toLowerCase();
 
   // Task 30: surewaka_way branch — validate cities have parks, insert with pending_routing, enqueue job
+  // City resolution: .kiro/specs/booking-city-classification — the client-supplied
+  // pickup.city/dropoff.city strings are NOT trusted for matching here. They come
+  // from free-text geocoding and are unreliable (e.g. "Ikeja" instead of "Lagos").
+  // Classify each location server-side via classifyZone (lat/lng + address text
+  // against the curated zones table) and use the classified city instead.
   if (parsed.data.mode === 'surewaka_way') {
-    if (parsed.data.pickup.city === parsed.data.dropoff.city) {
+    const [pickupZone, dropoffZone] = await Promise.all([
+      classifyZone(parsed.data.pickup.address, parsed.data.pickup.lat, parsed.data.pickup.lng),
+      classifyZone(parsed.data.dropoff.address, parsed.data.dropoff.lat, parsed.data.dropoff.lng),
+    ]);
+
+    if (!pickupZone || !dropoffZone) {
+      return c.json({ error: { code: 'UNCLASSIFIED_LOCATION', message: "We couldn't determine the service area for this location." } }, 422);
+    }
+
+    const pickupCity = pickupZone.city.trim().toLowerCase();
+    const dropoffCity = dropoffZone.city.trim().toLowerCase();
+
+    if (pickupCity === dropoffCity) {
       return c.json({ error: { code: 'SAME_CITY', message: 'surewaka_way requires different pickup and dropoff cities' } }, 422);
     }
 
     const pickupParks = await db.select({ id: carrierParks.id })
       .from(carrierParks)
-      .where(and(eq(carrierParks.city, parsed.data.pickup.city), eq(carrierParks.isActive, true)))
+      .where(and(eq(carrierParks.city, pickupCity), eq(carrierParks.isActive, true)))
       .limit(1);
     if (pickupParks.length === 0) {
-      return c.json({ error: { code: 'NO_PARKS_IN_CITY', message: `No active carrier parks in pickup city: ${parsed.data.pickup.city}` } }, 422);
+      return c.json({ error: { code: 'NO_PARKS_IN_CITY', message: `No active carrier parks in pickup city: ${pickupCity}` } }, 422);
     }
 
     const dropoffParks = await db.select({ id: carrierParks.id })
       .from(carrierParks)
-      .where(and(eq(carrierParks.city, parsed.data.dropoff.city), eq(carrierParks.isActive, true)))
+      .where(and(eq(carrierParks.city, dropoffCity), eq(carrierParks.isActive, true)))
       .limit(1);
     if (dropoffParks.length === 0) {
-      return c.json({ error: { code: 'NO_PARKS_IN_CITY', message: `No active carrier parks in dropoff city: ${parsed.data.dropoff.city}` } }, 422);
+      return c.json({ error: { code: 'NO_PARKS_IN_CITY', message: `No active carrier parks in dropoff city: ${dropoffCity}` } }, 422);
     }
 
     // Pre-fetch sender phone for senderPhone field
@@ -100,11 +118,11 @@ deliveryRoutes.post('/', async (c) => {
       status:             'pending_routing',
       deliveryMode:       'surewaka_way',
       pickupAddress:      parsed.data.pickup.address,
-      pickupCity:         parsed.data.pickup.city,
+      pickupCity:         pickupCity,
       pickupLat:          parsed.data.pickup.lat,
       pickupLng:          parsed.data.pickup.lng,
       dropoffAddress:     parsed.data.dropoff.address,
-      dropoffCity:        parsed.data.dropoff.city,
+      dropoffCity:        dropoffCity,
       dropoffLat:         parsed.data.dropoff.lat,
       dropoffLng:         parsed.data.dropoff.lng,
       packageDescription: parsed.data.packageDetails.description,

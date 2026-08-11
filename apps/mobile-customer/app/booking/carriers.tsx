@@ -47,6 +47,10 @@ export default function CarriersScreen() {
   const [routes, setRoutes] = useState<CarrierRoute[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attempted, setAttempted] = useState(false);
+  // Classified server-side by carrier-routes (via classifyZone), not a
+  // client-side city-string comparison — see .kiro/specs/booking-city-classification.
+  const [sameCity, setSameCity] = useState<boolean | null>(null);
 
   // Quotes state: keyed by routeId (or 'instant' for on-demand)
   const [quotes, setQuotes] = useState<Record<string, RouteQuoteState>>({});
@@ -54,15 +58,26 @@ export default function CarriersScreen() {
   const vehicleType = useBookingStore((s) => s.vehicleType);
   const packageWeight = packageDetails?.weight ?? 1;
 
-  const isIntercity =
-    !!pickup?.city && !!dropoff?.city && pickup.city !== dropoff.city;
+  // "SureWaka picks best route" only ever makes sense once we have a
+  // confirmed (server-classified) answer that pickup and dropoff differ.
+  const showSurewakaWay = sameCity === false;
+  // The registered-carriers section (with its own loading/error/empty states)
+  // shows as soon as we've attempted a lookup, unless we've confirmed it's a
+  // same-city trip (carriers only serve intercity routes in this system).
+  const showCarriersSection = attempted && sameCity !== true;
 
   async function loadRoutes() {
-    if (!pickup?.city || !dropoff?.city) return;
+    if (
+      pickup?.lat == null || pickup?.lng == null || !pickup?.address ||
+      dropoff?.lat == null || dropoff?.lng == null || !dropoff?.address
+    ) {
+      return;
+    }
 
     setLoading(true);
     setError(null);
     setRoutes([]);
+    setAttempted(true);
 
     const token = await getToken();
     if (!token) {
@@ -71,24 +86,35 @@ export default function CarriersScreen() {
       return;
     }
 
-    const res = await apiClient.get<CarrierRoute[]>(
-      `/api/v1/carrier-routes?fromCity=${encodeURIComponent(pickup.city)}&toCity=${encodeURIComponent(dropoff.city)}`,
-      token,
-    );
+    const params = new URLSearchParams({
+      fromLat: String(pickup.lat),
+      fromLng: String(pickup.lng),
+      fromAddress: pickup.address,
+      toLat: String(dropoff.lat),
+      toLng: String(dropoff.lng),
+      toAddress: dropoff.address,
+    });
+
+    const res = await apiClient.get<CarrierRoute[]>(`/api/v1/carrier-routes?${params}`, token);
 
     if (res.error || !res.data) {
-      setError('Could not load carriers for this route. Please try again.');
+      setError(
+        res.error?.code === 'UNCLASSIFIED_LOCATION'
+          ? "We couldn't determine the service area for this route."
+          : 'Could not load carriers for this route. Please try again.',
+      );
+      setSameCity(null);
     } else {
       setRoutes(res.data);
+      const meta = res.meta as { sameCity?: boolean } | undefined;
+      setSameCity(meta?.sameCity ?? null);
     }
     setLoading(false);
   }
 
   useEffect(() => {
-    if (isIntercity) {
-      loadRoutes();
-    }
-  }, [pickup?.city, dropoff?.city]);
+    loadRoutes();
+  }, [pickup?.lat, pickup?.lng, pickup?.address, dropoff?.lat, dropoff?.lng, dropoff?.address]);
 
   // Build quote request legs for a given carrierId (or 'instant')
   const buildQuoteLegs = useCallback(
@@ -326,7 +352,7 @@ export default function CarriersScreen() {
       <Text className="text-2xl font-bold text-gray-900 mb-2">Choose a Service</Text>
       <Text className="text-base text-gray-500 mb-6">Compare prices and delivery times</Text>
 
-      {isIntercity && (
+      {showSurewakaWay && (
         <Pressable
           onPress={selectSurewakaWay}
           className="bg-emerald-50 rounded-xl p-4 mb-4 border-2 border-emerald-600"
@@ -357,7 +383,7 @@ export default function CarriersScreen() {
         {renderQuoteDetails('instant')}
       </Pressable>
 
-      {isIntercity && (
+      {showCarriersSection && (
         <>
           <Text className="text-base font-semibold text-gray-900 mb-3 mt-2">Registered Carriers</Text>
 

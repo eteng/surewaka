@@ -23,7 +23,6 @@ import {
   useBookingStore,
   searchAddress,
   reverseGeocode,
-  normalizeCity,
   createAddressesClient,
 } from '@surewaka/mobile-shared';
 import type { LocationSuggestion } from '@surewaka/mobile-shared';
@@ -101,7 +100,7 @@ export default function PickupScreen() {
           const address = await reverseGeocode(loc.coords.latitude, loc.coords.longitude);
           if (address) {
             setSelectedAddress(address.display_name);
-            setSelectedCity(normalizeCity(address.address?.city ?? address.address?.town ?? address.address?.suburb ?? address.address?.county ?? ''));
+            setSelectedCity(address.address?.city ?? address.address?.town ?? address.address?.suburb ?? address.address?.county ?? '');
             setSelectedState(address.address?.state ?? '');
           }
         }
@@ -153,7 +152,7 @@ export default function PickupScreen() {
     const lon = parseFloat(suggestion.lon);
     setSelectedCoords([lon, lat]);
     setSelectedAddress(suggestion.display_name);
-    setSelectedCity(normalizeCity(suggestion.address?.city ?? suggestion.address?.town ?? suggestion.address?.suburb ?? suggestion.address?.county ?? ''));
+    setSelectedCity(suggestion.address?.city ?? suggestion.address?.town ?? suggestion.address?.suburb ?? suggestion.address?.county ?? '');
     setSelectedState(suggestion.address?.state ?? '');
     setSavedLabel(null);
     setQuery('');
@@ -164,7 +163,7 @@ export default function PickupScreen() {
   const selectSavedAddress = useCallback((address: SavedAddress) => {
     setSelectedCoords([address.lng, address.lat]);
     setSelectedAddress(address.address_text);
-    setSelectedCity(normalizeCity(address.city));
+    setSelectedCity(address.city);
     setSelectedState(address.state);
     setSavedLabel(null);
     setShowSuggestions(false);
@@ -173,7 +172,7 @@ export default function PickupScreen() {
   const selectRecentLocation = useCallback((recent: RecentLocation) => {
     setSelectedCoords([recent.lng, recent.lat]);
     setSelectedAddress(recent.address_text);
-    setSelectedCity(normalizeCity(recent.city));
+    setSelectedCity(recent.city);
     setSelectedState(recent.state);
     setSavedLabel(null);
     setShowSuggestions(false);

@@ -13,7 +13,7 @@ type ZoneDef = {
   neLng: number | null;
 };
 
-type ClassifyResult = { id: string; name: string } | null;
+type ClassifyResult = { id: string; name: string; city: string } | null;
 
 // In-memory cache
 let cachedZones: ZoneDef[] | null = null;
@@ -61,7 +61,7 @@ function matchZone(addressText: string, zoneDefs: ZoneDef[], lat: number, lng: n
       const idx = lower.indexOf(kw.toLowerCase());
       if (idx === -1) continue;
       if (kw.length > bestKeywordLen || (kw.length === bestKeywordLen && idx < bestIndex)) {
-        bestMatch = { id: zone.id, name: zone.name };
+        bestMatch = { id: zone.id, name: zone.name, city: zone.city };
         bestKeywordLen = kw.length;
         bestIndex = idx;
       }
