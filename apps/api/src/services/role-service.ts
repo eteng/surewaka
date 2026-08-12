@@ -3,7 +3,7 @@
 // Requirements: 4.1, 4.2, 4.3, 4.4, 4.7, 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6
 
 import { db, userRoles, roleAuditLog, users } from '@surewaka/db';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { getClerkClient } from '@surewaka/auth';
 import type { UserRole, UserRoleRecord, AppMetadata } from '@surewaka/shared';
 
@@ -85,7 +85,14 @@ export async function assignRole(params: AssignRoleParams): Promise<ServiceResul
     }
   }
 
-  // Check for duplicate active role assignment
+  // `uq_user_roles_active` is a plain unique constraint on (userId, role,
+  // scopeId) — despite its name, it is NOT partial on is_active, so it also
+  // blocks inserting a second row after a prior one was revoked. Look up any
+  // existing row (active or not) for this triple, not just active ones, so a
+  // revoke-then-reassign reactivates the old row instead of crashing on that
+  // constraint (scoped roles) or leaving a stray duplicate (unscoped roles,
+  // where Postgres treats each NULL scopeId as distinct and wouldn't have
+  // caught it).
   const existing = await db
     .select()
     .from(userRoles)
@@ -93,13 +100,12 @@ export async function assignRole(params: AssignRoleParams): Promise<ServiceResul
       and(
         eq(userRoles.userId, userId),
         eq(userRoles.role, role),
-        eq(userRoles.isActive, true),
-        ...(scopeId ? [eq(userRoles.scopeId, scopeId)] : [])
+        scopeId ? eq(userRoles.scopeId, scopeId) : isNull(userRoles.scopeId)
       )
     )
     .limit(1);
 
-  if (existing.length > 0) {
+  if (existing.length > 0 && existing[0].isActive) {
     return {
       data: null,
       error: { code: 'CONFLICT', message: 'User already has this active role' },
@@ -107,17 +113,30 @@ export async function assignRole(params: AssignRoleParams): Promise<ServiceResul
     };
   }
 
-  // Insert role record
-  const [roleRecord] = await db
-    .insert(userRoles)
-    .values({
-      userId,
-      role,
-      scopeType: scopeType ?? null,
-      scopeId: scopeId ?? null,
-      assignedBy,
-    })
-    .returning();
+  // Reactivate the existing (revoked) row rather than inserting a new one —
+  // the unique constraint would reject a second row for the same triple.
+  const [roleRecord] =
+    existing.length > 0
+      ? await db
+          .update(userRoles)
+          .set({
+            isActive: true,
+            revokedAt: null,
+            assignedBy,
+            assignedAt: new Date(),
+          })
+          .where(eq(userRoles.id, existing[0].id))
+          .returning()
+      : await db
+          .insert(userRoles)
+          .values({
+            userId,
+            role,
+            scopeType: scopeType ?? null,
+            scopeId: scopeId ?? null,
+            assignedBy,
+          })
+          .returning();
 
   // Audit log
   await db.insert(roleAuditLog).values({

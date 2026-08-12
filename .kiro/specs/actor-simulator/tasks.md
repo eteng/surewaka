@@ -6,31 +6,33 @@ Build bottom-up: identity bootstrap first (nothing else works without real, auth
 
 ## Tasks
 
-- [ ] 1. Bot Identity Bootstrap
-  - [ ] 1.1 Create `apps/api/scripts/seed-bot-actors.ts` skeleton
+- [x] 1. Bot Identity Bootstrap
+  - [x] 1.1 Create `apps/api/scripts/seed-bot-actors.ts` skeleton
     - Parse `--drivers`, `--carriers`, `--reset` flags
-    - Load env the same way `seed-drivers.ts` does (`dotenv` from repo root `.env`)
-    - Guard: refuse to run if `NODE_ENV === 'production'` or `DATABASE_URL`/Clerk keys don't look local/dev
+    - Env loaded via `tsx --env-file` (matches the existing `create-superuser` script's convention, not `dotenv`)
+    - Guard: refuse to run if `NODE_ENV === 'production'` or `CLERK_SECRET_KEY` looks like a live key (`sk_live_`)
     - _Requirements: 1.8, 5.1_
-  - [ ] 1.2 Implement driver bot creation
-    - For each missing driver bot up to `--drivers`: create Clerk user (`bot+driver-{n}@surewaka.test`), insert `users` row, insert `drivers` row (`verified: true`, starting lat/lng from a fixed Lagos coordinate list, vehicle type cycled)
+  - [x] 1.2 Implement driver bot creation
+    - For each missing driver bot up to `--drivers`: create Clerk user (`bot+driver-{n}@example.com` — see design.md's "Implementation corrections" for why not `.test`), insert `users` row, insert `drivers` row (`verified: true`, starting lat/lng from a fixed Lagos coordinate list, vehicle type cycled)
     - Call `assignRole`/`syncRolesToAuth` from `apps/api/src/services/role-service.ts` to grant the `driver` role
-    - Skip accounts whose email already exists (idempotent top-up)
-    - _Requirements: 1.1, 1.4, 1.5_
-  - [ ] 1.3 Implement carrier bot creation
+    - Skip accounts whose email already has an active role (idempotent top-up); reactivate deactivated ones instead of erroring
+    - _Requirements: 1.1, 1.4, 1.5, 6a_
+  - [x] 1.3 Implement carrier bot creation
     - Look up an active seeded carrier; fail fast with a clear message if none exists and `--carriers > 0`
-    - For each missing carrier bot up to `--carriers`: create Clerk user (`bot+carrier-{n}@surewaka.test`), insert `users` row, insert `carrier_members` row against that carrier
+    - For each missing carrier bot up to `--carriers`: create Clerk user (`bot+carrier-{n}@example.com`), insert `users` row, insert `carrier_members` row against that carrier
     - Call `assignRole`/`syncRolesToAuth` to grant `carrier_driver`
     - _Requirements: 1.2, 1.3, 1.4_
-  - [ ] 1.4 Implement `--reset`
-    - Find all `users` rows with email matching `bot+*@surewaka.test`
-    - Delete them (cascades to `drivers`/`carrier_members`) and their Clerk accounts
+  - [x] 1.4 Implement `--reset`
+    - Find all `users` rows with email matching `bot+*@example.com`
+    - Revoke role + deactivate `drivers`/`carrier_members` row (does NOT delete — see design.md's "Implementation corrections": `role_audit_log`'s FK makes hard-delete impossible once a bot has ever had a role assigned)
     - _Requirements: 1.6_
-  - [ ] 1.5 Manual verification
-    - Run with `--drivers 3 --carriers 1`, confirm rows + Clerk users created
-    - Re-run with `--drivers 5`, confirm only 2 new ones created
-    - Run `--reset`, confirm all bot rows and Clerk accounts gone
-    - _Requirements: 1.1, 1.6_
+  - [x] 1.5 Manual verification
+    - Ran with `--drivers 3 --carriers 1` against the real dev Clerk instance + DB, confirmed rows + Clerk users + `publicMetadata` created correctly
+    - Re-ran with `--drivers 4`, confirmed only the shortfall was created
+    - Ran `--reset`, confirmed all bots deactivated (Clerk `publicMetadata` reverted to `['customer']`) but not deleted
+    - Re-ran without `--reset`, confirmed deactivated bots were reactivated (not duplicated)
+    - Along the way, fixed two pre-existing bugs this task's real-API testing exposed in `role-service.ts` (`syncRolesToAuth`'s clerkId resolution; `assignRole`'s handling of reassigning a previously-revoked role) — see design.md
+    - _Requirements: 1.1, 1.6, 6a_
 
 - [ ] 2. Session Token Provider
   - [ ] 2.1 Implement `scripts/lib/bot-session.ts`

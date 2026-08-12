@@ -18,6 +18,7 @@ let syncSelectResult: unknown[] = [];
 vi.mock('drizzle-orm', () => ({
   eq: (col: unknown, val: unknown) => ({ col, val, op: 'eq' }),
   and: (...conditions: unknown[]) => ({ conditions, op: 'and' }),
+  isNull: (col: unknown) => ({ col, op: 'isNull' }),
 }));
 
 vi.mock('@surewaka/db', () => {

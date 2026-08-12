@@ -62,16 +62,29 @@ Lives inside `apps/api` (not `packages/db`) specifically so it can import `apps/
 
 For a configured count of driver bots (`--drivers`, default 5) and carrier bots (`--carriers`, default 1, requires at least one seeded carrier to attach to — reuses `seed-carriers.ts` output):
 
-1. Skip creation if a bot with that email already exists (idempotent; safe to re-run after `--drivers` count changes to top up the pool).
-2. Create a real Clerk user via the Clerk Backend API: email `bot+driver-{n}@surewaka.test` / `bot+carrier-{n}@surewaka.test`, a random password, `skipPasswordChecks`.
+1. Skip creation if an *active* bot with that email already exists (idempotent; safe to re-run after `--drivers` count changes to top up the pool).
+2. Create a real Clerk user via the Clerk Backend API: email `bot+driver-{n}@example.com` / `bot+carrier-{n}@example.com` (see "Implementation corrections" below for why not `.test`), a random password, `skipPasswordChecks`, and a real Nigerian mobile prefix phone number (also below).
 3. Insert the matching `users` row (`clerkId` = the real Clerk user id, `role` = `'driver'` / `'carrier_driver'`).
 4. For driver bots: insert a `drivers` row (`verified: true`, `available: false` initially, `vehicleType` cycled across the enum, a starting `lat`/`lng` from a fixed list of Lagos coordinates spread across zones — Ikeja, Lekki, Yaba, Surulere, VI — so at least one bot is plausibly near wherever the phone books from).
-5. For carrier bots: insert a `carrier_members` row against the first active seeded carrier, `role: 'driver'` (carrier's internal member role) and `isActive: true`.
+5. For carrier bots: insert a `carrier_members` row against the first active seeded carrier, `role: 'carrier_driver'` and `isActive: true`.
 6. Call `assignRole` (→ `syncRolesToAuth`) so Clerk `publicMetadata.roles` carries `driver` / `carrier_driver`, exactly as it would for a real onboarded user.
 
-Bots are identified purely by the `bot+` email convention — no new DB column, no migration. A `--reset` flag deletes all `bot+*@surewaka.test` users (cascades to `drivers`/`carrier_members`) and their Clerk accounts, for a clean re-seed.
+Bots are identified purely by the `bot+` email convention — no new DB column, no migration. A `--reset` flag **deactivates** (not deletes) every bot — see "Implementation corrections" below for why.
 
-Run: `pnpm --filter @surewaka/api tsx scripts/seed-bot-actors.ts -- --drivers 5 --carriers 1`
+Run: `pnpm --filter @surewaka/api seed:bot-actors -- --drivers 5 --carriers 1`
+
+#### Implementation corrections (learned building this)
+
+Three things in the original design didn't survive contact with the real system:
+
+- **Email domain**: Clerk's live email-format validation rejects the `.test` TLD (RFC 2606-reserved but apparently not allow-listed). Switched to `bot+driver-N@example.com` — same identifying convention, different domain.
+- **Phone number**: this Clerk instance requires a phone number at user creation, and validates it against real assigned carrier ranges — an invented prefix like `0900` is rejected. Bots use a real Nigerian mobile prefix (MTN's `803`) with a seed-derived suffix.
+- **`--reset` can't hard-delete**: `role_audit_log.user_id` is a `NOT NULL`, non-cascading FK to `users.id` — by design, so audit history outlives the user. Once `assignRole` has run for a bot (which it always has, immediately at creation), the `users` row can never be deleted, only its role revoked. `--reset` was rewritten to revoke the bot's role (which syncs Clerk `publicMetadata` back to `['customer']`) and deactivate its `drivers`/`carrier_members` row, rather than deleting anything. This is fully reversible — a later bootstrap run reactivates a deactivated bot instead of erroring or creating a duplicate — and arguably safer than the original delete-based design anyway.
+
+Two pre-existing bugs in `role-service.ts` surfaced and were fixed as prerequisites (both were blocking, not optional cleanup):
+
+- `syncRolesToAuth` called Clerk's `updateUserMetadata` with the internal `users.id` UUID instead of the resolved `users.clerkId` — Clerk's API is keyed by clerk_id, so every role assignment via the admin API was silently failing to sync to Clerk (error caught and swallowed). Fixed to resolve `clerkId` first, matching the pattern already used in `profile-service.ts`.
+- `assignRole` only checked for a duplicate *active* role before inserting, but `uq_user_roles_active` is an unconditional unique constraint on `(userId, role, scopeId)` — not partial on `is_active` despite its name. Reassigning a previously-revoked scoped role (e.g. `carrier_driver`) crashed with a raw Postgres unique-violation; reassigning a revoked unscoped role (e.g. `driver`) silently created a duplicate row instead (Postgres treats each NULL `scopeId` as distinct). Fixed `assignRole` to look up any existing row for the triple (active or not) and reactivate it via `UPDATE` when found, instead of always `INSERT`.
 
 ### Component 2: Session Token Provider (shared lib used by the simulator)
 
