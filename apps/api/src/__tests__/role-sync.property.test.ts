@@ -10,6 +10,8 @@ import { USER_ROLES } from '@surewaka/shared';
 // ─── Mock Setup ──────────────────────────────────────────────────────────────
 
 let mockActiveRoles: Array<{ role: string; scopeId: string | null }> = [];
+/** clerkId that the mocked `users` lookup resolves the internal userId to. */
+let mockClerkId: string | null = 'user_clerk_test123';
 let lastUpdateCall: { userId: string; publicMetadata: unknown } | null = null;
 
 vi.mock('drizzle-orm', () => ({
@@ -17,21 +19,38 @@ vi.mock('drizzle-orm', () => ({
   and: (...conditions: unknown[]) => ({ conditions, op: 'and' }),
 }));
 
-vi.mock('@surewaka/db', () => ({
-  db: {
-    select: (fields: unknown) => ({
-      from: () => ({
-        where: () => Promise.resolve(mockActiveRoles),
-      }),
-    }),
-  },
-  userRoles: {
+vi.mock('@surewaka/db', () => {
+  const userRolesTable = {
     userId: 'userId',
     role: 'role',
     isActive: 'isActive',
     scopeId: 'scopeId',
-  },
-}));
+  };
+  const usersTable = { id: 'id', clerkId: 'clerkId' };
+
+  return {
+    db: {
+      select: () => ({
+        from: (table: unknown) => {
+          // Distinguish the `users.clerkId` lookup from the `userRoles` query
+          // by table identity, same as the real drizzle query builder would
+          // by table shape.
+          if (table === usersTable) {
+            const rows = mockClerkId ? [{ clerkId: mockClerkId }] : [];
+            return {
+              where: () => ({
+                limit: () => Promise.resolve(rows),
+              }),
+            };
+          }
+          return { where: () => Promise.resolve(mockActiveRoles) };
+        },
+      }),
+    },
+    userRoles: userRolesTable,
+    users: usersTable,
+  };
+});
 
 vi.mock('@surewaka/auth', () => ({
   getClerkClient: () => ({
@@ -72,6 +91,7 @@ const activeRolesArb = fc
 describe('Role Sync — Property Tests', () => {
   beforeEach(() => {
     mockActiveRoles = [];
+    mockClerkId = 'user_clerk_test123';
     lastUpdateCall = null;
   });
 
@@ -88,6 +108,11 @@ describe('Role Sync — Property Tests', () => {
             await syncRolesToAuth(userId);
 
             expect(lastUpdateCall).not.toBeNull();
+
+            // Regression guard: Clerk must be updated using the resolved
+            // clerkId, never the internal DB userId directly.
+            expect(lastUpdateCall!.userId).toBe(mockClerkId);
+            expect(lastUpdateCall!.userId).not.toBe(userId);
 
             const metadata = lastUpdateCall!.publicMetadata as {
               roles: UserRole[];
@@ -186,6 +211,21 @@ describe('Role Sync — Property Tests', () => {
           expect(metadata.primary_role).toBe('customer');
         }),
         { numRuns: 50 },
+      );
+    });
+
+    it('does not call Clerk and does not throw when the user has no clerkId', async () => {
+      await fc.assert(
+        fc.asyncProperty(uuidArb, async (userId) => {
+          mockActiveRoles = [{ role: 'customer', scopeId: null }];
+          mockClerkId = null;
+          lastUpdateCall = null;
+
+          await expect(syncRolesToAuth(userId)).resolves.toBeUndefined();
+
+          expect(lastUpdateCall).toBeNull();
+        }),
+        { numRuns: 20 },
       );
     });
 

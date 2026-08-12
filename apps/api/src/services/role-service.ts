@@ -2,7 +2,7 @@
 // Role Service — business logic for role assignment, revocation, querying, and sync.
 // Requirements: 4.1, 4.2, 4.3, 4.4, 4.7, 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6
 
-import { db, userRoles, roleAuditLog } from '@surewaka/db';
+import { db, userRoles, roleAuditLog, users } from '@surewaka/db';
 import { eq, and } from 'drizzle-orm';
 import { getClerkClient } from '@surewaka/auth';
 import type { UserRole, UserRoleRecord, AppMetadata } from '@surewaka/shared';
@@ -380,8 +380,17 @@ export async function syncRolesToAuth(userId: string): Promise<void> {
       ...(carrierRole?.scopeId && { carrier_id: carrierRole.scopeId }),
     };
 
+    // Clerk's API is keyed by clerk_id, not our internal UUID — resolve it first
+    // (see profile-service.ts for the same pattern).
+    const [user] = await db.select({ clerkId: users.clerkId }).from(users).where(eq(users.id, userId)).limit(1);
+
+    if (!user?.clerkId) {
+      console.error(`[RoleSync] Cannot sync roles — no clerkId for user ${userId}`);
+      return;
+    }
+
     const clerk = getClerkClient();
-    await clerk.users.updateUserMetadata(userId, {
+    await clerk.users.updateUserMetadata(user.clerkId, {
       publicMetadata: appMetadata,
     });
   } catch (err) {
