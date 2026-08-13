@@ -59,40 +59,47 @@ export async function runDriverBot(
   let pos: Point = { lat: bot.startLat, lng: bot.startLng };
 
   while (!options.signal.aborted) {
-    const offer = await idleUntilOffer(session, bot, pos, options);
-    if (!offer) break; // aborted while idle
+    try {
+      const offer = await idleUntilOffer(session, bot, pos, options);
+      if (!offer) break; // aborted while idle
 
-    await sleep(randomBetween(500, 2000) / options.speed, options.signal);
-    if (options.signal.aborted) break;
+      await sleep(randomBetween(500, 2000) / options.speed, options.signal);
+      if (options.signal.aborted) break;
 
-    if (Math.random() >= options.acceptRate) {
-      log(`ignored offer for delivery ${offer.deliveryId}`);
-      continue;
+      if (Math.random() >= options.acceptRate) {
+        log(`ignored offer for delivery ${offer.deliveryId}`);
+        continue;
+      }
+
+      const acceptResult = await apiFetch<{ matched: boolean }>(
+        session,
+        `/api/v1/deliveries/${offer.deliveryId}/accept`,
+        { method: 'POST' },
+      );
+
+      if (!acceptResult.ok) {
+        log(`accept failed for delivery ${offer.deliveryId}: ${acceptResult.error?.message ?? acceptResult.status}`);
+        continue;
+      }
+      if (!acceptResult.data.matched) {
+        log(`lost the race for delivery ${offer.deliveryId}`);
+        continue;
+      }
+      log(`accepted delivery ${offer.deliveryId}`);
+
+      const leg = await findAssignedLeg(bot.driverId, offer.deliveryId);
+      if (!leg) {
+        log(`accepted delivery ${offer.deliveryId} but couldn't find its assigned leg — skipping`);
+        continue;
+      }
+
+      pos = await runLeg(session, bot, leg, pos, options, log);
+    } catch (err) {
+      // A DB hiccup (Postgres momentarily unreachable, etc.) shouldn't take
+      // down the whole simulator — log it and keep this bot's loop going.
+      log(`unexpected error, retrying: ${err instanceof Error ? err.message : err}`);
+      await sleep(2_000, options.signal);
     }
-
-    const acceptResult = await apiFetch<{ matched: boolean }>(
-      session,
-      `/api/v1/deliveries/${offer.deliveryId}/accept`,
-      { method: 'POST' },
-    );
-
-    if (!acceptResult.ok) {
-      log(`accept failed for delivery ${offer.deliveryId}: ${acceptResult.error?.message ?? acceptResult.status}`);
-      continue;
-    }
-    if (!acceptResult.data.matched) {
-      log(`lost the race for delivery ${offer.deliveryId}`);
-      continue;
-    }
-    log(`accepted delivery ${offer.deliveryId}`);
-
-    const leg = await findAssignedLeg(bot.driverId, offer.deliveryId);
-    if (!leg) {
-      log(`accepted delivery ${offer.deliveryId} but couldn't find its assigned leg — skipping`);
-      continue;
-    }
-
-    pos = await runLeg(session, bot, leg, pos, options, log);
   }
 }
 

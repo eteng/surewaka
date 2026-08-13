@@ -101,6 +101,36 @@ eas build --profile production --platform android
 eas update --branch preview --message "description of changes"
 ```
 
+## Actor Simulator
+
+Test the app as a real customer on your own phone while every other actor —
+on-demand drivers, carrier intercity legs — is played by headless bots
+calling the real, auth-guarded API (no mock auth, no direct-write shortcuts).
+See `.kiro/specs/actor-simulator/` for the full design.
+
+```bash
+# 1. pnpm dev running (API + workers + Redis/Postgres)
+# 2. Point mobile-customer at your laptop's LAN IP / Expo tunnel
+pnpm sim:actors -- --drivers 5 --carriers 1 --speed 5 --accept-rate 0.9
+```
+
+Bot identities (`bot+driver-N@example.com` / `bot+carrier-N@example.com`) are
+created/topped-up/reactivated automatically before the bots start — no
+separate seed step needed. To manage them directly:
+
+```bash
+pnpm --filter @surewaka/api seed:bot-actors -- --drivers 5 --carriers 1
+pnpm --filter @surewaka/api seed:bot-actors -- --reset   # deactivates all bots
+```
+
+`--reset` deactivates (revokes role, deactivates drivers/carrier_members row)
+rather than deleting — bot `users` rows can never actually be deleted once
+they've had a role assigned (`role_audit_log`'s FK), and revoking is fully
+reversible: the next non-`--reset` run reactivates them automatically.
+
+Dev-only: both scripts refuse to run if `NODE_ENV=production` or
+`CLERK_SECRET_KEY` looks like a live key (`sk_live_...`).
+
 ## Deployment
 
 | Target | Platform | Region | Command |

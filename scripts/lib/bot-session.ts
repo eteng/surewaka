@@ -57,33 +57,42 @@ export type ApiResult<T> =
 
 /**
  * Calls the real API as the given bot session. Mirrors the API's
- * `{ data, error, meta }` response envelope — never throws on a non-2xx
- * response, so callers can branch on `ok` without wrapping every call in
- * try/catch. Network-level failures (API not reachable) still throw, since
- * there's no envelope to report them through.
+ * `{ data, error, meta }` response envelope and never throws — a non-2xx
+ * response *or* a network-level failure (API/worker not reachable, session
+ * mint failed) both come back as `{ ok: false, ... }` so bot loops can just
+ * branch on `ok` and keep going, per the simulator's resilience requirement
+ * (a down API degrades individual bots, never crashes the whole process).
  */
 export async function apiFetch<T>(
   session: BotSession,
   path: string,
   init?: { method?: string; body?: unknown },
 ): Promise<ApiResult<T>> {
-  const token = await session.getToken();
-  const res = await fetch(`${SIM_API_URL}${path}`, {
-    method: init?.method ?? 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-    },
-    body: init?.body ? JSON.stringify(init.body) : undefined,
-  });
+  try {
+    const token = await session.getToken();
+    const res = await fetch(`${SIM_API_URL}${path}`, {
+      method: init?.method ?? 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: init?.body ? JSON.stringify(init.body) : undefined,
+    });
 
-  const json = (await res.json().catch(() => null)) as
-    | { data: T; error: null }
-    | { data: null; error: { code: string; message: string } }
-    | null;
+    const json = (await res.json().catch(() => null)) as
+      | { data: T; error: null }
+      | { data: null; error: { code: string; message: string } }
+      | null;
 
-  if (res.ok && json) {
-    return { ok: true, status: res.status, data: json.data };
+    if (res.ok && json) {
+      return { ok: true, status: res.status, data: json.data };
+    }
+    return { ok: false, status: res.status, error: json?.error ?? null };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      error: { code: 'NETWORK_ERROR', message: err instanceof Error ? err.message : String(err) },
+    };
   }
-  return { ok: false, status: res.status, error: json?.error ?? null };
 }

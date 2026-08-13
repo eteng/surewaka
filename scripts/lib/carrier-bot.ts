@@ -58,15 +58,22 @@ export async function runCarrierBot(
   const log = options.log ?? ((line: string) => console.log(`[${bot.label}] ${line}`));
 
   while (!options.signal.aborted) {
-    const leg = await findClaimableLeg(bot.carrierId, options.claimedLegIds);
-    if (!leg) {
-      await sleep(POLL_INTERVAL_MS, options.signal);
-      continue;
-    }
+    try {
+      const leg = await findClaimableLeg(bot.carrierId, options.claimedLegIds);
+      if (!leg) {
+        await sleep(POLL_INTERVAL_MS, options.signal);
+        continue;
+      }
 
-    options.claimedLegIds.add(leg.id);
-    log(`claimed leg ${leg.id} for delivery ${leg.deliveryId}`);
-    await runLeg(session, leg, options, log);
+      options.claimedLegIds.add(leg.id);
+      log(`claimed leg ${leg.id} for delivery ${leg.deliveryId}`);
+      await runLeg(session, leg, options, log);
+    } catch (err) {
+      // A DB hiccup (Postgres momentarily unreachable, etc.) shouldn't take
+      // down the whole simulator — log it and keep this bot's loop going.
+      log(`unexpected error, retrying: ${err instanceof Error ? err.message : err}`);
+      await sleep(2_000, options.signal);
+    }
   }
 }
 
