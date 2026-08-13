@@ -76,24 +76,30 @@ Build bottom-up: identity bootstrap first (nothing else works without real, auth
     - Seed/create a delivery with an intercity leg assigned to the bootstrap carrier, run the carrier bot, confirm it progresses the leg to `delivered`
     - _Requirements: 3.1–3.4_
 
-- [ ] 5. CLI Entry Point
-  - [ ] 5.1 Implement `scripts/simulate-actors.ts`
+- [x] 5. CLI Entry Point
+  - [x] 5.1 Implement `scripts/simulate-actors.ts`
     - Parse `--drivers`, `--carriers`, `--speed`, `--accept-rate` (defaults 5/1/1/0.9)
-    - Load bot identities by `bot+` email convention; auto-run bootstrap if the requested counts aren't met
-    - Start all driver/carrier bot loops concurrently
-    - Structured logging (bot id, timestamp, action); suppress routine location-ping logs
-    - Graceful shutdown on SIGINT: let in-flight calls finish, then exit
+    - Load bot identities by `bot+` email convention (filtered to active roles); spawn the bootstrap script first (it lives in a different package, so it's a child process via `pnpm --filter @surewaka/api seed:bot-actors`, not an import)
+    - Start all driver/carrier bot loops concurrently, isolated per bot so one failing to start doesn't stop the others
+    - Structured logging (bot id, timestamp, action); location pings excluded from routine logging by construction (driver-bot.ts never logs them)
+    - Graceful shutdown on SIGINT via a shared `AbortController`: bots finish their current step, then exit — verified with a real `kill -INT`
     - _Requirements: 4.1–4.6_
-  - [ ] 5.2 Add `pnpm sim:actors` script to root `package.json`
+  - [x] 5.2 Add `pnpm sim:actors` script to root `package.json`
     - _Requirements: 4.1_
-  - [ ] 5.3 Document in `AGENTS.md` under a new "Actor Simulator" section
+  - [x] 5.3 Document in `AGENTS.md` under a new "Actor Simulator" section
     - Command reference, what it needs running first (`pnpm dev`), what `--reset` does
     - _Requirements: (documentation, no specific acceptance criterion)_
+  - [x] 5.4 (added) Harden against the API being briefly unreachable
+    - Found via testing: a network-level fetch failure previously propagated uncaught out of `apiFetch`, and one bot's rejected promise took down the entire `Promise.all` — the whole simulator, not just that bot
+    - `apiFetch` now never throws (network failures come back as a normal `{ok:false}` result); each bot's loop body is wrapped so a DB hiccup logs and retries; matches Requirement 4.5
+    - _Requirements: 4.5_
 
-- [ ] 6. End-to-End Verification
-  - [ ] 6.1 Full manual pass per the design doc's Testing Strategy
-    - `pnpm dev` + bootstrap + `pnpm sim:actors -- --drivers 3 --carriers 1`
-    - Book an in-city delivery from the mobile-customer app on a physical phone (LAN IP), confirm live match + tracking
-    - Book/seed an interstate delivery with an intercity leg, confirm the carrier bot completes it
-    - Re-run bootstrap with a higher `--drivers` count (top-up only) and `--reset` (full teardown)
+- [x] 6. End-to-End Verification
+  - [x] 6.1 Full manual pass, run by Claude against the real dev stack (API, workers, Redis, Postgres, real Clerk dev instance)
+    - `pnpm sim:actors -- --drivers 2 --carriers 1 --speed 20 --accept-rate 1` against a running `pnpm dev` stack
+    - Seeded a single-leg on-demand delivery (booking flow itself not wired up — no in-app booking UI change was in scope): bot matched, accepted, walked the full status sequence to `delivered`
+    - Seeded a multi-leg surewaka_way delivery (first-mile driver leg → intercity carrier leg): driver bot completed its leg, carrier bot correctly waited (`precedingLegDelivered`) then claimed and completed its own leg — full chain reached `delivered`, including the top-level `deliveries.status` (task 5's bug fix)
+    - Re-ran bootstrap with a higher `--drivers` count (top-up only, confirmed only the shortfall created), ran `--reset` (confirmed deactivation, not deletion), ran again without `--reset` (confirmed reactivation, not duplication)
+    - Sent a real `SIGINT`: confirmed the "shutting down" message, bots finishing in-flight work, and a clean process exit
+    - Not verified here (needs a physical device, outside what Claude can drive): booking from the actual `mobile-customer` Expo app on a phone over LAN IP. The API-level behavior a phone booking would trigger is the same path just exercised via direct seeding, so this is expected to work, but hasn't been watched end-to-end from the phone's UI.
     - _Requirements: all_
