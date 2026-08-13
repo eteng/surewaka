@@ -34,32 +34,34 @@ Build bottom-up: identity bootstrap first (nothing else works without real, auth
     - Along the way, fixed two pre-existing bugs this task's real-API testing exposed in `role-service.ts` (`syncRolesToAuth`'s clerkId resolution; `assignRole`'s handling of reassigning a previously-revoked role) — see design.md
     - _Requirements: 1.1, 1.6, 6a_
 
-- [ ] 2. Session Token Provider
-  - [ ] 2.1 Implement `scripts/lib/bot-session.ts`
-    - Given a bot's Clerk user id, mint a sign-in token via the Clerk Backend API and exchange it for a session JWT
-    - Expose `getToken(clerkUserId)` that returns a cached, auto-refreshed token (refresh before the JWT's expiry)
+- [x] 2. Session Token Provider
+  - [x] 2.1 Implement `scripts/lib/bot-session.ts`
+    - Given a bot's Clerk user id, create a Clerk session directly (`sessions.createSession`) and mint tokens from it (`sessions.getToken`) — simpler than a sign-in-token exchange and equally a real, non-bypass auth path
+    - Expose `getToken()` that returns a cached, auto-refreshed token (lazy refresh on each call rather than a background timer — every bot HTTP call already goes through it)
+    - Also ships `apiFetch()`, a thin client mirroring the API's `{ data, error, meta }` envelope
     - _Requirements: (supports all of Requirement 2 & 3 — every bot HTTP call needs a real token)_
-  - [ ] 2.2 Manual verification
-    - Mint a token for one bootstrap driver bot, call `GET` on an authenticated endpoint (or the location endpoint) directly with it, confirm 200 rather than 401
+  - [x] 2.2 Manual verification
+    - Minted a token for a bootstrap driver bot, called `POST /driver/location` directly with it: 200, then confirmed the API's own rate limiter returns 429 on an immediate second call
     - _Requirements: 5.2 (confirm no secret ends up in a log line)_
 
-- [ ] 3. Driver Bot State Machine
-  - [ ] 3.1 Implement `scripts/lib/driver-bot.ts`
-    - `idle` loop: POST `/driver-locations` at bot's current position every 2s
+- [x] 3. Driver Bot State Machine
+  - [x] 3.1 Implement `scripts/lib/driver-bot.ts`
+    - `idle` loop: POST `/driver/location` at bot's current position every 2s
     - Poll `delivery_offers` for a `pending` row addressed to this bot every 2s
     - _Requirements: 2.1_
-  - [ ] 3.2 Implement accept/ignore decision
+  - [x] 3.2 Implement accept/ignore decision
     - Randomized delay scaled by `--speed`, then accept via `POST /deliveries/:id/accept` with probability `--accept-rate`, else no-op
     - Handle `matched: false` response by logging and returning to idle
     - _Requirements: 2.2, 2.3_
-  - [ ] 3.3 Implement leg progression + GPS interpolation
-    - On successful accept, walk `ALLOWED_LEG_STATUSES` via `PATCH /deliveries/:deliveryId/legs/:legId/status`
-    - Interpolate lat/lng between leg pickup/dropoff coordinates, pinging location (with `deliveryId`) every 2s en route
+  - [x] 3.3 Implement leg progression + GPS interpolation
+    - On successful accept, look up the assigned leg (`delivery_legs` where `actorType='driver'`, `actorId`=this driver, `isActive=true` — offers don't carry a `legId`) and walk the real status sequence via `PATCH /deliveries/:deliveryId/legs/:legId/status`
+    - Interpolate lat/lng between leg pickup/dropoff coordinates (`haversineKm` from `@surewaka/shared`), pinging location (with `deliveryId`) every 2s en route
     - Scale total per-leg time by `--speed` based on leg distance at ~25km/h baseline
     - Return to idle after `delivered`
     - _Requirements: 2.4, 2.5, 2.6, 2.7_
-  - [ ] 3.4 Manual verification
-    - With one driver bot running and API/workers up, book an in-city delivery from Postman/curl as a real customer test account, confirm the bot logs offer → accept → status walk → delivered, and Redis/Postgres reflect it
+  - [x] 3.4 Manual verification
+    - Manually seeded a delivery + leg + pending offer for a bootstrap bot (full booking flow not wired up yet — that's task 6), ran the bot against the real API: accepted, walked the complete status sequence, final DB state confirmed `delivered` with the correct `actorId`
+    - En route, found and fixed a real production bug this exposed: `delivery_legs.actor_id` was never assigned to the matched driver anywhere in the codebase (see the dedicated fix commit) — without it, no real driver could ever progress a leg past acceptance
     - _Requirements: 2.1–2.7_
 
 - [ ] 4. Carrier Bot State Machine
