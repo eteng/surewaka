@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db, deliveries, deliveryLegs } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
@@ -99,6 +99,23 @@ deliveryLegRoutes.patch(
       // Trigger next leg matching only after preceding leg is delivered
       if (status === 'delivered') {
         await triggerNextLegMatching(deliveryId, leg.legNumber);
+
+        // If every still-active leg of this delivery is now delivered, the
+        // whole delivery is complete. Nothing else ever advances
+        // deliveries.status past 'accepted' — without this, it stays
+        // "active" per idx_deliveries_active_driver forever, permanently
+        // blocking this driver from ever being matched to another delivery.
+        const remainingLegs = await db
+          .select({ status: deliveryLegs.status })
+          .from(deliveryLegs)
+          .where(and(eq(deliveryLegs.deliveryId, deliveryId), eq(deliveryLegs.isActive, true)));
+
+        if (remainingLegs.every((l) => l.status === 'delivered')) {
+          await db
+            .update(deliveries)
+            .set({ status: 'delivered', updatedAt: now })
+            .where(eq(deliveries.id, deliveryId));
+        }
       }
 
       return c.json({ data: updatedLeg, error: null, meta: null });
