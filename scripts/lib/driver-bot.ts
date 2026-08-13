@@ -15,6 +15,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { db, deliveryOffers, deliveryLegs } from '@surewaka/db';
 import { haversineKm } from '@surewaka/shared';
 import { apiFetch, type BotSession } from './bot-session.ts';
+import { sleep, randomBetween } from './util.ts';
 
 const LOCATION_PING_INTERVAL_MS = 2_000; // matches the API's own rate limit
 const BASELINE_SPEED_KMH = 25; // plausible urban driving speed at --speed 1
@@ -47,21 +48,6 @@ export type DriverBotOptions = {
 };
 
 type Point = { lat: number; lng: number };
-
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
-  if (signal.aborted || ms <= 0) return Promise.resolve();
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener('abort', () => {
-      clearTimeout(timer);
-      resolve();
-    }, { once: true });
-  });
-}
-
-function randomBetween(min: number, max: number): number {
-  return min + Math.random() * (max - min);
-}
 
 /** Runs the bot until `options.signal` aborts. */
 export async function runDriverBot(
