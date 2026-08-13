@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { db, deliveryOffers, deliveries, drivers } from '@surewaka/db';
+import { db, deliveryOffers, deliveries, deliveryLegs, drivers } from '@surewaka/db';
 import { and, eq, isNull } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth';
 import type { AuthUser } from '@surewaka/auth';
@@ -8,7 +8,7 @@ import { getRedis } from '../lib/redis';
 import { claimDelivery, releaseReservations } from '../lib/matching-redis';
 import { getRealtime, CHANNELS } from '../lib/realtime';
 import { enqueuePush } from '../services/push-service';
-import { PUSH_DEEP_LINK_MAP } from '@surewaka/shared';
+import { PUSH_DEEP_LINK_MAP, NIL_UUID } from '@surewaka/shared';
 import type { PushNotificationPayload } from '@surewaka/shared';
 
 type Env = { Variables: { user: AuthUser } };
@@ -98,6 +98,25 @@ deliveryAcceptRoutes.post('/:deliveryId/accept', async (c) => {
     .update(deliveries)
     .set({ driverId: driver.id, status: 'accepted', updatedAt: new Date() })
     .where(and(eq(deliveries.id, deliveryId), isNull(deliveries.driverId)));
+
+  // 6a-2. Assign the matched driver on their leg. `delivery_legs.actor_id` is
+  // created as NIL_UUID for driver-type legs (a placeholder — see
+  // deliveries.ts) and is otherwise never updated once a driver is matched,
+  // which would leave requireLegActor rejecting the very driver who just
+  // accepted on every subsequent leg-status PATCH. Only one leg is ever
+  // is_active=true per delivery at a time, so this targets the correct leg
+  // even for multi-leg surewaka_way deliveries.
+  await db
+    .update(deliveryLegs)
+    .set({ actorId: driver.id })
+    .where(
+      and(
+        eq(deliveryLegs.deliveryId, deliveryId),
+        eq(deliveryLegs.actorType, 'driver'),
+        eq(deliveryLegs.actorId, NIL_UUID),
+        eq(deliveryLegs.isActive, true),
+      ),
+    );
 
   // 6b. Update winning offer to 'accepted' with respondedAt (Req 8.2)
   await db

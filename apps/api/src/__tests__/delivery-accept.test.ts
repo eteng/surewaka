@@ -105,6 +105,12 @@ vi.mock('@surewaka/db', () => ({
   },
   deliveryOffers: { id: 'deliveryOffers.id', deliveryId: 'deliveryOffers.deliveryId', driverId: 'deliveryOffers.driverId', status: 'deliveryOffers.status' },
   deliveries: { id: 'deliveries.id', driverId: 'deliveries.driverId', customerId: 'deliveries.customerId' },
+  deliveryLegs: {
+    deliveryId: 'deliveryLegs.deliveryId',
+    actorType: 'deliveryLegs.actorType',
+    actorId: 'deliveryLegs.actorId',
+    isActive: 'deliveryLegs.isActive',
+  },
   drivers: { id: 'drivers.id', userId: 'drivers.userId' },
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((a: unknown, b: unknown) => [a, b]),
@@ -146,6 +152,30 @@ describe('POST /api/v1/deliveries/:deliveryId/accept', () => {
     const body = (await res.json()) as { data: { matched: boolean } };
     expect(body.data.matched).toBe(true);
     expect(mockClaimDelivery).toHaveBeenCalledWith({}, VALID_UUID, 'driver-1');
+  });
+
+  it('assigns the matched driver to their delivery_legs row, not just deliveries.driverId', async () => {
+    // Regression test: delivery_legs.actor_id for a driver-type leg is
+    // created as NIL_UUID (see deliveries.ts) and was never updated to the
+    // matched driver anywhere in the codebase — meaning requireLegActor
+    // would reject every subsequent leg-status PATCH from the very driver
+    // who just accepted. See delivery-accept.ts's "6a-2" step.
+    mockClaimDelivery.mockResolvedValue({ claimed: true });
+    mockReleaseReservations.mockResolvedValue(undefined);
+
+    await app.request(`/api/v1/deliveries/${VALID_UUID}/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer tok' },
+    });
+
+    // update() must have been called once for delivery_legs specifically...
+    const updatedTables = mockDbUpdate.mock.calls.map(([table]) => table as { deliveryId?: string } | undefined);
+    expect(updatedTables.some((t) => t?.deliveryId === 'deliveryLegs.deliveryId')).toBe(true);
+
+    // ...setting actorId to the matched driver (all update() calls share the
+    // same mocked `.set()` chain, so this asserts the payload was sent at all).
+    const setMock = mockDbUpdate.mock.results[0].value.set as ReturnType<typeof vi.fn>;
+    expect(setMock).toHaveBeenCalledWith({ actorId: 'driver-1' });
   });
 
   it('returns matched: false when another driver already claimed (Req 6.3, 6.7)', async () => {
