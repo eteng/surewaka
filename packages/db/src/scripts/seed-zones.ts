@@ -59,9 +59,12 @@ const LAGOS_ZONES: ZoneSeed[] = [
     name: 'Ikeja',
     city: 'Lagos',
     country: 'Nigeria',
-    keywords: ['ikeja', 'maryland', 'alausa', 'toyin', 'allen', 'oregun', 'agidingbi'],
+    // 'airport'/'mmia'/'murtala muhammed' cover Murtala Muhammed International
+    // Airport, whose coordinates (~6.5774, 3.3212) sit just west of the rest
+    // of Ikeja — swLng widened from 3.33 to 3.30 to include it.
+    keywords: ['ikeja', 'maryland', 'alausa', 'toyin', 'allen', 'oregun', 'agidingbi', 'airport', 'mmia', 'murtala muhammed'],
     swLat: 6.57,
-    swLng: 3.33,
+    swLng: 3.30,
     neLat: 6.64,
     neLng: 3.38,
   },
@@ -93,7 +96,10 @@ const LAGOS_ZONES: ZoneSeed[] = [
     swLat: 6.43,
     swLng: 3.38,
     neLat: 6.47,
-    neLng: 3.44,
+    // Banana Island itself (~6.4408, 3.4436) was just outside the old 3.44
+    // boundary — self-contradictory, since 'banana island' is a keyword on
+    // this same zone. Widened to 3.46 to actually include it.
+    neLng: 3.46,
   },
 ];
 
