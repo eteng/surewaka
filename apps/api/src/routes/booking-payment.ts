@@ -117,7 +117,7 @@ bookingPaymentRoutes.post('/booking/confirm', async (c) => {
 
       await matchingQueue.add('match-driver', jobData, {
         delay: 0,
-        jobId: `match-leg:${firstLeg.id}`, // same dedup key scheme as trigger-next-leg.ts / the cron sweeper
+        jobId: `match-leg-${firstLeg.id}`, // same dedup key scheme as trigger-next-leg.ts / the cron sweeper
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
       });

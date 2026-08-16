@@ -260,12 +260,23 @@ describe('Timed Dispatch Property Tests', () => {
    * **Validates: Requirements 9.4, 10.6**
    */
   describe('Property 14: Deterministic Job ID', () => {
-    it('jobId always follows match-leg:{legId} format for UUID inputs', () => {
+    // NOTE: these assert against a locally-redefined format string, not the
+    // real jobId construction in trigger-next-leg.ts/compute-route.ts/
+    // rescue-missed-matching.ts/booking-payment.ts — so this suite could not
+    // and did not catch the actual bug where those files used a `:`
+    // separator that BullMQ's custom-job-id validation rejects outright
+    // ("Custom Id cannot contain :", since a plain `prefix:id` doesn't match
+    // BullMQ's reserved 3-segment repeatable-job format). Fixed to `-`
+    // everywhere. This property still documents the intended shape/
+    // determinism/uniqueness invariants, but a real regression test needs to
+    // call the actual job-enqueueing functions — see
+    // booking-payment-matching-trigger.test.ts for one that does.
+    it('jobId always follows match-leg-{legId} format for UUID inputs', () => {
       fc.assert(
         fc.property(fc.uuid(), (legId) => {
-          const jobId = `match-leg:${legId}`;
-          expect(jobId).toMatch(/^match-leg:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
-          expect(jobId).toBe(`match-leg:${legId}`);
+          const jobId = `match-leg-${legId}`;
+          expect(jobId).toMatch(/^match-leg-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+          expect(jobId).toBe(`match-leg-${legId}`);
         }),
         { numRuns: 100 },
       );
@@ -274,8 +285,8 @@ describe('Timed Dispatch Property Tests', () => {
     it('jobId is deterministic — same legId always produces same jobId', () => {
       fc.assert(
         fc.property(fc.uuid(), (legId) => {
-          const jobId1 = `match-leg:${legId}`;
-          const jobId2 = `match-leg:${legId}`;
+          const jobId1 = `match-leg-${legId}`;
+          const jobId2 = `match-leg-${legId}`;
           expect(jobId1).toBe(jobId2);
         }),
         { numRuns: 100 },
@@ -286,8 +297,8 @@ describe('Timed Dispatch Property Tests', () => {
       fc.assert(
         fc.property(fc.uuid(), fc.uuid(), (legId1, legId2) => {
           fc.pre(legId1 !== legId2);
-          const jobId1 = `match-leg:${legId1}`;
-          const jobId2 = `match-leg:${legId2}`;
+          const jobId1 = `match-leg-${legId1}`;
+          const jobId2 = `match-leg-${legId2}`;
           expect(jobId1).not.toBe(jobId2);
         }),
         { numRuns: 100 },

@@ -10,7 +10,7 @@ import { releaseReservations } from '../lib/reservation';
  * Validates: Requirement 13.2
  */
 export async function cancelScheduledMatching(legId: string): Promise<void> {
-  const jobId = `match-leg:${legId}`;
+  const jobId = `match-leg-${legId}`;
   const job = await matchingQueue.getJob(jobId);
 
   if (job) {

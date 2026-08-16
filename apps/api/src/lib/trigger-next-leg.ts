@@ -42,7 +42,11 @@ export function getNextBusinessHourStart(now: Date): Date {
  * For transfer legs: delay = max(nextCarrierDeparture - legETA - buffer, now)
  * For last-mile legs: delay = max(nextBusinessHourStart, customerWindow - legETA - buffer, now)
  *
- * Uses deterministic jobId `match-leg:{legId}` for deduplication (Req 9.4).
+ * Uses deterministic jobId `match-leg-{legId}` for deduplication (Req 9.4).
+ * (Not `match-leg:{legId}` — BullMQ reserves colon-containing custom job IDs
+ * for its internal repeatable-job bookkeeping and rejects any that don't
+ * match its specific 3-segment format, so a plain `prefix:id` throws
+ * "Custom Id cannot contain :" at enqueue time.)
  *
  * Validates: Requirements 10.1, 10.2, 10.3, 10.4, 10.5, 10.6
  */
@@ -131,7 +135,7 @@ export async function triggerNextLegMatching(
     jobData,
     {
       delay: delayMs,
-      jobId: `match-leg:${nextLeg.id}`, // deterministic — prevents duplicate enqueue (Req 9.4)
+      jobId: `match-leg-${nextLeg.id}`, // deterministic — prevents duplicate enqueue (Req 9.4)
       attempts: 3,
       backoff: { type: 'exponential', delay: 5000 },
     },

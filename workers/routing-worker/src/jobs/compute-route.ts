@@ -31,7 +31,9 @@ type DeliveryLeg = {
  * - legETA is the estimated travel time in minutes for the first-mile leg
  * - carrierDeparture is when the carrier departs from the origin park
  *
- * Uses deterministic jobId `match-leg:{legId}` to prevent duplicate enqueue (Req 9.4).
+ * Uses deterministic jobId `match-leg-{legId}` to prevent duplicate enqueue (Req 9.4).
+ * (Not `match-leg:{legId}` — BullMQ rejects colon-containing custom job IDs
+ * that don't match its internal repeatable-job format.)
  * Configured with 3 attempts and exponential backoff from 5s for resilience.
  *
  * Validates: Requirements 9.1, 9.2, 9.3, 9.4
@@ -69,7 +71,7 @@ export async function scheduleFirstMileMatching(
     jobData,
     {
       delay: delayMs,
-      jobId: `match-leg:${firstMileLeg.id}`, // deterministic — prevents duplicate enqueue (Req 9.4)
+      jobId: `match-leg-${firstMileLeg.id}`, // deterministic — prevents duplicate enqueue (Req 9.4)
       attempts: 3,
       backoff: { type: 'exponential', delay: 5000 },
     },

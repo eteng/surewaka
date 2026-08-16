@@ -58,7 +58,7 @@ export async function rescueMissedMatching(): Promise<void> {
 
   let rescueCount = 0;
   for (const leg of missedLegs) {
-    const jobId = `match-leg:${leg.id}`;
+    const jobId = `match-leg-${leg.id}`;
     const existingJob = await matchingQueue.getJob(jobId);
     if (existingJob) continue;
 

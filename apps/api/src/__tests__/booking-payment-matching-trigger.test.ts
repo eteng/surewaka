@@ -139,7 +139,13 @@ describe('POST /booking/confirm — initial matching trigger', () => {
     const [jobName, jobData, jobOpts] = matchingQueueAddCalls[0];
     expect(jobName).toBe('match-driver');
     expect(jobData).toMatchObject({ deliveryId: '11111111-1111-4111-8111-111111111111', legId: '22222222-2222-4222-8222-222222222222', legType: 'first_mile' });
-    expect(jobOpts).toMatchObject({ delay: 0, jobId: 'match-leg:22222222-2222-4222-8222-222222222222' });
+    expect(jobOpts).toMatchObject({ delay: 0, jobId: 'match-leg-22222222-2222-4222-8222-222222222222' });
+    // Not a colon: BullMQ's real Job.create rejects a custom jobId containing
+    // ':' unless it matches its internal 3-segment repeatable-job format —
+    // `match-leg:${id}` (2 segments) throws "Custom Id cannot contain :" at
+    // enqueue time. The mock above wouldn't have caught that; assert it here
+    // directly against the string this test just captured.
+    expect((jobOpts as { jobId: string }).jobId).not.toContain(':');
   });
 
   it('does not enqueue a match job when the first leg is a carrier leg (self-drop)', async () => {
