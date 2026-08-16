@@ -3,7 +3,7 @@ import { db, carrierParks, coverageGaps, drivers } from '@surewaka/db';
 import { eq, isNotNull, sql } from 'drizzle-orm';
 import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
-import { h3CellsToGeoJSON, getH3Center } from '@surewaka/shared';
+import { h3CellsToGeoJSON, getH3Center } from '@surewaka/shared/h3';
 import type { AuthUser } from '@surewaka/auth';
 
 type Env = { Variables: { user: AuthUser; accessToken: string } };

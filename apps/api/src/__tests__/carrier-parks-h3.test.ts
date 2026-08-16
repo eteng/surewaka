@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
-import { getH3Cell } from '@surewaka/shared';
+import { getH3Cell } from '@surewaka/shared/h3';
 import { stubAuthModule, personas } from '../test-utils/auth-mock';
 
 const H3_RESOLUTION = 7;

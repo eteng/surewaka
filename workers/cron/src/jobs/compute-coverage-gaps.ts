@@ -1,6 +1,7 @@
 import { db, deliveries, coverageGaps, carrierParks, drivers } from '@surewaka/db';
 import { eq, and, isNotNull, isNull, notInArray } from 'drizzle-orm';
-import { getH3Cell, getH3Center, H3_RESOLUTION, haversineKm } from '@surewaka/shared';
+import { getH3Cell, getH3Center, H3_RESOLUTION } from '@surewaka/shared/h3';
+import { haversineKm } from '@surewaka/shared';
 
 type Point = { lat: number; lng: number };
 

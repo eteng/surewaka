@@ -1,6 +1,6 @@
 import { db, deliveries, drivers } from '@surewaka/db';
 import { eq, and, inArray, isNotNull } from 'drizzle-orm';
-import { getH3Cell, getH3Neighborhood, H3_RESOLUTION } from '@surewaka/shared';
+import { getH3Cell, getH3Neighborhood, H3_RESOLUTION } from '@surewaka/shared/h3';
 
 /**
  * Surge Pricing Service

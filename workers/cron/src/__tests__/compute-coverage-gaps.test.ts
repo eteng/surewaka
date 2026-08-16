@@ -3,7 +3,8 @@
 // Requirements: .kiro/specs/coverage-map/requirements.md #3
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getH3Cell, getH3Center, haversineKm } from '@surewaka/shared';
+import { getH3Cell, getH3Center } from '@surewaka/shared/h3';
+import { haversineKm } from '@surewaka/shared';
 
 const H3_RESOLUTION = 7;
 

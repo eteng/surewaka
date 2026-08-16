@@ -7,7 +7,8 @@ import { db, carrierParks } from '@surewaka/db';
 import { eq } from 'drizzle-orm';
 import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/role';
-import { createCarrierParkSchema, updateCarrierParkSchema, getH3Cell, H3_RESOLUTION } from '@surewaka/shared';
+import { createCarrierParkSchema, updateCarrierParkSchema } from '@surewaka/shared';
+import { getH3Cell, H3_RESOLUTION } from '@surewaka/shared/h3';
 
 const adminCarrierParks = new Hono();
 

@@ -3,7 +3,7 @@ import { db, deliveries, driverLocations, drivers } from '@surewaka/db';
 import { and, eq } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth';
 import { recordDriverLocationSchema } from '@surewaka/shared';
-import { getH3Cell, H3_RESOLUTION } from '@surewaka/shared';
+import { getH3Cell, H3_RESOLUTION } from '@surewaka/shared/h3';
 import { initLocationStore, updateDriverLocation } from '@surewaka/realtime';
 import type { AuthUser } from '@surewaka/auth';
 import { getRedis } from '../lib/redis';
