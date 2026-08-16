@@ -5,12 +5,21 @@ import { startHealthServer } from './health';
 import { eq } from 'drizzle-orm';
 import { enqueuePushFromWorker } from './push-enqueue';
 import { logger } from './lib/logger';
+import { initLocationStore, createAblyProvider } from '@surewaka/realtime';
 
 // ─── Matching Worker ──────────────────────────────────────────────────────────
 // Req 15.1: 3 attempts + exponential backoff from 5s (configured at enqueue time)
 // Req 15.3: Stalled job detection every 60s — if worker crashes mid-matching,
 //           the job re-queues after 60s. Reservations auto-expire via 60s TTL,
 //           so stalled re-runs start fresh from GEOSEARCH (Req 15.4).
+
+// The location store (packages/realtime) keeps its dependencies in
+// module-level state per process — apps/api initializing it for itself has
+// no effect here, this is a completely separate Node process. Without this,
+// every findNearbyDrivers() call (used by every single matching attempt)
+// throws "Location store not initialized" and the job fails after
+// exhausting all retries.
+initLocationStore({ redis: connection, realtime: createAblyProvider() });
 
 const matchingWorker = new Worker(
   'matching',
