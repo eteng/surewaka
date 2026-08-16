@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { enqueuePushFromWorker } from './push-enqueue';
 import { logger } from './lib/logger';
 import { initLocationStore, createAblyProvider } from '@surewaka/realtime';
+import { initReservation } from './lib/reservation';
 
 // ─── Matching Worker ──────────────────────────────────────────────────────────
 // Req 15.1: 3 attempts + exponential backoff from 5s (configured at enqueue time)
@@ -20,6 +21,14 @@ import { initLocationStore, createAblyProvider } from '@surewaka/realtime';
 // throws "Location store not initialized" and the job fails after
 // exhausting all retries.
 initLocationStore({ redis: connection, realtime: createAblyProvider() });
+
+// Same story as the location store above: the reservation layer
+// (workers/matching-worker/src/lib/reservation.ts) also keeps its Redis
+// client in module-level state, set once via initReservation(). Without
+// this, reserveDriver() throws the moment a candidate is actually found and
+// about to be offered — which is why this one didn't surface until a real
+// candidate cleared the location-store fix and reached the reservation step.
+initReservation(connection);
 
 const matchingWorker = new Worker(
   'matching',
