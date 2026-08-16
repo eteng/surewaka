@@ -3,13 +3,14 @@ import { eq, and, isNull, sql } from 'drizzle-orm';
 import { db, deliveries, escrowHolds, deliveryLegs, quotes } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { getWalletByUserId, creditWallet, debitWallet } from '../lib/wallet-service';
-import { bookingConfirmSchema, cancelDeliverySchema, FEE_ENGINE_ERRORS } from '@surewaka/shared';
+import { bookingConfirmSchema, cancelDeliverySchema, FEE_ENGINE_ERRORS, matchDriverJobDataSchema } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
 import { randomUUID } from 'crypto';
 import { notifyDeliveryCancelled } from '../services/push-triggers';
 import { confirmAll } from '../services/quote-service';
 import { writeLedgerEvent } from '../lib/ledger';
 import { enqueueRouteDelivery } from '../lib/routing-queue';
+import { matchingQueue } from '../lib/matching-queue';
 
 type Env = { Variables: { user: AuthUser; accessToken: string } };
 
@@ -75,6 +76,52 @@ bookingPaymentRoutes.post('/booking/confirm', async (c) => {
         .set({ status: 'pending', paymentStatus: 'escrowed', escrowHoldId: escrow.id, amountPaid: totalKobo })
         .where(eq(deliveries.id, delivery_id));
     });
+
+    // Kick off driver matching for the first leg, if it's a driver-type leg.
+    // This is the only place that does so for deliveries booked with legs
+    // already known upfront (plain on-demand, or a customer-selected
+    // specific carrier route) — surewaka_way (auto-routed) deliveries get
+    // this from compute-route.ts instead, since they don't have legs yet at
+    // booking time. Without this, escrow confirms but nothing ever finds a
+    // driver: trigger-next-leg only fires after a *prior* leg is delivered,
+    // and the cron rescue-sweeper only rescues legs with a systemEtaAt set,
+    // which these legs never get. Dispatches immediately (no ADR-010 timed
+    // delay) — that formula exists to avoid dispatching a driver too early
+    // relative to a carrier's departure, which doesn't apply to a first leg
+    // whose whole job is to start moving toward pickup right away.
+    const [firstLeg] = await db
+      .select({
+        id: deliveryLegs.id,
+        actorType: deliveryLegs.actorType,
+        pickupLng: deliveryLegs.pickupLng,
+        pickupLat: deliveryLegs.pickupLat,
+        dropoffLng: deliveryLegs.dropoffLng,
+        dropoffLat: deliveryLegs.dropoffLat,
+      })
+      .from(deliveryLegs)
+      .where(and(eq(deliveryLegs.deliveryId, delivery_id), eq(deliveryLegs.legNumber, 1)))
+      .limit(1);
+
+    if (firstLeg && firstLeg.actorType === 'driver') {
+      const jobData = matchDriverJobDataSchema.parse({
+        deliveryId: delivery_id,
+        legId: firstLeg.id,
+        legType: 'first_mile',
+        pickupLng: firstLeg.pickupLng,
+        pickupLat: firstLeg.pickupLat,
+        dropoffLng: firstLeg.dropoffLng,
+        dropoffLat: firstLeg.dropoffLat,
+        vehicleType: 'motorcycle', // default — matches the fallback used elsewhere (trigger-next-leg.ts, compute-route.ts)
+        customerId: user.id,
+      });
+
+      await matchingQueue.add('match-driver', jobData, {
+        delay: 0,
+        jobId: `match-leg:${firstLeg.id}`, // same dedup key scheme as trigger-next-leg.ts / the cron sweeper
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      });
+    }
 
     return c.json({ data: { delivery_id, status: 'confirmed', totalKobo }, error: null, meta: null });
   } catch (err) {
