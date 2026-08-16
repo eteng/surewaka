@@ -160,42 +160,64 @@ export function usePushNotifications(
         }
 
         // Handle permission denied gracefully — no error UI (Req 1.5)
-        if (finalStatus !== 'granted') return;
+        if (finalStatus !== 'granted') {
+          console.warn('[usePushNotifications] Permission not granted, skipping registration:', finalStatus);
+          return;
+        }
 
         if (cancelled) return;
 
         // Get Expo push token
         const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-        const tokenResponse = await Notifications.getExpoPushTokenAsync({
-          projectId,
-        });
-        const expoPushToken = tokenResponse.data;
+        let expoPushToken: string;
+        try {
+          const tokenResponse = await Notifications.getExpoPushTokenAsync({
+            projectId,
+          });
+          expoPushToken = tokenResponse.data;
+        } catch (err) {
+          // Common causes: running in Expo Go (no native push support on
+          // recent SDKs), a dev client built before expo-notifications was
+          // added as a dependency (native module not compiled in — needs a
+          // fresh `eas build --profile development`), or a
+          // simulator/emulator without real push capability.
+          console.error('[usePushNotifications] getExpoPushTokenAsync failed:', err);
+          return;
+        }
 
         if (cancelled) return;
 
         // Register with backend (retry 3x with exponential backoff) (Req 1.6)
-        await withRetry(async () => {
-          const sessionToken = await getToken();
-          if (!sessionToken || cancelled) return;
+        try {
+          await withRetry(async () => {
+            const sessionToken = await getToken();
+            if (!sessionToken || cancelled) return;
 
-          await apiClient.post(
-            '/api/v1/push-tokens',
-            {
-              expoPushToken,
-              deviceId: getDeviceId(),
-              platform: Platform.OS as 'ios' | 'android',
-              app,
-            },
-            sessionToken
-          );
-        });
+            await apiClient.post(
+              '/api/v1/push-tokens',
+              {
+                expoPushToken,
+                deviceId: getDeviceId(),
+                platform: Platform.OS as 'ios' | 'android',
+                app,
+              },
+              sessionToken
+            );
+          });
+        } catch (err) {
+          console.error('[usePushNotifications] Failed to register token with backend after retries:', err);
+          return;
+        }
 
         if (!cancelled) {
           _lastRegisteredToken = expoPushToken;
           registeredRef.current = true;
         }
-      } catch {
-        // Silently fail — permission denied or network errors are handled gracefully
+      } catch (err) {
+        // Last-resort catch-all — the specific steps above already log and
+        // return, so reaching here means something outside those (e.g.
+        // getPermissionsAsync itself throwing) went wrong.
+        console.error('[usePushNotifications] Unexpected registration failure:', err);
       }
     }
 
