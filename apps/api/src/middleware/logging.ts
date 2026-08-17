@@ -86,8 +86,13 @@ export const requestLogger: MiddlewareHandler = async (c, next) => {
     accessStream.write(apacheLine(ip, userId, now, method, path, status, size, referer, ua, ms));
 
     if (status >= 400) {
+      // Routes can attach extra diagnostic context via c.set('logExtra', {...})
+      // before returning a 4xx/5xx — folded into the structured file log so
+      // it's there on the first read instead of requiring a follow-up
+      // DB/access-log reconstruction.
+      const logExtra = c.get('logExtra') as Record<string, unknown> | undefined;
       errorStream.write(
-        errorEntry(status >= 500 ? 'error' : 'warn', now, method, path, status, ms, userId, ip, ua),
+        errorEntry(status >= 500 ? 'error' : 'warn', now, method, path, status, ms, userId, ip, ua, logExtra),
       );
     }
 

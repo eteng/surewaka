@@ -43,6 +43,15 @@ export default function ConfirmedScreen() {
   const [stillSearching, setStillSearching] = useState(false);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // getToken read via a ref, not a callback dependency — see the identical
+  // comment in tracking/[id].tsx for why (an unstable getToken identity
+  // would re-create syncFromRest every render and re-fire the mount effect
+  // in a tight loop, observed on-device as a burst of repeated fetches).
+  const getTokenRef = useRef(getToken);
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
+
   const goToTracking = useCallback(() => {
     setScreenState('matched');
     if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
@@ -57,7 +66,7 @@ export default function ConfirmedScreen() {
   // connection may have missed the event that would've told us.
   const syncFromRest = useCallback(async () => {
     if (!deliveryId) return;
-    const token = await getToken();
+    const token = await getTokenRef.current();
     if (!token) return;
 
     const { data } = await createAuthClient(token).get<DeliveryStatusResponse>(
@@ -70,7 +79,7 @@ export default function ConfirmedScreen() {
     } else if (data.status === 'routing_failed') {
       setScreenState('failed');
     }
-  }, [deliveryId, getToken, goToTracking]);
+  }, [deliveryId, goToTracking]);
 
   useEffect(() => {
     syncFromRest();

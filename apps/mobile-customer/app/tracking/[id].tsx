@@ -67,8 +67,19 @@ export default function TrackingScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // getToken is read via a ref rather than a fetchDelivery dependency —
+  // if its identity isn't stable across renders (observed on-device: a
+  // burst of ~7 identical fetches within one second, right before Clerk's
+  // dev-mode rate limit started rejecting tokens as "Invalid token"),
+  // depending on it directly would re-create fetchDelivery every render
+  // and re-fire the mount effect below in a tight loop.
+  const getTokenRef = useRef(getToken);
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
+
   const fetchDelivery = useCallback(async () => {
-    const token = await getToken();
+    const token = await getTokenRef.current();
     if (!token || !id) return;
 
     const client = createAuthClient(token);
@@ -82,7 +93,7 @@ export default function TrackingScreen() {
     }
     setLoading(false);
     setRefreshing(false);
-  }, [id, getToken]);
+  }, [id]);
 
   // Initial fetch (Requirement 6.2) — first paint before any subscription exists
   useEffect(() => {

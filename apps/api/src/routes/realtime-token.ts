@@ -7,7 +7,7 @@ import { requireAuth } from '../middleware/auth';
 import { CHANNELS } from '../lib/realtime';
 import type { AuthUser } from '@surewaka/auth';
 
-type Env = { Variables: { user: AuthUser } };
+type Env = { Variables: { user: AuthUser; logExtra?: Record<string, unknown> } };
 
 const realtimeTokenRoutes = new Hono<Env>();
 realtimeTokenRoutes.use('*', requireAuth);
@@ -52,6 +52,17 @@ realtimeTokenRoutes.get('/token', async (c) => {
     .limit(1);
 
   if (!delivery || delivery.customerId !== user.id) {
+    // Ownership 404s here have twice now turned out to be genuinely-owned
+    // deliveries when checked directly against the DB after the fact —
+    // log enough to settle it definitively next time instead of having to
+    // reconstruct it from access logs + a one-off DB query. Picked up by
+    // requestLogger and folded into logs/api/error/ for this response.
+    c.set('logExtra', {
+      deliveryId,
+      userId: user.id,
+      foundCustomerId: delivery?.customerId ?? null,
+      deliveryExists: !!delivery,
+    });
     return c.json(
       { data: null, error: { code: 'NOT_FOUND', message: 'Delivery not found' }, meta: null },
       404,
