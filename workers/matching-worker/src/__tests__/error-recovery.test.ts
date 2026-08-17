@@ -18,6 +18,13 @@ vi.mock('../push-enqueue', () => ({
   enqueuePushFromWorker: (...args: unknown[]) => mockEnqueuePush(...args),
 }));
 
+const mockPublish = vi.fn().mockResolvedValue(undefined);
+
+vi.mock('@surewaka/realtime', () => ({
+  createAblyProvider: vi.fn(() => ({ publish: mockPublish })),
+  CHANNELS: { deliveryTracking: (id: string) => `delivery:${id}` },
+}));
+
 // ─── Extract the failed handler logic as a testable function ──────────────────
 
 /**
@@ -55,6 +62,11 @@ async function handleMatchingWorkerFailed(
         deepLink: '/deliveries',
       },
     });
+
+    // Notify the matching-progress screen over the delivery's realtime channel
+    const { createAblyProvider, CHANNELS } = await import('@surewaka/realtime');
+    const realtime = createAblyProvider();
+    await realtime.publish(CHANNELS.deliveryTracking(deliveryId), 'matching-failed', { deliveryId });
   }
 }
 
@@ -89,6 +101,14 @@ describe('Error Recovery', () => {
           title: 'Unable to find a driver',
         }),
       );
+
+      // Verify the matching-progress screen was told over the delivery's
+      // realtime channel (Requirement 5.1, 5.2)
+      expect(mockPublish).toHaveBeenCalledWith(
+        'delivery:del-001',
+        'matching-failed',
+        { deliveryId: 'del-001' },
+      );
     });
 
     it('does NOT mark routing_failed for intermediate failures (attemptsMade < max)', async () => {
@@ -103,6 +123,7 @@ describe('Error Recovery', () => {
       // Should not have been called — retries remaining
       expect(mockUpdate).not.toHaveBeenCalled();
       expect(mockEnqueuePush).not.toHaveBeenCalled();
+      expect(mockPublish).not.toHaveBeenCalled();
     });
 
     it('does nothing when job is undefined (BullMQ edge case)', async () => {
@@ -110,6 +131,7 @@ describe('Error Recovery', () => {
 
       expect(mockUpdate).not.toHaveBeenCalled();
       expect(mockEnqueuePush).not.toHaveBeenCalled();
+      expect(mockPublish).not.toHaveBeenCalled();
     });
 
     it('uses default of 3 attempts when opts.attempts is not set', async () => {
@@ -125,6 +147,11 @@ describe('Error Recovery', () => {
       expect(mockUpdate).toHaveBeenCalled();
       expect(mockSet).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'routing_failed' }),
+      );
+      expect(mockPublish).toHaveBeenCalledWith(
+        'delivery:del-003',
+        'matching-failed',
+        { deliveryId: 'del-003' },
       );
     });
   });

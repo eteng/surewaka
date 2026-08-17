@@ -5,7 +5,7 @@ import { startHealthServer } from './health';
 import { eq } from 'drizzle-orm';
 import { enqueuePushFromWorker } from './push-enqueue';
 import { logger } from './lib/logger';
-import { initLocationStore, createAblyProvider } from '@surewaka/realtime';
+import { initLocationStore, createAblyProvider, CHANNELS } from '@surewaka/realtime';
 import { initReservation } from './lib/reservation';
 
 // ─── Matching Worker ──────────────────────────────────────────────────────────
@@ -97,6 +97,14 @@ matchingWorker.on('failed', async (job, err) => {
         deepLink: `/deliveries`,
       },
     });
+
+    // Tell the matching-progress screen directly, over the same channel
+    // Phase 2's status updates will also use, so the client only needs one
+    // subscription per delivery. Ad-hoc createAblyProvider() to match the
+    // pattern already used elsewhere in this worker (match-driver.ts,
+    // self-drop-fallback.ts).
+    const realtime = createAblyProvider();
+    await realtime.publish(CHANNELS.deliveryTracking(deliveryId), 'matching-failed', { deliveryId });
   } else {
     log.warn('Job failed — will retry', {
       attempt: job.attemptsMade,

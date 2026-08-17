@@ -249,6 +249,9 @@ importers:
       '@surewaka/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      ably:
+        specifier: ^2.6.0
+        version: 2.26.0(bufferutil@4.1.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(utf-8-validate@6.0.6)
       bullmq:
         specifier: ^5.34.8
         version: 5.81.2
@@ -755,9 +758,15 @@ importers:
 
   packages/mobile-shared:
     dependencies:
+      '@surewaka/realtime':
+        specifier: workspace:*
+        version: link:../realtime
       '@surewaka/shared':
         specifier: workspace:*
         version: link:../shared
+      ably:
+        specifier: ^2.6.0
+        version: 2.26.0(bufferutil@4.1.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(utf-8-validate@6.0.6)
       react-native:
         specifier: '>=0.76.0'
         version: 0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)

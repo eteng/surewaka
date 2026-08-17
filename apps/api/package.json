@@ -21,6 +21,7 @@
     "@surewaka/db": "workspace:*",
     "@surewaka/realtime": "workspace:*",
     "@surewaka/shared": "workspace:*",
+    "ably": "^2.6.0",
     "bullmq": "^5.34.8",
     "cloudinary": "^2.5.1",
     "drizzle-orm": "^0.45.2",

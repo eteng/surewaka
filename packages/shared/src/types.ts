@@ -411,6 +411,17 @@ export type StatusUpdatePayload = {
   previousStatus: DeliveryStatus;
   newStatus: DeliveryStatus;
   timestamp: string;
+  /**
+   * Present when this update originates from a single leg's status change
+   * (PATCH /deliveries/:deliveryId/legs/:legId/status) rather than a
+   * top-level delivery transition. `delivery_legs.status` shares the same
+   * enum as `deliveries.status`, and deliveries.status barely moves until
+   * the final leg completes — consumers that want live per-leg progress
+   * (e.g. the tracking screen's stepper) should prefer `legStatus` when
+   * present and fall back to `newStatus` otherwise.
+   */
+  legId?: string;
+  legStatus?: DeliveryStatus;
 };
 
 export type LocationUpdatePayload = {

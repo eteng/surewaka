@@ -1,8 +1,8 @@
 import { and, asc, eq, gt } from 'drizzle-orm';
 import { db, deliveries, deliveryLegs } from '@surewaka/db';
-import { BUSINESS_HOUR_START, BUSINESS_HOUR_END, matchDriverJobDataSchema } from '@surewaka/shared';
+import { BUSINESS_HOUR_START, BUSINESS_HOUR_END } from '@surewaka/shared';
 import { getConfig } from '@surewaka/shared/server';
-import { matchingQueue } from './matching-queue';
+import { enqueueMatchDriverJob } from './enqueue-match-driver';
 
 /**
  * Compute the next business hour start from a given time.
@@ -118,7 +118,7 @@ export async function triggerNextLegMatching(
   }
 
   // Validate job data before enqueueing (Req 16.4)
-  const jobData = matchDriverJobDataSchema.parse({
+  await enqueueMatchDriverJob({
     deliveryId,
     legId: nextLeg.id,
     legType: nextLeg.legType as 'transfer' | 'last_mile',
@@ -126,18 +126,7 @@ export async function triggerNextLegMatching(
     pickupLat: nextLeg.pickupLat,
     dropoffLng: nextLeg.dropoffLng,
     dropoffLat: nextLeg.dropoffLat,
-    vehicleType: 'motorcycle', // default for surewaka_way
     customerId: delivery.customerId,
+    delayMs,
   });
-
-  await matchingQueue.add(
-    'match-driver',
-    jobData,
-    {
-      delay: delayMs,
-      jobId: `match-leg-${nextLeg.id}`, // deterministic — prevents duplicate enqueue (Req 9.4)
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 5000 },
-    },
-  );
 }

@@ -3,14 +3,14 @@ import { eq, and, isNull, sql } from 'drizzle-orm';
 import { db, deliveries, escrowHolds, deliveryLegs, quotes } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { getWalletByUserId, creditWallet, debitWallet } from '../lib/wallet-service';
-import { bookingConfirmSchema, cancelDeliverySchema, FEE_ENGINE_ERRORS, matchDriverJobDataSchema } from '@surewaka/shared';
+import { bookingConfirmSchema, cancelDeliverySchema, FEE_ENGINE_ERRORS } from '@surewaka/shared';
 import type { AuthUser } from '@surewaka/auth';
 import { randomUUID } from 'crypto';
 import { notifyDeliveryCancelled } from '../services/push-triggers';
 import { confirmAll } from '../services/quote-service';
 import { writeLedgerEvent } from '../lib/ledger';
 import { enqueueRouteDelivery } from '../lib/routing-queue';
-import { matchingQueue } from '../lib/matching-queue';
+import { enqueueMatchDriverJob } from '../lib/enqueue-match-driver';
 
 type Env = { Variables: { user: AuthUser; accessToken: string } };
 
@@ -103,7 +103,7 @@ bookingPaymentRoutes.post('/booking/confirm', async (c) => {
       .limit(1);
 
     if (firstLeg && firstLeg.actorType === 'driver') {
-      const jobData = matchDriverJobDataSchema.parse({
+      await enqueueMatchDriverJob({
         deliveryId: delivery_id,
         legId: firstLeg.id,
         legType: 'first_mile',
@@ -111,15 +111,7 @@ bookingPaymentRoutes.post('/booking/confirm', async (c) => {
         pickupLat: firstLeg.pickupLat,
         dropoffLng: firstLeg.dropoffLng,
         dropoffLat: firstLeg.dropoffLat,
-        vehicleType: 'motorcycle', // default — matches the fallback used elsewhere (trigger-next-leg.ts, compute-route.ts)
         customerId: user.id,
-      });
-
-      await matchingQueue.add('match-driver', jobData, {
-        delay: 0,
-        jobId: `match-leg-${firstLeg.id}`, // same dedup key scheme as trigger-next-leg.ts / the cron sweeper
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
       });
     }
 

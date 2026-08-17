@@ -1,15 +1,16 @@
 import { useAuth } from '@clerk/expo';
-import { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, RefreshControl, ActivityIndicator, AppState, type AppStateStatus } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { useAuthStore, createAuthClient } from '@surewaka/mobile-shared';
+import { createAuthClient, useRealtimeChannel, EVENTS } from '@surewaka/mobile-shared';
+import type { DeliveryStatus, StatusUpdatePayload } from '@surewaka/shared';
 
 type Delivery = {
   id: string;
   customerId: string;
   driverId: string | null;
   carrierId: string | null;
-  status: 'pending' | 'matched' | 'picked_up' | 'in_transit' | 'delivered' | 'cancelled';
+  status: DeliveryStatus;
   pickupAddress: string;
   pickupCity: string;
   dropoffAddress: string;
@@ -25,15 +26,38 @@ type Delivery = {
   updatedAt: string;
 };
 
-const statusSteps: { label: string; value: Delivery['status'] }[] = [
-  { label: 'Booked', value: 'pending' },
-  { label: 'Matched', value: 'matched' },
+// Real backend delivery_status progression (Requirement 8.1) — the previous
+// pending/matched/picked_up/in_transit/delivered/cancelled set didn't match
+// any actual status the backend ever writes, so the stepper silently failed
+// to highlight (indexOf returning -1) for nearly every real delivery.
+const statusSteps: { label: string; value: DeliveryStatus }[] = [
+  { label: 'Driver Assigned', value: 'accepted' },
+  { label: 'Heading to Pickup', value: 'en_route_pickup' },
+  { label: 'Arrived at Pickup', value: 'arrived_pickup' },
   { label: 'Picked Up', value: 'picked_up' },
-  { label: 'In Transit', value: 'in_transit' },
+  { label: 'Heading to Drop-off', value: 'en_route_dropoff' },
+  { label: 'Arrived at Drop-off', value: 'arrived_dropoff' },
   { label: 'Delivered', value: 'delivered' },
 ];
 
-const statusOrder: Delivery['status'][] = ['pending', 'matched', 'picked_up', 'in_transit', 'delivered', 'cancelled'];
+const statusOrder: DeliveryStatus[] = statusSteps.map((s) => s.value);
+
+const STATUS_LABELS: Partial<Record<DeliveryStatus, string>> = Object.fromEntries(
+  statusSteps.map((s) => [s.value, s.label]),
+);
+
+// Terminal, non-progressing states — the stepper doesn't meaningfully apply
+// to any of these, unlike the old code's cancelled-only handling.
+const TERMINAL_FAILURE_STATUSES = new Set<DeliveryStatus>(['cancelled', 'failed', 'returned']);
+
+// Resilience safety net (Requirement 6.4) — stays active even while the
+// realtime subscription is connected, since a dropped connection on
+// Nigerian mobile networks is common, not an edge case.
+const FALLBACK_POLL_INTERVAL_MS = 60_000;
+
+function isTerminal(status: DeliveryStatus): boolean {
+  return status === 'delivered' || TERMINAL_FAILURE_STATUSES.has(status);
+}
 
 export default function TrackingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -60,16 +84,58 @@ export default function TrackingScreen() {
     setRefreshing(false);
   }, [id, getToken]);
 
+  // Initial fetch (Requirement 6.2) — first paint before any subscription exists
   useEffect(() => {
     fetchDelivery();
   }, [fetchDelivery]);
 
-  useEffect(() => {
-    if (!delivery || delivery.status === 'delivered' || delivery.status === 'cancelled') return;
+  // Realtime (Requirement 6.1): update local state directly from the pushed
+  // payload rather than re-fetching on every event — legStatus is the live
+  // per-leg progress this stepper tracks; newStatus is the delivery-level
+  // status, used when a leg-level value isn't present.
+  const handleStatusUpdate = useCallback((data: unknown) => {
+    const payload = data as StatusUpdatePayload;
+    setDelivery((prev) => {
+      if (!prev || prev.id !== payload.deliveryId) return prev;
+      return { ...prev, status: payload.legStatus ?? payload.newStatus };
+    });
+  }, []);
 
-    const interval = setInterval(fetchDelivery, 30000);
+  useRealtimeChannel({
+    // Skip (or tear down) the subscription once the delivery is terminal —
+    // nothing further will ever be published for it. Otherwise a
+    // completed delivery's tracking screen, if left mounted in the nav
+    // stack (expo-router's default Stack behavior — screens aren't
+    // unmounted just by navigating past them), keeps its Ably connection
+    // alive and keeps re-authenticating in the background indefinitely.
+    deliveryId: delivery && isTerminal(delivery.status) ? null : id,
+    events: { [EVENTS.statusUpdate]: handleStatusUpdate },
+    // Requirement 2.4 / 6.1 — a reconnect may have missed an event while down
+    onReconnect: fetchDelivery,
+  });
+
+  // Resilience fallback poll (Requirement 6.4) — active alongside the
+  // realtime subscription, not instead of it. Stops once the delivery
+  // reaches a terminal state.
+  useEffect(() => {
+    if (!delivery || isTerminal(delivery.status)) return;
+
+    const interval = setInterval(fetchDelivery, FALLBACK_POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [delivery?.status, fetchDelivery]);
+
+  // Re-sync on app foreground (Requirement 6.5) — events may have been
+  // missed entirely while backgrounded.
+  const appStateRef = useRef(AppState.currentState);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+        fetchDelivery();
+      }
+      appStateRef.current = nextState;
+    });
+    return () => sub.remove();
+  }, [fetchDelivery]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -99,7 +165,9 @@ export default function TrackingScreen() {
     );
   }
 
+  const failed = TERMINAL_FAILURE_STATUSES.has(delivery.status);
   const currentStatusIndex = statusOrder.indexOf(delivery.status);
+  const statusLabel = STATUS_LABELS[delivery.status] ?? delivery.status.replace(/_/g, ' ');
 
   return (
     <ScrollView
@@ -116,8 +184,10 @@ export default function TrackingScreen() {
         <Text className="text-lg font-bold text-gray-900 mb-1">
           Delivery #{delivery.id.slice(0, 8)}
         </Text>
-        <Text className="text-sm text-primary font-semibold mb-6 capitalize">
-          {delivery.status.replace('_', ' ')}
+        <Text
+          className={`text-sm font-semibold mb-6 capitalize ${failed ? 'text-error' : 'text-primary'}`}
+        >
+          {statusLabel}
         </Text>
 
         <View className="bg-gray-50 rounded-xl p-4 mb-4">
@@ -139,38 +209,42 @@ export default function TrackingScreen() {
           </View>
         </View>
 
-        <View className="mb-6">
-          {statusSteps.map((step) => {
-            const stepIndex = statusOrder.indexOf(step.value);
-            const isDone = stepIndex <= currentStatusIndex && delivery.status !== 'cancelled';
-            const isCancelled = delivery.status === 'cancelled' && step.value === 'pending';
+        {failed ? (
+          <View className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+            <Text className="text-sm font-semibold text-error uppercase mb-1">{statusLabel}</Text>
+            <Text className="text-sm text-gray-600">
+              {delivery.status === 'cancelled'
+                ? 'This delivery was cancelled.'
+                : delivery.status === 'returned'
+                  ? 'This delivery was returned to the sender.'
+                  : 'This delivery could not be completed.'}
+            </Text>
+          </View>
+        ) : (
+          <View className="mb-6">
+            {statusSteps.map((step) => {
+              const stepIndex = statusOrder.indexOf(step.value);
+              const isDone = stepIndex <= currentStatusIndex;
 
-            return (
-              <View key={step.label} className="flex-row items-center mb-4">
-                <View
-                  className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${
-                    isCancelled
-                      ? 'bg-error'
-                      : isDone
-                        ? 'bg-primary'
-                        : 'bg-gray-200'
-                  }`}
-                >
-                  <Text className="text-white text-xs">
-                    {isCancelled ? '✕' : isDone ? '✓' : stepIndex + 1}
+              return (
+                <View key={step.label} className="flex-row items-center mb-4">
+                  <View
+                    className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${
+                      isDone ? 'bg-primary' : 'bg-gray-200'
+                    }`}
+                  >
+                    <Text className="text-white text-xs">{isDone ? '✓' : stepIndex + 1}</Text>
+                  </View>
+                  <Text
+                    className={`text-base ${isDone ? 'text-gray-900 font-medium' : 'text-gray-400'}`}
+                  >
+                    {step.label}
                   </Text>
                 </View>
-                <Text
-                  className={`text-base ${
-                    isDone ? 'text-gray-900 font-medium' : 'text-gray-400'
-                  }`}
-                >
-                  {step.label}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
+              );
+            })}
+          </View>
+        )}
 
         {delivery.price && (
           <View className="bg-gray-50 rounded-xl p-4 mb-4">

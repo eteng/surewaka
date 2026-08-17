@@ -9,7 +9,9 @@
     "test": "jest"
   },
   "dependencies": {
+    "@surewaka/realtime": "workspace:*",
     "@surewaka/shared": "workspace:*",
+    "ably": "^2.6.0",
     "zustand": "^5.0.13"
   },
   "peerDependencies": {

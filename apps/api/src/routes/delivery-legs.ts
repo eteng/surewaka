@@ -6,7 +6,9 @@ import { requireAuth } from '../middleware/auth';
 import { requireRole } from '../middleware/role';
 import { requireLegActor } from '../middleware/require-leg-actor';
 import { triggerNextLegMatching } from '../lib/trigger-next-leg';
+import { getRealtime, CHANNELS, EVENTS } from '../lib/realtime';
 import type { AuthUser } from '@surewaka/auth';
+import type { DeliveryStatus, StatusUpdatePayload } from '@surewaka/shared';
 
 type DeliveryLegsEnv = {
   Variables: {
@@ -82,6 +84,17 @@ deliveryLegRoutes.patch(
     const { status } = parsed.data;
 
     try {
+      // Snapshot the delivery's overall status before this update, so the
+      // realtime publish below can report an honest previousStatus/newStatus
+      // pair rather than guessing — most leg updates don't move it at all.
+      const [deliveryBefore] = await db
+        .select({ status: deliveries.status })
+        .from(deliveries)
+        .where(eq(deliveries.id, deliveryId))
+        .limit(1);
+      const previousDeliveryStatus = (deliveryBefore?.status ?? 'accepted') as DeliveryStatus;
+      let newDeliveryStatus = previousDeliveryStatus;
+
       // Update the leg status (only the validated status field)
       const now = new Date();
       const updateValues: { status: string; completedAt?: Date } = { status };
@@ -115,8 +128,22 @@ deliveryLegRoutes.patch(
             .update(deliveries)
             .set({ status: 'delivered', updatedAt: now })
             .where(eq(deliveries.id, deliveryId));
+          newDeliveryStatus = 'delivered';
         }
       }
+
+      // Tell the tracking screen (Requirement 7.1, 7.2) — EVENTS.statusUpdate
+      // was a dead constant until now, never published anywhere.
+      const realtime = getRealtime();
+      const payload: StatusUpdatePayload = {
+        deliveryId,
+        previousStatus: previousDeliveryStatus,
+        newStatus: newDeliveryStatus,
+        timestamp: now.toISOString(),
+        legId: leg.id,
+        legStatus: status,
+      };
+      await realtime.publish(CHANNELS.deliveryTracking(deliveryId), EVENTS.statusUpdate, payload);
 
       return c.json({ data: updatedLeg, error: null, meta: null });
     } catch (err) {
