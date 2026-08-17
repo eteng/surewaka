@@ -61,6 +61,8 @@ supabase/.temp/
 service-account*.json
 credentials*.json
 google-services.json
+!apps/mobile-customer/google-services.json
+!apps/mobile-driver/google-services.json
 GoogleService-Info.plist
 
 # Build artifacts (mobile)

@@ -11,7 +11,8 @@
       "supportsTablet": false
     },
     "android": {
-      "package": "com.surewaka.customer"
+      "package": "com.surewaka.customer",
+      "googleServicesFile": "./google-services.json"
     },
     "extra": {
       "router": {},
