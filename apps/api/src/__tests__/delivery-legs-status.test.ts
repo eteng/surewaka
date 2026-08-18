@@ -11,10 +11,14 @@ import { Hono } from 'hono';
 // ─── Mock state ─────────────────────────────────────────────────────────────
 
 let remainingLegsResult: Array<{ status: string }> = [];
-let deliveryBeforeResult: Array<{ status: string }> = [{ status: 'accepted' }];
+let deliveryBeforeResult: Array<{ status: string; customerId: string }> = [
+  { status: 'accepted', customerId: 'customer-1' },
+];
 const deliveriesUpdateCalls: Array<Record<string, unknown>> = [];
 const mockTriggerNextLegMatching = vi.fn().mockResolvedValue(undefined);
 const mockPublish = vi.fn().mockResolvedValue(undefined);
+const mockNotifyDeliveryStatusChange = vi.fn().mockResolvedValue(true);
+const mockNotifyDriverArrived = vi.fn().mockResolvedValue(true);
 
 const LEG = {
   id: 'leg-1',
@@ -47,7 +51,7 @@ vi.mock('@surewaka/db', () => {
     isActive: 'deliveryLegs.isActive',
     status: 'deliveryLegs.status',
   };
-  const deliveriesTable = { id: 'deliveries.id', status: 'deliveries.status' };
+  const deliveriesTable = { id: 'deliveries.id', status: 'deliveries.status', customerId: 'deliveries.customerId' };
 
   return {
     db: {
@@ -95,6 +99,11 @@ vi.mock('../lib/realtime', () => ({
   EVENTS: { statusUpdate: 'status-update' },
 }));
 
+vi.mock('../services/push-triggers', () => ({
+  notifyDeliveryStatusChange: (...args: unknown[]) => mockNotifyDeliveryStatusChange(...args),
+  notifyDriverArrived: (...args: unknown[]) => mockNotifyDriverArrived(...args),
+}));
+
 vi.mock('../middleware/auth', () => ({
   requireAuth: async (_c: unknown, next: () => Promise<void>) => next(),
 }));
@@ -125,7 +134,7 @@ describe('PATCH /api/v1/deliveries/:deliveryId/legs/:legId/status', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     remainingLegsResult = [];
-    deliveryBeforeResult = [{ status: 'accepted' }];
+    deliveryBeforeResult = [{ status: 'accepted', customerId: 'customer-1' }];
     deliveriesUpdateCalls.length = 0;
     app = await createTestApp();
   });
@@ -204,5 +213,70 @@ describe('PATCH /api/v1/deliveries/:deliveryId/legs/:legId/status', () => {
       'status-update',
       expect.objectContaining({ legStatus: 'picked_up', previousStatus: 'accepted', newStatus: 'accepted' }),
     );
+
+    expect(mockNotifyDeliveryStatusChange).toHaveBeenCalledWith('delivery-1', 'customer-1', 'picked_up');
+    expect(mockNotifyDriverArrived).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH .../status — customer push notifications', () => {
+  let app: Hono;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    remainingLegsResult = [];
+    deliveryBeforeResult = [{ status: 'accepted', customerId: 'customer-1' }];
+    deliveriesUpdateCalls.length = 0;
+    app = await createTestApp();
+  });
+
+  async function patchStatus(status: string) {
+    return app.request('/api/v1/deliveries/delivery-1/legs/leg-1/status', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  it.each(['arrived_pickup', 'arrived_dropoff'] as const)(
+    'notifies driver arrival for %s',
+    async (status) => {
+      const res = await patchStatus(status);
+
+      expect(res.status).toBe(200);
+      expect(mockNotifyDriverArrived).toHaveBeenCalledWith('delivery-1', 'customer-1', status);
+      expect(mockNotifyDeliveryStatusChange).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['picked_up', 'en_route_dropoff', 'delivered'] as const)(
+    'notifies delivery status change for %s',
+    async (status) => {
+      const res = await patchStatus(status);
+
+      expect(res.status).toBe(200);
+      expect(mockNotifyDeliveryStatusChange).toHaveBeenCalledWith('delivery-1', 'customer-1', status);
+      expect(mockNotifyDriverArrived).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['accepted', 'en_route_pickup'] as const)(
+    'sends no customer push for %s (no trigger function exists / covered elsewhere)',
+    async (status) => {
+      const res = await patchStatus(status);
+
+      expect(res.status).toBe(200);
+      expect(mockNotifyDeliveryStatusChange).not.toHaveBeenCalled();
+      expect(mockNotifyDriverArrived).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not push when the delivery lookup finds no customerId', async () => {
+    deliveryBeforeResult = [];
+
+    const res = await patchStatus('picked_up');
+
+    expect(res.status).toBe(200);
+    expect(mockNotifyDeliveryStatusChange).not.toHaveBeenCalled();
   });
 });

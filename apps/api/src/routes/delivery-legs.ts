@@ -7,6 +7,7 @@ import { requireRole } from '../middleware/role';
 import { requireLegActor } from '../middleware/require-leg-actor';
 import { triggerNextLegMatching } from '../lib/trigger-next-leg';
 import { getRealtime, CHANNELS, EVENTS } from '../lib/realtime';
+import { notifyDeliveryStatusChange, notifyDriverArrived } from '../services/push-triggers';
 import type { AuthUser } from '@surewaka/auth';
 import type { DeliveryStatus, StatusUpdatePayload } from '@surewaka/shared';
 
@@ -88,7 +89,7 @@ deliveryLegRoutes.patch(
       // realtime publish below can report an honest previousStatus/newStatus
       // pair rather than guessing — most leg updates don't move it at all.
       const [deliveryBefore] = await db
-        .select({ status: deliveries.status })
+        .select({ status: deliveries.status, customerId: deliveries.customerId })
         .from(deliveries)
         .where(eq(deliveries.id, deliveryId))
         .limit(1);
@@ -144,6 +145,23 @@ deliveryLegRoutes.patch(
         legStatus: status,
       };
       await realtime.publish(CHANNELS.deliveryTracking(deliveryId), EVENTS.statusUpdate, payload);
+
+      // Customer-facing milestone pushes — fire-and-forget, a push failure
+      // shouldn't fail the status update. 'accepted' is already covered by
+      // delivery-accept.ts's own push; 'en_route_pickup' has no trigger
+      // function yet (nobody's written driver-en-route copy).
+      if (deliveryBefore?.customerId) {
+        const customerId = deliveryBefore.customerId;
+        if (status === 'arrived_pickup' || status === 'arrived_dropoff') {
+          notifyDriverArrived(deliveryId, customerId, status).catch((err) =>
+            console.error('[PushTrigger] driver_arrived failed:', err),
+          );
+        } else if (status === 'picked_up' || status === 'en_route_dropoff' || status === 'delivered') {
+          notifyDeliveryStatusChange(deliveryId, customerId, status).catch((err) =>
+            console.error('[PushTrigger] delivery_status_change failed:', err),
+          );
+        }
+      }
 
       return c.json({ data: updatedLeg, error: null, meta: null });
     } catch (err) {
