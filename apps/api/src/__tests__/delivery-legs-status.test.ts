@@ -249,7 +249,7 @@ describe('PATCH .../status — customer push notifications', () => {
     },
   );
 
-  it.each(['picked_up', 'en_route_dropoff', 'delivered'] as const)(
+  it.each(['en_route_pickup', 'picked_up', 'en_route_dropoff', 'delivered'] as const)(
     'notifies delivery status change for %s',
     async (status) => {
       const res = await patchStatus(status);
@@ -260,8 +260,8 @@ describe('PATCH .../status — customer push notifications', () => {
     },
   );
 
-  it.each(['accepted', 'en_route_pickup'] as const)(
-    'sends no customer push for %s (no trigger function exists / covered elsewhere)',
+  it.each(['accepted'] as const)(
+    'sends no customer push for %s (covered elsewhere)',
     async (status) => {
       const res = await patchStatus(status);
 

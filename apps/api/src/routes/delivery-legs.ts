@@ -148,15 +148,19 @@ deliveryLegRoutes.patch(
 
       // Customer-facing milestone pushes — fire-and-forget, a push failure
       // shouldn't fail the status update. 'accepted' is already covered by
-      // delivery-accept.ts's own push; 'en_route_pickup' has no trigger
-      // function yet (nobody's written driver-en-route copy).
+      // delivery-accept.ts's own push.
       if (deliveryBefore?.customerId) {
         const customerId = deliveryBefore.customerId;
         if (status === 'arrived_pickup' || status === 'arrived_dropoff') {
           notifyDriverArrived(deliveryId, customerId, status).catch((err) =>
             console.error('[PushTrigger] driver_arrived failed:', err),
           );
-        } else if (status === 'picked_up' || status === 'en_route_dropoff' || status === 'delivered') {
+        } else if (
+          status === 'en_route_pickup' ||
+          status === 'picked_up' ||
+          status === 'en_route_dropoff' ||
+          status === 'delivered'
+        ) {
           notifyDeliveryStatusChange(deliveryId, customerId, status).catch((err) =>
             console.error('[PushTrigger] delivery_status_change failed:', err),
           );

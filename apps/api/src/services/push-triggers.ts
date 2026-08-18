@@ -41,9 +41,11 @@ function buildPayload(
 // ─── Delivery Status Change ──────────────────────────────────────────────────
 
 /**
- * Notify customer when delivery status transitions to picked_up, en_route_dropoff, or delivered.
+ * Notify customer when delivery status transitions to en_route_pickup,
+ * picked_up, en_route_dropoff, or delivered.
  *
  * Call this from the delivery status update handler when the new status is one of:
+ * - en_route_pickup
  * - picked_up
  * - en_route_dropoff
  * - delivered
@@ -53,9 +55,13 @@ function buildPayload(
 export async function notifyDeliveryStatusChange(
   deliveryId: string,
   customerId: string,
-  newStatus: 'picked_up' | 'en_route_dropoff' | 'delivered',
+  newStatus: 'en_route_pickup' | 'picked_up' | 'en_route_dropoff' | 'delivered',
 ): Promise<boolean> {
   const statusMessages: Record<string, { title: string; body: string }> = {
+    en_route_pickup: {
+      title: 'Driver On The Way',
+      body: 'Your driver is on the way to the pickup location.',
+    },
     picked_up: {
       title: 'Package Picked Up',
       body: 'Your package has been picked up and is on its way.',
