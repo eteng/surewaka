@@ -199,7 +199,7 @@ export type DriverDetailDelivery = {
   pickupAddress: string;
   dropoffAddress: string;
   date: string; // ISO string of deliveries.createdAt
-  price: number; // deliveries.price_kobo (0 if null)
+  priceKobo: number; // deliveries.price_kobo (0 if null)
 };
 
 export type DriverDetail = {
@@ -273,7 +273,7 @@ export type CustomerDeliveryItem = {
   dropoffCity: string;
   packageDescription: string;
   packageCategory: string;
-  price: number | null;
+  priceKobo: number | null;
   amountPaid: number | null;
   paymentStatus: string;
   recipientName: string;
@@ -346,7 +346,7 @@ export type DeliveryListItem = {
   dropoffAddress: string;
   dropoffCity: string;
   packageCategory: PackageCategory;
-  price: number | null;
+  priceKobo: number | null;
   createdAt: string;
   updatedAt: string;
   customerName: string;
@@ -372,7 +372,7 @@ export type DeliveryDetail = {
   packageWeight: number;
   packageCategory: PackageCategory;
   deliveryNotes: string | null;
-  price: number | null;
+  priceKobo: number | null;
   amountPaid: number | null;
   paymentStatus: string;
   createdAt: string;

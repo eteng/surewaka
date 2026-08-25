@@ -18,7 +18,6 @@ type Delivery = {
   packageDescription: string;
   packageWeight: number;
   packageCategory: string;
-  price: number | null;
   priceKobo: number | null;
   deliveryMode: string | null;
   cancellationDeadlineAt: string | null;
@@ -257,14 +256,14 @@ export default function TrackingScreen() {
           </View>
         )}
 
-        {delivery.price && (
+        {delivery.priceKobo ? (
           <View className="bg-gray-50 rounded-xl p-4 mb-4">
             <Text className="text-sm font-semibold text-gray-500 uppercase mb-1">Price</Text>
             <Text className="text-xl font-bold text-primary">
-              ₦{((delivery.priceKobo ?? delivery.price ?? 0) / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+              ₦{(delivery.priceKobo / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
             </Text>
           </View>
-        )}
+        ) : null}
 
         {delivery.cancellationDeadlineAt &&
           delivery.status === 'pending' &&

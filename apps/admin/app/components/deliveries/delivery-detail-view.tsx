@@ -285,7 +285,7 @@ function DetailsContent({ delivery }: { delivery: DeliveryDetail }) {
       {/* Pricing | Timestamps */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-4 border-t pt-3">
         <DetailSection title="Pricing">
-          <Field label="Price" value={formatPrice(delivery.price)} />
+          <Field label="Price" value={formatPrice(delivery.priceKobo)} />
           <Field label="Amount Paid" value={formatPrice(delivery.amountPaid)} />
           <Field label="Payment" value={<span className="capitalize">{delivery.paymentStatus}</span>} />
         </DetailSection>

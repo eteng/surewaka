@@ -49,7 +49,7 @@ export async function getDriverDetail(id: string): Promise<DriverDetail | null> 
       pickupAddress: deliveries.pickupAddress,
       dropoffAddress: deliveries.dropoffAddress,
       date: deliveries.createdAt,
-      price: deliveries.priceKobo,
+      priceKobo: deliveries.priceKobo,
     })
     .from(deliveries)
     .where(eq(deliveries.driverId, id))
@@ -80,7 +80,7 @@ export async function getDriverDetail(id: string): Promise<DriverDetail | null> 
       pickupAddress: d.pickupAddress,
       dropoffAddress: d.dropoffAddress,
       date: d.date.toISOString(),
-      price: d.price ?? 0,
+      priceKobo: d.priceKobo ?? 0,
     })),
   };
 }

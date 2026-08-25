@@ -234,12 +234,15 @@ function getColumns(activeTab?: DeliveryTab, compact?: boolean): ColumnDef<Deliv
     });
   } else {
     allColumns.push({
-      accessorKey: 'price',
+      // id stays 'price' — it's the public sortBy value (adminDeliveryListQuerySchema);
+      // the underlying field is priceKobo, so accessorFn reads it explicitly.
+      id: 'price',
+      accessorFn: (row) => row.priceKobo,
       header: 'Price',
       enableSorting: true,
       cell: ({ row }) => (
         <span className="tabular-nums">
-          {formatPrice(row.original.price)}
+          {formatPrice(row.original.priceKobo)}
         </span>
       ),
     });

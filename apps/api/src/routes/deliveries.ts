@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq, and, or, isNull, inArray } from 'drizzle-orm';
+import { eq, and, or, isNull, inArray, ne, desc } from 'drizzle-orm';
 import { db, deliveries, deliveryLegs, users, carriers, carrierRoutes, feeSettings, vehicleTypeRates, quotes, carrierParks } from '@surewaka/db';
 import { requireAuth } from '../middleware/auth';
 import { requireRole } from '../middleware/role';
@@ -45,10 +45,14 @@ deliveryRoutes.use('*', requireAuth);
 deliveryRoutes.get('/', async (c) => {
   const user = c.get('user');
   try {
+    // Exclude 'draft' — abandoned/never-paid bookings, not real deliveries.
+    // Order deterministically: without ORDER BY, Postgres gives no ordering
+    // guarantee, so the customer's list order could shift between refreshes.
     const rows = await db
       .select()
       .from(deliveries)
-      .where(eq(deliveries.customerId, user.id));
+      .where(and(eq(deliveries.customerId, user.id), ne(deliveries.status, 'draft')))
+      .orderBy(desc(deliveries.createdAt));
     return c.json({ data: { deliveries: rows, total: rows.length }, error: null, meta: null });
   } catch {
     return c.json({ data: null, error: { code: 'INTERNAL_ERROR', message: 'Failed to list deliveries' }, meta: null }, 500);

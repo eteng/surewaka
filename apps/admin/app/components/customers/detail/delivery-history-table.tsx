@@ -111,7 +111,7 @@ export function DeliveryHistoryTable({ customerId }: DeliveryHistoryTableProps) 
                 {delivery.pickupCity} → {delivery.dropoffCity}
               </TableCell>
               <TableCell className="tabular-nums whitespace-nowrap">
-                {formatPrice(delivery.price)}
+                {formatPrice(delivery.priceKobo)}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                 {formatDate(delivery.createdAt)}

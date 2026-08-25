@@ -7,6 +7,7 @@ import {
   real,
   integer,
   index,
+  uniqueIndex,
   foreignKey,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -41,6 +42,11 @@ export const drivers = pgTable(
       foreignColumns: [users.id],
       name: 'drivers_user_id_users_id_fk',
     }),
+    // One driver profile per user — every lookup site (driver-locations,
+    // delivery-accept, require-leg-actor, ...) already assumes this via
+    // `.where(eq(drivers.userId, ...)).limit(1)`. Without an index those
+    // lookups are seq scans; this makes it both fast and enforced.
+    uniqueIndex('idx_drivers_user_id').on(table.userId),
     index('idx_drivers_h3_available')
       .on(table.h3Index)
       .where(sql`available = true AND h3_index IS NOT NULL`),

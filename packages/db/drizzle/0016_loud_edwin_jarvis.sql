@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "idx_drivers_user_id" ON "drivers" USING btree ("user_id");

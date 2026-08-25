@@ -83,7 +83,7 @@ export function DeliveriesTab({ deliveries }: DeliveriesTabProps) {
                   {formatDate(delivery.date)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums whitespace-nowrap">
-                  {formatNaira(delivery.price / 100)}
+                  {formatNaira(delivery.priceKobo / 100)}
                 </TableCell>
               </TableRow>
             ))}

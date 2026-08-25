@@ -142,7 +142,7 @@ export function DeliveryRow({
       ) : (
         <>
           <td className="p-3 capitalize">{delivery.packageCategory}</td>
-          <td className="p-3 text-right">{formatPrice(delivery.price)}</td>
+          <td className="p-3 text-right">{formatPrice(delivery.priceKobo)}</td>
           <td className="p-3 text-sm text-muted-foreground">{formatDate(delivery.createdAt)}</td>
         </>
       )}

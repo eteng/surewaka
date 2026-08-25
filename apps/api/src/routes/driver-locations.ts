@@ -30,6 +30,33 @@ export function _resetRateLimit(): void {
   lastUpdateMap.clear();
 }
 
+// ─── Postgres Write Throttling ─────────────────────────────────────────────────
+
+/**
+ * Redis + Ably get every ping at whatever cadence the client sends (that's
+ * what they're built for — cheap, and it's the live-tracking path). Postgres
+ * does not need that freshness: `drivers.lat/lng/h3Index` only feeds
+ * density/matching queries, and `driver_locations` is an audit trail, not
+ * where live tracking reads from. Throttling these separately from the
+ * request-level rate limit above keeps the fast path fast while capping
+ * write (and index-maintenance) volume on the two Postgres tables.
+ */
+const lastPgWriteMap = new Map<string, number>();
+const POSTGRES_WRITE_THROTTLE_MS = 15_000;
+
+function shouldPersistToPostgres(driverId: string): boolean {
+  const now = Date.now();
+  const lastWrite = lastPgWriteMap.get(driverId) ?? 0;
+  if (now - lastWrite < POSTGRES_WRITE_THROTTLE_MS) return false;
+  lastPgWriteMap.set(driverId, now);
+  return true;
+}
+
+/** @internal — exposed for test teardown only */
+export function _resetPgWriteThrottle(): void {
+  lastPgWriteMap.clear();
+}
+
 // ─── Location Store Lazy Init ─────────────────────────────────────────────────
 
 let locationStoreInitialized = false;
@@ -105,7 +132,8 @@ driverLocationRoutes.post('/', async (c) => {
     }
   }
 
-  // Update Redis geo store + publish to Ably via location store
+  // Update Redis geo store + publish to Ably via location store — every
+  // ping, at full client cadence. This is the live-tracking path.
   ensureLocationStore();
   await updateDriverLocation(
     driver.id,
@@ -115,29 +143,40 @@ driverLocationRoutes.post('/', async (c) => {
     { deliveryId: parsed.data.deliveryId },
   );
 
-  // Update driver's H3 cell + coordinates in Postgres (for density queries)
-  const h3Index = getH3Cell(parsed.data.lat, parsed.data.lng, H3_RESOLUTION);
-  await db
-    .update(drivers)
-    .set({ lat: parsed.data.lat, lng: parsed.data.lng, h3Index })
-    .where(eq(drivers.id, driver.id));
+  // Postgres writes are throttled independently of the above — see
+  // shouldPersistToPostgres for why.
+  const persisted = shouldPersistToPostgres(driver.id);
+  let locationId: string | undefined;
 
-  // Postgres audit trail (when there's an active delivery)
-  if (parsed.data.deliveryId) {
-    const [location] = await db
-      .insert(driverLocations)
-      .values({
-        driverId: driver.id,
-        deliveryId: parsed.data.deliveryId,
-        lat: parsed.data.lat,
-        lng: parsed.data.lng,
-      })
-      .returning({ id: driverLocations.id });
+  if (persisted) {
+    // Update driver's H3 cell + coordinates in Postgres (for density queries)
+    const h3Index = getH3Cell(parsed.data.lat, parsed.data.lng, H3_RESOLUTION);
+    await db
+      .update(drivers)
+      .set({ lat: parsed.data.lat, lng: parsed.data.lng, h3Index })
+      .where(eq(drivers.id, driver.id));
 
-    return c.json({ data: { id: location.id }, error: null, meta: null });
+    // Postgres audit trail (when there's an active delivery)
+    if (parsed.data.deliveryId) {
+      const [location] = await db
+        .insert(driverLocations)
+        .values({
+          driverId: driver.id,
+          deliveryId: parsed.data.deliveryId,
+          lat: parsed.data.lat,
+          lng: parsed.data.lng,
+        })
+        .returning({ id: driverLocations.id });
+
+      locationId = location.id;
+    }
   }
 
-  return c.json({ data: { recorded: true }, error: null, meta: null });
+  return c.json({
+    data: { recorded: true, persisted, ...(locationId ? { id: locationId } : {}) },
+    error: null,
+    meta: null,
+  });
 });
 
 export default driverLocationRoutes;
