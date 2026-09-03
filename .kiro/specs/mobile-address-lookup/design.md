@@ -1,14 +1,18 @@
 # Design — Mobile Address Lookup
 
+## Overview
+
+Reusable saved *places* (pickup/dropoff locations) and recent locations for the
+customer mobile app, surfaced as quick-select chips and a save nudge in the
+booking flow, plus a profile management screen.
+
 ## Architecture
 
 This feature follows the established monorepo pattern: DB → shared validators → API routes → service layer → mobile-shared client methods → React Native screens.
 
 No new packages required. All changes are additive.
 
----
-
-## Data Model
+## Data Models
 
 ### New table: `user_saved_addresses`
 
@@ -57,7 +61,17 @@ create policy "users manage own recent locations"
 
 **Upsert strategy:** match on `(user_id, address_text)`. If a row exists, update `used_at` and coords. If new, insert and delete the oldest row if the user's count exceeds 5. All writes are fire-and-forget from the mobile client.
 
-### Drizzle schema (`packages/db/src/schema.ts`)
+### Drizzle schema (`packages/db/src/schema/addresses.ts`)
+
+> **Reconciliation notes (design vs. shipped code):**
+> - Schema is one-file-per-table under `packages/db/src/schema/`, exported via
+>   `schema/index.ts` — not a monolithic `schema.ts`. These tables live in
+>   `schema/addresses.ts`.
+> - The `create table` SQL above shows `references auth.users(id)` and RLS
+>   policies for illustration. The **shipped** tables use a plain foreign key to
+>   `users(id)` (`on delete cascade`) and **no RLS** — authorization is enforced
+>   in the API layer (explicit `WHERE user_id = ?` in every query), per the
+>   project's "no RLS" rule.
 
 ```ts
 export const userSavedAddresses = pgTable('user_saved_addresses', {
@@ -130,7 +144,9 @@ export type UpsertRecentLocation = z.infer<typeof upsertRecentLocationSchema>;
 
 ---
 
-## API Routes (`apps/api/src/routes/addresses.ts`)
+## Components and Interfaces
+
+### API Routes (`apps/api/src/routes/addresses.ts`)
 
 All routes behind `requireAuth`. Ownership enforced at the service layer via explicit `WHERE user_id = ?` in every Drizzle query. RLS is defense-in-depth only.
 
@@ -271,3 +287,29 @@ No new Zustand store. All address data is fetched per-screen into local `useStat
 | Delete fails | `Alert.alert`, item stays in list |
 | Cap reached (`LIMIT_REACHED`) | Edit screen shows error; booking screen never reaches API (chips hidden) |
 | `upsertRecent` fails | Silent — fire-and-forget |
+
+## Correctness Properties
+
+Retained retroactively for this shipped spec. Key invariants enforced by the implementation:
+
+### Property 1: Owner isolation
+
+Every saved-address and recent-location query is scoped by `WHERE user_id = ?`; a user can never read or mutate another user's rows.
+
+**Validates: Requirements 1.1**
+
+### Property 2: Cap invariant
+
+A user never holds more than 25 saved addresses; a create at the cap returns `LIMIT_REACHED` and inserts nothing.
+
+**Validates: Requirements 1.2**
+
+### Property 3: Recent eviction
+
+A user never holds more than 5 recent locations; upsert on `(user_id, address_text)` updates in place, otherwise inserts and evicts the oldest.
+
+**Validates: Requirements 2.1**
+
+## Testing Strategy
+
+Retained retroactively for this shipped spec. Coverage: service-layer unit tests for owner scoping, the 25-cap, and recent upsert/eviction; API route tests behind `requireAuth`; manual verification of the booking chips, search sections, and save nudge on device.

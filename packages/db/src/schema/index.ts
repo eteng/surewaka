@@ -39,6 +39,7 @@ export * from './payout-requests';
 
 // User features
 export * from './addresses';
+export * from './saved-recipients';
 export * from './name-change-requests';
 export * from './notifications';
 export * from './push-tokens';

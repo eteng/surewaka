@@ -8,6 +8,7 @@ import { requestLogger } from './middleware/logging';
 import { maintenanceMode } from './middleware/maintenance';
 import authRoutes from './routes/auth';
 import addressRoutes from './routes/addresses';
+import recipientRoutes from './routes/recipients';
 import carrierRoutes from './routes/carriers';
 import deliveryRoutes from './routes/deliveries';
 import notificationRoutes from './routes/notifications';
@@ -93,6 +94,7 @@ if (process.env.NODE_ENV !== 'production') {
 app.get('/api/v1', (c) => c.json({ message: 'SureWaka API v1' }));
 app.route('/api/v1/auth', authRoutes);
 app.route('/api/v1/addresses', addressRoutes);
+app.route('/api/v1/recipients', recipientRoutes);
 app.route('/api/v1/carriers', carrierRoutes);
 app.route('/api/v1/deliveries', deliveryRoutes);
 app.route('/api/v1/deliveries', deliveryAcceptRoutes);

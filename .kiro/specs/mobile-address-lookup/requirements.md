@@ -1,11 +1,29 @@
-# Requirements — Mobile Address Lookup
+# Requirements Document
 
-## Overview
+Feature: Mobile Address Lookup
+
+> **Status:** Implemented and shipped.
+>
+> **Scope clarification (address vs. recipient):** This spec covers reusable saved
+> *places* (pickup/dropoff locations) and recent locations. It does **not** cover
+> *recipient contact* details (name, phone, notes) — those are per-delivery fields
+> owned by the `booking-recipient-contact` spec, and their reusable contact-book
+> counterpart is `saved-recipients-contact-book`.
+
+## Introduction
 Users need to save frequently-used addresses and quickly select them during the booking flow, with recent locations surfaced automatically — reducing friction for repeat senders.
 
----
+## Glossary
 
-## User Stories
+- **Saved Address:** A user-owned, labelled place (pickup/dropoff location) with coordinates and city/state, reusable across bookings.
+- **Recent Location:** An automatically recorded recently-used location (up to 5 per user), surfaced during address search.
+- **Booking Flow:** The customer mobile pickup → dropoff → package → recipient → carriers → review sequence.
+
+## Requirements
+
+The following user stories and acceptance criteria define the feature.
+
+### User Stories
 
 ### Saved Addresses — Profile
 
