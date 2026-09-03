@@ -1,17 +1,22 @@
-# Tasks — Mobile Address Lookup
+# Implementation Plan — Mobile Address Lookup
+
+## Overview
 
 Implementation order: schema → validators → API → mobile client → screens → booking integration.
 
----
+> **Status:** Implemented and shipped. This document has been reconciled with the
+> shipped code — see the corrected schema location and authorization notes below.
 
-- [x] 1. **DB migration** — create `user_saved_addresses` and `recent_locations` tables with RLS policies in a single migration
+## Tasks
+
+- [x] 1. **DB migration** — create `user_saved_addresses` and `recent_locations` tables in a single migration
   - Run `pnpm db:generate new add_address_lookup_tables`
   - `user_saved_addresses`: id, user_id, label, address_text, city, state, lat, lng, created_at (no is_default)
   - `recent_locations`: id, user_id, address_text, city, state, lat, lng, used_at
-  - RLS on both tables: users manage own rows
+  - Both tables: plain foreign key to `users(id)` `on delete cascade`, **no RLS** — authorization enforced in the API layer per the project's "no RLS" rule
   - Run `pnpm db:generate fetch --yes` to apply
 
-- [x] 2. **Drizzle schema** — add `userSavedAddresses` and `recentLocations` table definitions to `packages/db/src/schema.ts`
+- [x] 2. **Drizzle schema** — add `userSavedAddresses` and `recentLocations` table definitions to `packages/db/src/schema/addresses.ts` (one-file-per-table; exported via `packages/db/src/schema/index.ts` — not a monolithic `schema.ts`)
 
 - [x] 3. **Zod validators** — add `savedAddressSchema` / `createSavedAddressSchema` / `updateSavedAddressSchema` to `packages/shared/src/validators/saved-address.ts`; add `recentLocationSchema` / `upsertRecentLocationSchema` to `packages/shared/src/validators/recent-location.ts`; export both from package index
 
@@ -36,3 +41,49 @@ Implementation order: schema → validators → API → mobile client → screen
 - [x] 13. **Inline save nudge** — add preset label chips ("Home", "Office", "Work", "Other") to the address confirmation card in both booking screens; hidden when `savedAddresses.length >= 25`; chip tap POSTs to `/addresses` and shows "Saved as [label] ✓"; silent on failure
 
 - [x] 14. **Recent location write on confirm** — in `handleConfirm` in `booking/pickup.tsx` and `booking/dropoff.tsx`, fire-and-forget `upsertRecent()` with the confirmed address; no await, no error handling
+
+## Task Dependency Graph
+
+```json
+{
+  "waves": [
+    { "wave": 1, "tasks": ["1", "4"] },
+    { "wave": 2, "tasks": ["2"] },
+    { "wave": 3, "tasks": ["3"] },
+    { "wave": 4, "tasks": ["5", "6"] },
+    { "wave": 5, "tasks": ["7"] },
+    { "wave": 6, "tasks": ["8"] },
+    { "wave": 7, "tasks": ["9", "10", "11"] },
+    { "wave": 8, "tasks": ["12", "13", "14"] }
+  ]
+}
+```
+
+```mermaid
+graph TD
+  T1["1. DB migration"] --> T2["2. Drizzle schema"]
+  T2 --> T3["3. Zod validators"]
+  T3 --> T5["5. Address service"]
+  T3 --> T6["6. Recent location service"]
+  T5 --> T7["7. API routes"]
+  T6 --> T7
+  T7 --> T8["8. Mobile-shared client"]
+  T8 --> T9["9. Profile addresses screen"]
+  T8 --> T10["10. Address edit screen"]
+  T8 --> T11["11. Booking quick-select chips"]
+  T4["4. reverseGeocode() update"] --> T11
+  T11 --> T12["12. Search panel — Recent + Saved"]
+  T11 --> T13["13. Inline save nudge"]
+  T11 --> T14["14. Recent location write on confirm"]
+```
+
+## Notes
+
+- This spec is shipped; the task list is retained as an implementation record.
+- Schema lives in `packages/db/src/schema/addresses.ts` (one-file-per-table),
+  exported via `packages/db/src/schema/index.ts`.
+- Authorization is enforced in the API layer (explicit `WHERE user_id = ?`), not
+  via database RLS, consistent with the project's "no RLS" rule.
+- Scope is saved *places* / recent locations only. Recipient *contact* details are
+  covered by `booking-recipient-contact`; the reusable contact book is
+  `saved-recipients-contact-book`.

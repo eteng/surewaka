@@ -65,9 +65,17 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@react-native/jest-preset": "0.86.3",
+    "@testing-library/react-native": "^14.0.1",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.2.0",
     "babel-preset-expo": "~57.0.4",
+    "fast-check": "^4.9.0",
+    "jest": "^30.5.0",
+    "jest-expo": "~57.0.5",
     "postcss": "^8.5.14",
+    "react-test-renderer": "19.2.3",
+    "test-renderer": "^1.2.0",
     "typescript": "^6.0.3"
   },
   "expo": {

@@ -1,11 +1,35 @@
-# Requirements — Booking Recipient Contact Info
+# Requirements Document
 
-## Overview
+Feature: Booking Recipient Contact Info
+
+> **Status:** Implemented and shipped.
+>
+> **Scope clarification (address vs. recipient):** This spec covers per-delivery
+> *recipient contact* (name, phone, notes) captured on the booking Recipient step
+> and snapshotted onto the `deliveries` row. It does **not** cover saved *places*
+> (pickup/dropoff locations) — that is the separate `mobile-address-lookup` spec.
+>
+> **Related specs:**
+> - `mobile-address-lookup` — reusable saved *places* / recent locations.
+> - `saved-recipients-contact-book` — makes recipient *contacts* reusable (a
+>   contact book) on top of this spec. Recipient details captured here remain a
+>   per-delivery snapshot; the contact book is a convenience source only and never
+>   mutates historical deliveries.
+
+## Introduction
 Drivers need to know who to contact at the pickup and dropoff locations. Currently the delivery record stores addresses but no contact details — a driver arriving at a dropoff has no way to reach the recipient. This feature adds a dedicated booking step to collect recipient contact info and optional delivery notes.
 
----
+## Glossary
 
-## User Stories
+- **Recipient Details:** The name, phone, and optional delivery notes for the person receiving a delivery.
+- **Delivery Snapshot:** Recipient details copied onto the `deliveries` row at booking time; the immutable record for that delivery.
+- **Sender Phone:** The authenticated sender's phone, populated server-side from `users.phone` (not collected in the booking flow).
+
+## Requirements
+
+The following user stories and acceptance criteria define the feature.
+
+### User Stories
 
 ### Recipient Step — Booking Flow
 

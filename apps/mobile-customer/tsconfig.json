@@ -29,6 +29,10 @@
     "nativewind-env.d.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "**/__tests__/**",
+    "test/**",
+    "jest.config.js",
+    "jest.setup.js"
   ]
 }

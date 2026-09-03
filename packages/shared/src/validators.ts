@@ -134,6 +134,24 @@ export const upsertRecentLocationSchema = recentLocationSchema.omit({ id: true, 
 export type RecentLocation = z.infer<typeof recentLocationSchema>;
 export type UpsertRecentLocation = z.infer<typeof upsertRecentLocationSchema>;
 
+// ─── Saved Recipient Validators ──────────────────────────────────────────────
+
+// Composes the reused recipientDetailsSchema (name/phone/notes) so a
+// SavedRecipient inherits the exact recipient validation rules; do not
+// redefine recipient name/phone/notes validation here.
+export const savedRecipientSchema = recipientDetailsSchema.extend({
+  id:         z.string().uuid(),
+  label:      z.string().max(50).optional(),
+  created_at: z.string(),
+});
+
+export const createSavedRecipientSchema = savedRecipientSchema.omit({ id: true, created_at: true });
+export const updateSavedRecipientSchema = createSavedRecipientSchema.partial();
+
+export type SavedRecipient = z.infer<typeof savedRecipientSchema>;
+export type CreateSavedRecipient = z.infer<typeof createSavedRecipientSchema>;
+export type UpdateSavedRecipient = z.infer<typeof updateSavedRecipientSchema>;
+
 // ─── Carrier Driver Onboarding ───────────────────────────────────────────────
 
 export const onboardCarrierDriverSchema = z.object({
