@@ -18,11 +18,13 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Mapbox from '@rnmapbox/maps';
 import { Ionicons } from '@expo/vector-icons';
+import * as Sentry from '@sentry/react-native';
 import {
   useBookingStore,
   searchAddress,
   reverseGeocode,
   createAddressesClient,
+  useSavedAddresses,
 } from '@surewaka/mobile-shared';
 import type { LocationSuggestion } from '@surewaka/mobile-shared';
 import type { SavedAddress, RecentLocation } from '@surewaka/shared';
@@ -58,9 +60,15 @@ export default function DropoffScreen() {
   const [selectedCity, setSelectedCity] = useState(dropoff?.city ?? '');
   const [selectedState, setSelectedState] = useState(dropoff?.state ?? '');
 
-  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
-  const [recentLocations, setRecentLocations] = useState<RecentLocation[]>([]);
+  const {
+    savedAddresses,
+    recentLocations,
+    state: addrLoadState,
+    reload,
+    addSaved,
+  } = useSavedAddresses(token, 'booking/dropoff');
   const [savedLabel, setSavedLabel] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const pickupCoords = pickup?.lat && pickup?.lng
     ? [pickup.lng, pickup.lat] as [number, number]
@@ -100,12 +108,6 @@ export default function DropoffScreen() {
     getTokenRef.current().then((t) => { if (t) setToken(t); });
   }, []);
 
-  useEffect(() => {
-    if (!token) return;
-    client.list().then((r) => { if (r.data) setSavedAddresses(r.data); });
-    client.listRecent().then((r) => { if (r.data) setRecentLocations(r.data); });
-  }, [token]);
-
   const handleSearch = useCallback(
     (text: string) => {
       setQuery(text);
@@ -142,6 +144,7 @@ export default function DropoffScreen() {
     setSelectedCity(suggestion.address?.city ?? suggestion.address?.town ?? suggestion.address?.suburb ?? suggestion.address?.county ?? '');
     setSelectedState(suggestion.address?.state ?? '');
     setSavedLabel(null);
+    setSaveError(null);
     setQuery('');
     setShowSuggestions(false);
     setSuggestions([]);
@@ -153,6 +156,7 @@ export default function DropoffScreen() {
     setSelectedCity(address.city);
     setSelectedState(address.state);
     setSavedLabel(null);
+    setSaveError(null);
     setShowSuggestions(false);
   }, []);
 
@@ -162,6 +166,7 @@ export default function DropoffScreen() {
     setSelectedCity(recent.city);
     setSelectedState(recent.state);
     setSavedLabel(null);
+    setSaveError(null);
     setShowSuggestions(false);
   }, []);
 
@@ -170,6 +175,7 @@ export default function DropoffScreen() {
       const coords = feature.geometry.coordinates as [number, number];
       setSelectedCoords(coords);
       setSavedLabel(null);
+      setSaveError(null);
 
       const address = await reverseGeocode(coords[1], coords[0]);
       if (address) {
@@ -184,20 +190,37 @@ export default function DropoffScreen() {
   const handleSaveNudge = useCallback(
     async (nudgeLabel: string) => {
       if (!selectedAddress || !selectedCoords) return;
-      const result = await client.create({
-        label:        nudgeLabel,
-        address_text: selectedAddress,
-        city:         selectedCity,
-        state:        selectedState,
-        lat:          selectedCoords[1],
-        lng:          selectedCoords[0],
-      });
-      if (!result.error) {
-        setSavedLabel(nudgeLabel);
-        setSavedAddresses((prev) => [...prev, result.data!]);
+      try {
+        const result = await client.create({
+          label:        nudgeLabel,
+          address_text: selectedAddress,
+          city:         selectedCity,
+          state:        selectedState,
+          lat:          selectedCoords[1],
+          lng:          selectedCoords[0],
+        });
+        if (!result.error) {
+          setSavedLabel(nudgeLabel);
+          setSaveError(null);
+          addSaved(result.data!);
+        } else {
+          setSaveError("Couldn't save — try again");
+          Sentry.captureException(
+            result.error instanceof Error
+              ? result.error
+              : new Error(JSON.stringify(result.error)),
+            { tags: { app: 'mobile-customer', screen: 'booking/dropoff' }, extra: { op: 'create' } },
+          );
+        }
+      } catch (e) {
+        setSaveError("Couldn't save — try again");
+        Sentry.captureException(e, {
+          tags: { app: 'mobile-customer', screen: 'booking/dropoff' },
+          extra: { op: 'create' },
+        });
       }
     },
-    [selectedAddress, selectedCoords, selectedCity, selectedState, token],
+    [selectedAddress, selectedCoords, selectedCity, selectedState, token, client, addSaved],
   );
 
   const handleConfirm = () => {
@@ -215,13 +238,20 @@ export default function DropoffScreen() {
     });
     setStep(2);
 
-    client.upsertRecent({
-      address_text: selectedAddress,
-      city:         selectedCity,
-      state:        selectedState,
-      lat:          selectedCoords[1],
-      lng:          selectedCoords[0],
-    });
+    client
+      .upsertRecent({
+        address_text: selectedAddress,
+        city:         selectedCity,
+        state:        selectedState,
+        lat:          selectedCoords[1],
+        lng:          selectedCoords[0],
+      })
+      .catch((e) =>
+        Sentry.captureException(e, {
+          tags: { app: 'mobile-customer', screen: 'booking/dropoff' },
+          extra: { op: 'upsertRecent' },
+        }),
+      );
 
     router.push('/booking/package');
   };
@@ -261,7 +291,32 @@ export default function DropoffScreen() {
         </Mapbox.MapView>
 
       <View className="absolute top-12 left-4 right-4 z-10">
-        {savedAddresses.length > 0 && !showSuggestions && (
+        {addrLoadState === 'loading' && !showSuggestions && (
+          <View
+            testID="saved-addresses-loading"
+            className="flex-row mb-2"
+            style={{ paddingHorizontal: 4, gap: 8 }}
+          >
+            {[0, 1, 2].map((i) => (
+              <View
+                key={i}
+                className="bg-gray-200 rounded-full h-8 w-20 animate-pulse"
+              />
+            ))}
+          </View>
+        )}
+
+        {addrLoadState === 'error' && !showSuggestions && (
+          <View className="flex-row items-center bg-white rounded-full px-3 py-1.5 mb-2 shadow-sm self-start">
+            <Ionicons name="alert-circle-outline" size={16} color="#dc2626" />
+            <Text className="text-xs text-gray-700 ml-1.5">Couldn't load your addresses</Text>
+            <Pressable onPress={() => reload()} hitSlop={8} className="ml-2">
+              <Text className="text-xs font-semibold text-primary">Retry</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {addrLoadState === 'ready' && savedAddresses.length > 0 && !showSuggestions && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -295,7 +350,26 @@ export default function DropoffScreen() {
             {searching && <ActivityIndicator size="small" color="#16a34a" />}
           </View>
 
-          {showEmptySearch && (recentLocations.length > 0 || savedAddresses.length > 0) && (
+          {showEmptySearch && addrLoadState === 'loading' && (
+            <View className="px-4 py-3">
+              <Text className="pt-1 pb-2 text-xs font-semibold text-gray-400 uppercase">Recent</Text>
+              {[0, 1].map((i) => (
+                <View key={i} className="h-4 bg-gray-200 rounded animate-pulse mb-3 w-3/4" />
+              ))}
+            </View>
+          )}
+
+          {showEmptySearch && addrLoadState === 'error' && (
+            <View className="flex-row items-center px-4 py-3">
+              <Ionicons name="alert-circle-outline" size={16} color="#dc2626" />
+              <Text className="text-xs text-gray-700 ml-1.5">Couldn't load your addresses</Text>
+              <Pressable onPress={() => reload()} hitSlop={8} className="ml-2">
+                <Text className="text-xs font-semibold text-primary">Retry</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {showEmptySearch && addrLoadState === 'ready' && (recentLocations.length > 0 || savedAddresses.length > 0) && (
             <ScrollView style={{ maxHeight: 260 }} keyboardShouldPersistTaps="always">
               {recentLocations.length > 0 && (
                 <>
@@ -392,6 +466,12 @@ export default function DropoffScreen() {
                         </Pressable>
                       ))}
                     </ScrollView>
+                  )}
+                  {saveError && (
+                    <View className="flex-row items-center gap-1 mt-2">
+                      <Ionicons name="alert-circle-outline" size={14} color="#dc2626" />
+                      <Text className="text-xs text-red-600 font-medium">{saveError}</Text>
+                    </View>
                   )}
                 </View>
               )}

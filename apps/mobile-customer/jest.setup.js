@@ -60,6 +60,23 @@ jest.mock('@surewaka/mobile-shared/src/store/connectivity-store', () => {
   return { useConnectivityStore };
 });
 
+// --- addresses-client seam: the REAL useSavedAddresses hook
+// (packages/mobile-shared/src/hooks/use-saved-addresses.ts) obtains its client
+// from packages/mobile-shared/src/api/addresses-client.ts. The booking-address
+// tests drive the hook with a controllable client by overriding
+// `createAddressesClient` on their `jest.mock('@surewaka/mobile-shared', ...)`.
+// Mock this seam so the hook resolves `createAddressesClient` from that (mocked)
+// package export at call-time — routing each test's `mockClient` into the real
+// hook while its Promise.all / Sentry / state logic runs unchanged. When a test
+// does NOT mock `@surewaka/mobile-shared` (e.g. the recipient suite), it resolves
+// via moduleNameMapper to the shim, which re-exports the real factory — so the
+// seam stays transparent there too. ---
+jest.mock('@surewaka/mobile-shared/src/api/addresses-client', () => ({
+  createAddressesClient: (token) =>
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('@surewaka/mobile-shared').createAddressesClient(token),
+}));
+
 // --- @sentry/react-native: tests assert captureException is called ---
 jest.mock('@sentry/react-native', () => ({
   captureException: jest.fn(),

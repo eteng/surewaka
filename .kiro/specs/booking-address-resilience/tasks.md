@@ -22,7 +22,7 @@ schema, or package additions. Test sub-tasks are marked with `*`.
 
 ## Tasks
 
-- [ ] 1. Write bug-condition exploration tests (EXPECTED TO FAIL on unfixed code)
+- [x] 1. Write bug-condition exploration tests (EXPECTED TO FAIL on unfixed code)
   - **Property 1: Bug Condition** - Address Resilience And Reporting (exploration phase)
   - **CRITICAL**: These tests MUST FAIL on the current, unfixed `pickup.tsx` / `dropoff.tsx` —
     failure confirms the four defects exist. **DO NOT fix the test or the code when it fails.**
@@ -52,7 +52,7 @@ schema, or package additions. Test sub-tasks are marked with `*`.
   - **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7**
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7_
 
-- [ ] 2. Create the shared `useSavedAddresses` hook
+- [x] 2. Create the shared `useSavedAddresses` hook
   - Create `packages/mobile-shared/src/hooks/use-saved-addresses.ts`.
   - Export `type AddrLoadState = 'loading' | 'error' | 'ready'`.
   - Implement `useSavedAddresses(token: string, route: string)` returning
@@ -75,7 +75,7 @@ schema, or package additions. Test sub-tasks are marked with `*`.
   - _Preservation: successful loads still populate savedAddresses/recentLocations; token gate + timing unchanged (Req 3.1, 3.2)_
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.7, 3.1, 3.2_
 
-- [ ] 3. Fix `pickup.tsx` (route `booking/pickup`)
+- [x] 3. Fix `pickup.tsx` (route `booking/pickup`)
   - Adopt the hook: replace the local `savedAddresses` / `recentLocations` `useState` + on-mount
     `useEffect` with
     `const { savedAddresses, recentLocations, state: addrLoadState, reload, addSaved } = useSavedAddresses(token, 'booking/pickup');`
@@ -102,7 +102,7 @@ schema, or package additions. Test sub-tasks are marked with `*`.
   - _Preservation: successful chip/search population; "Saved as {label}" + append; store set + step advance + non-blocking upsertRecent + synchronous navigation (Req 3.1, 3.3, 3.4)_
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 3.1, 3.3, 3.4_
 
-- [ ] 4. Fix `dropoff.tsx` (route `booking/dropoff`) — symmetric to task 3
+- [x] 4. Fix `dropoff.tsx` (route `booking/dropoff`) — symmetric to task 3
   - Apply the identical changes as task 3, with route/screen `'booking/dropoff'`:
     - Adopt `useSavedAddresses(token, 'booking/dropoff')`.
     - Loading placeholder for the chip row + Recent/Saved section (Req 2.1, 2.3).
@@ -117,7 +117,7 @@ schema, or package additions. Test sub-tasks are marked with `*`.
   - _Preservation: successful chip/search population; "Saved as {label}" + append; store set + step advance + non-blocking upsertRecent + synchronous navigation (Req 3.1, 3.3, 3.4)_
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 3.1, 3.3, 3.4_
 
-- [ ] 5. * Fix-checking tests — verify Property 1 for all bug inputs
+- [x] 5. * Fix-checking tests — verify Property 1 for all bug inputs
   - **Property 1: Expected Behavior** - Address Resilience And Reporting (fix-checking phase)
   - **IMPORTANT**: Re-run the SAME tests written in task 1 — do NOT write new ones. Task 1's tests
     encode the expected behavior; passing them confirms the fix.
@@ -134,7 +134,7 @@ schema, or package additions. Test sub-tasks are marked with `*`.
   - **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7**
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7_
 
-- [ ] 6. * Preservation tests — verify Property 2 for all non-bug inputs (fast-check)
+- [x] 6. * Preservation tests — verify Property 2 for all non-bug inputs (fast-check)
   - **Property 2: Preservation** - Happy Path And Out-Of-Scope Paths Unchanged
   - **IMPORTANT**: Follow the observation-first methodology — first observe the happy-path behavior on
     UNFIXED code (successful chip/search population; "Saved as {label}" + append; non-blocking recent
@@ -157,7 +157,7 @@ schema, or package additions. Test sub-tasks are marked with `*`.
   - **Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7**
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
 
-- [ ] 7. Checkpoint — type-check and run the test suite
+- [x] 7. Checkpoint — type-check and run the test suite
   - Run `pnpm --filter @surewaka/mobile-shared exec tsc --noEmit`.
   - Run `pnpm --filter @surewaka/mobile-customer exec tsc --noEmit`.
   - Run the mobile test suite (single run, no watch) and ensure Task 1's tests now PASS (fix checking),

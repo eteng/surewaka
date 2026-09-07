@@ -49,6 +49,15 @@ module.exports = {
     '/node_modules/\\.pnpm/@react-native\\+babel-preset@',
   ],
   moduleNameMapper: {
+    // @sentry/react-native: under pnpm the app and packages/mobile-shared resolve
+    // DIFFERENT physical copies of this package (distinct .pnpm hashes). The
+    // jest.mock('@sentry/react-native', ...) in jest.setup.js only replaces one
+    // resolution, so the REAL useSavedAddresses hook (which lives in
+    // packages/mobile-shared) would import an UNMOCKED Sentry and its
+    // captureException calls would be invisible to the app's spy. Collapse every
+    // resolution onto a single instance so the mock applies uniformly and the
+    // hook's Sentry reporting is observable in the booking-address tests.
+    '^@sentry/react-native$': require.resolve('@sentry/react-native'),
     // @surewaka/shared is pure TS (zod validators/types) — resolve to source.
     '^@surewaka/shared$': '<rootDir>/../../packages/shared/src/index.ts',
     // @surewaka/mobile-shared's barrel index pulls in heavy transitive modules

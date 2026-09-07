@@ -14,6 +14,8 @@ export { tokenCache } from './clerk';
 export { useAuth } from './hooks/use-auth';
 export { useLocation } from './hooks/use-location';
 export { useQuoteExpiry } from './hooks/use-quote-expiry';
+export { useSavedAddresses } from './hooks/use-saved-addresses';
+export type { AddrLoadState } from './hooks/use-saved-addresses';
 export { apiClient, createAuthClient } from './api/client';
 export type { ApiResponse } from './api/client';
 export { createAddressesClient } from './api/addresses';
