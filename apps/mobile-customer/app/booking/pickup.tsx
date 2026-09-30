@@ -43,7 +43,6 @@ export default function PickupScreen() {
   const setPickup = useBookingStore((s) => s.setPickup);
   const setStep = useBookingStore((s) => s.setStep);
   const [token, setToken] = useState('');
-  const client = createAddressesClient(token);
 
   // Stabilize getToken — @clerk/expo v4 returns a new reference each render
   const getTokenRef = useRef(getToken);
@@ -204,7 +203,14 @@ export default function PickupScreen() {
     async (nudgeLabel: string) => {
       if (!selectedAddress || !selectedCoords) return;
       try {
-        const result = await client.create({
+        // Fetch a fresh token at call time — the token captured at mount may
+        // have expired by the time the user taps a save-nudge label.
+        const freshToken = await getTokenRef.current();
+        if (!freshToken) {
+          setSaveError("Couldn't save — try again");
+          return;
+        }
+        const result = await createAddressesClient(freshToken).create({
           label:        nudgeLabel,
           address_text: selectedAddress,
           city:         selectedCity,
@@ -236,7 +242,7 @@ export default function PickupScreen() {
         });
       }
     },
-    [selectedAddress, selectedCoords, selectedCity, selectedState, token, client, addSaved],
+    [selectedAddress, selectedCoords, selectedCity, selectedState, addSaved],
   );
 
   const handleConfirm = () => {
@@ -254,7 +260,12 @@ export default function PickupScreen() {
     });
     setStep(1);
 
-    client
+    // Fire-and-forget background write with the mount-captured token, kept
+    // synchronous and non-blocking (Req 3.4). This is a non-critical background
+    // write; a rejection (incl. an expired token) is caught + reported to Sentry
+    // and never surfaced to the user. The user-facing save-nudge `create` uses a
+    // fresh call-time token instead, where a 401 would actually matter.
+    createAddressesClient(token)
       .upsertRecent({
         address_text: selectedAddress,
         city:         selectedCity,

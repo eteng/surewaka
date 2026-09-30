@@ -104,11 +104,16 @@ export default function RecipientScreen() {
   const handleSaveNudge = useCallback(async () => {
     const values = watch();
     const parsed = recipientDetailsSchema.safeParse(values);
-    if (!parsed.success || !token) return;
+    if (!parsed.success) return;
+
+    // Fetch a fresh token at call time — a token captured at mount may have
+    // expired by the time the user taps Save (Clerk tokens live ~60s).
+    const freshToken = await getTokenRef.current();
+    if (!freshToken) return;
 
     setSaving(true);
     setSaveError(false);
-    const client = createRecipientsClient(token);
+    const client = createRecipientsClient(freshToken);
     const result = await client.create({
       recipientName: parsed.data.recipientName,
       recipientPhone: parsed.data.recipientPhone,
@@ -131,7 +136,7 @@ export default function RecipientScreen() {
 
     addRecipient(result.data);
     setSaved(true);
-  }, [watch, token, label, addRecipient]);
+  }, [watch, label, addRecipient]);
 
   // Save-nudge visibility: valid form values AND under the cap.
   const values = watch();
