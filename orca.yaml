@@ -1,0 +1,5 @@
+scripts:
+  setup: |
+    pnpm worktree:setup
+  archive: |
+    echo "Cleaning up before archive"

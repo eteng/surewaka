@@ -2,8 +2,12 @@
 set -euo pipefail
 
 # Usage: scripts/new-worktree.sh <branch-name>
-# Creates a git worktree at .worktrees/<branch-name>, installs deps,
-# and symlinks all local env files from the root and each app.
+# Creates a git worktree at .worktrees/<branch-name>, then runs the shared
+# setup (env symlinks + pnpm install) via scripts/worktree-setup.sh.
+#
+# For Orca-managed worktrees, Orca performs the checkout itself and runs
+# scripts/worktree-setup.sh directly through the orca.yaml `setup` hook
+# (pnpm worktree:setup). This script is the manual, non-Orca entry point.
 
 BRANCH=${1:-}
 if [[ -z "$BRANCH" ]]; then
@@ -23,43 +27,9 @@ fi
 echo "Creating worktree: $DEST on branch $BRANCH"
 git worktree add "$DEST" -b "$BRANCH"
 
-# Symlink root-level env files
-for f in .env .env.local .env.*.local; do
-  if [[ -f "$ROOT/$f" ]]; then
-    ln -s "$ROOT/$f" "$DEST/$f"
-    echo "  linked $f"
-  fi
-done
-
-# Symlink per-app env files
-APP_DIRS=(
-  apps/api
-  apps/landing
-  apps/admin
-  apps/web
-  apps/mobile-customer
-  apps/mobile-driver
-)
-
-for app in "${APP_DIRS[@]}"; do
-  src_dir="$ROOT/$app"
-  dest_dir="$DEST/$app"
-
-  if [[ ! -d "$src_dir" ]]; then
-    continue
-  fi
-
-  for f in .env .env.local .env.*.local; do
-    if [[ -f "$src_dir/$f" ]]; then
-      ln -sf "$src_dir/$f" "$dest_dir/$f"
-      echo "  linked $app/$f"
-    fi
-  done
-done
-
-echo "Installing dependencies..."
-cd "$DEST"
-pnpm install
+# Delegate env symlinking + dependency install to the shared setup script,
+# run from inside the new worktree so it resolves the main worktree correctly.
+( cd "$DEST" && bash "$ROOT/scripts/worktree-setup.sh" )
 
 echo ""
 echo "Worktree ready at $DEST"
