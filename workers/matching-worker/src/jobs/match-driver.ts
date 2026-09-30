@@ -11,6 +11,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { connection } from '../queue';
 import { triggerSelfDropFallback } from './self-drop-fallback';
 import { cleanupCancelledMatching } from './cancel-matching';
+import { enqueuePushFromWorker } from '../push-enqueue';
 import { logger } from '../lib/logger';
 
 /**
@@ -259,7 +260,22 @@ export async function handleMatchDriver(job: Job<MatchDriverJobData>): Promise<M
   // All tiers exhausted — no match found (Req 3.6, 12.1)
   const totalDurationMs = Date.now() - startTime;
 
-  if (job.data.legType === 'first_mile' && job.data.legId) {
+  // Self-drop is a surewaka_way (multi-leg) mechanism only: the customer drops
+  // at the park so the downstream intercity/transfer/last-mile legs can still
+  // proceed (Req 12.3). It is meaningless for a single-leg on-demand delivery,
+  // where the first-mile leg IS the whole trip — there are no remaining legs to
+  // keep active. Gate on the delivery's mode so on-demand no-matches fall
+  // through to the cancel/routing_failed path (Req 3.6) instead.
+  const [deliveryRow] = await log.time('db:load-delivery-mode', () =>
+    db
+      .select({ deliveryMode: deliveries.deliveryMode })
+      .from(deliveries)
+      .where(eq(deliveries.id, deliveryId))
+      .limit(1),
+  );
+  const isSurewakaWay = deliveryRow?.deliveryMode === 'surewaka_way';
+
+  if (job.data.legType === 'first_mile' && job.data.legId && isSurewakaWay) {
     log.warn('All tiers exhausted — triggering self-drop fallback', {
       totalDurationMs,
       offeredTotal: offeredDriverIds.size,
@@ -276,13 +292,14 @@ export async function handleMatchDriver(job: Job<MatchDriverJobData>): Promise<M
     );
     return { matched: false, reason: 'no_drivers' };
   } else {
-    log.warn('All tiers exhausted — cancelling delivery (no self-drop for this leg type)', {
+    log.warn('All tiers exhausted — marking delivery routing_failed (no self-drop for this delivery)', {
       totalDurationMs,
       offeredTotal: offeredDriverIds.size,
       legType: job.data.legType,
+      deliveryMode: deliveryRow?.deliveryMode ?? null,
     });
     await log.time('cancel:no-match', () =>
-      cancelDeliveryNoMatch(deliveryId),
+      cancelDeliveryNoMatch(deliveryId, job.data.customerId),
     );
     return { matched: false, reason: 'no_drivers' };
   }
@@ -367,9 +384,42 @@ async function expireOffers(deliveryId: string, tier: number): Promise<void> {
 
 // ─── Cancel Delivery on Total Timeout (Req 3.6) ──────────────────────────────
 
-async function cancelDeliveryNoMatch(deliveryId: string): Promise<void> {
+async function cancelDeliveryNoMatch(deliveryId: string, customerId: string): Promise<void> {
+  // Mark as routing_failed (not a bare 'cancelled') and notify the client, so
+  // the matching-progress screen leaves its "Finding your driver" state and
+  // shows the failed + retry affordance. Mirrors the retry-exhaustion path in
+  // index.ts: routing_failed status + a 'matching-failed' event on the delivery
+  // channel + a push. The confirmed screen already handles both signals.
   await db
     .update(deliveries)
-    .set({ status: 'cancelled', updatedAt: new Date() })
+    .set({ status: 'routing_failed', updatedAt: new Date() })
     .where(eq(deliveries.id, deliveryId));
+
+  try {
+    await enqueuePushFromWorker(customerId, 'routing-failed', {
+      title: 'Unable to find a driver',
+      body: 'We could not match a driver for your delivery. Our team has been notified and will assist you shortly.',
+      data: {
+        type: 'routing-failed',
+        resourceId: deliveryId,
+        deepLink: `/deliveries`,
+      },
+    });
+  } catch (err) {
+    logger.error('Failed to enqueue routing-failed push', {
+      deliveryId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  try {
+    const realtime = createAblyProvider();
+    await realtime.publish(`delivery:${deliveryId}`, 'matching-failed', { deliveryId });
+    realtime.close();
+  } catch (err) {
+    logger.error('Failed to publish matching-failed event', {
+      deliveryId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
