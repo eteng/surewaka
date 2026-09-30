@@ -47,8 +47,18 @@ async function upsertPark(park: {
 }): Promise<string> {
   const h3Index = latLngToCell(park.lat, park.lng, H3_RESOLUTION);
 
+  // Normalize city to lowercase so seeded parks match the surewaka_way park
+  // lookup in apps/api/src/routes/deliveries.ts (which compares against the
+  // lowercased classified city) and the admin carrier-parks write path
+  // (apps/api/src/routes/admin/carrier-parks.ts), both of which store/query
+  // lowercase. Seeding Title Case here caused NO_PARKS_IN_CITY (see SUR-7).
+  const normalizedCity = park.city.trim().toLowerCase();
+
   // Insert with h3_index, silently skip if (carrierId, name) already exists.
-  await db.insert(carrierParks).values({ ...park, h3Index }).onConflictDoNothing();
+  await db
+    .insert(carrierParks)
+    .values({ ...park, city: normalizedCity, h3Index })
+    .onConflictDoNothing();
 
   // Fetch the row to get its id (whether just inserted or pre-existing).
   const rows = await db
