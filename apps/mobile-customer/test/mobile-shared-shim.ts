@@ -34,6 +34,7 @@ export { apiClient, createAuthClient } from '@surewaka/mobile-shared/src/api/cli
 export type { ApiResponse, ApiError } from '@surewaka/mobile-shared/src/api/client';
 export { useSavedAddresses } from '@surewaka/mobile-shared/src/hooks/use-saved-addresses';
 export type { AddrLoadState } from '@surewaka/mobile-shared/src/hooks/use-saved-addresses';
+export { useBottomActionInset } from '@surewaka/mobile-shared/src/hooks/use-bottom-action-inset';
 export { createAddressesClient } from '@surewaka/mobile-shared/src/api/addresses-client';
 export { searchAddress, reverseGeocode } from '@surewaka/mobile-shared/src/maps/locationiq';
 export type { LocationSuggestion } from '@surewaka/mobile-shared/src/maps/locationiq';

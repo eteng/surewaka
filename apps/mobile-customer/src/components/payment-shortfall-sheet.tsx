@@ -1,14 +1,18 @@
 import { useAuth } from '@clerk/expo';
-import { useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { useRef, useState } from 'react';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { useAuthStore } from '@surewaka/mobile-shared';
+import { BottomSheet, Button } from '@surewaka/mobile-shared';
 
 type Props = {
+  /** Controls sheet visibility so this component owns its own Modal. */
+  visible: boolean;
   shortfall: number;
   deliveryId: string;
   totalAmount: number;
+  /** Called after a top-up is confirmed successfully. */
   onSuccess: () => void;
+  /** Called when the user dismisses the sheet (Cancel / backdrop / back). */
   onDismiss: () => void;
 };
 
@@ -19,6 +23,7 @@ function formatNaira(kobo: number) {
 }
 
 export function PaymentShortfallSheet({
+  visible,
   shortfall,
   deliveryId,
   totalAmount,
@@ -27,6 +32,7 @@ export function PaymentShortfallSheet({
 }: Props) {
   const { getToken } = useAuth();
   const [loading, setLoading] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function pay(amount: number, topupType: 'manual' | 'booking_shortfall') {
     const token = await getToken();
@@ -53,31 +59,37 @@ export function PaymentShortfallSheet({
         throw new Error(json.error?.message ?? 'No authorization URL');
       }
 
+      // Opens the Paystack checkout. Resolves (and auto-dismisses the in-app browser)
+      // as soon as Paystack redirects back to the surewaka://booking return URL.
       await WebBrowser.openAuthSessionAsync(json.data.authorization_url, 'surewaka://booking');
 
-      // Poll for payment status then trigger booking confirm
+      // The browser has closed at this point; poll the fund status and route on success.
+      const reference = json.data.reference;
       let attempts = 0;
-      const interval = setInterval(() => {
+      pollRef.current = setInterval(() => {
         void (async () => {
           try {
             attempts++;
             const pollToken = await getToken();
             if (!pollToken) return;
-            const statusRes = await fetch(
-              `${API_URL}/api/v1/wallet/fund/${json.data!.reference}`,
-              { headers: { Authorization: `Bearer ${pollToken}` } },
-            );
-            const statusJson = (await statusRes.json()) as { data: { status: string } };
+            const statusRes = await fetch(`${API_URL}/api/v1/wallet/fund/${reference}`, {
+              headers: { Authorization: `Bearer ${pollToken}` },
+            });
+            const statusJson = (await statusRes.json()) as { data: { status: string } | null };
             if (statusJson.data?.status === 'success') {
-              clearInterval(interval);
+              stopPolling();
+              setLoading(false);
               onSuccess();
             } else if (attempts >= 8) {
-              clearInterval(interval);
+              stopPolling();
               setLoading(false);
-              Alert.alert('Payment Timeout', 'We could not confirm your payment. Please check your wallet and try again.');
+              Alert.alert(
+                'Payment Timeout',
+                'We could not confirm your payment. Please check your wallet and try again.',
+              );
             }
           } catch {
-            clearInterval(interval);
+            stopPolling();
             setLoading(false);
           }
         })();
@@ -89,49 +101,81 @@ export function PaymentShortfallSheet({
     }
   }
 
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  function handleDismiss() {
+    if (loading) return; // don't allow dismiss mid-payment
+    stopPolling();
+    onDismiss();
+  }
+
   return (
-    <View className="bg-white rounded-t-2xl p-6">
-      <Text className="text-lg font-bold text-gray-900 mb-1">Insufficient Balance</Text>
-      <Text className="text-sm text-gray-500 mb-6">
-        You need{' '}
-        <Text className="font-semibold text-gray-900">{formatNaira(shortfall)}</Text> more to
-        complete this booking.
+    <BottomSheet visible={visible} onClose={handleDismiss} title="Insufficient Balance">
+      <Text style={styles.body}>
+        You need <Text style={styles.bodyStrong}>{formatNaira(shortfall)}</Text> more to complete
+        this booking.
       </Text>
 
-      <Pressable
-        onPress={() => pay(shortfall, 'booking_shortfall')}
+      <Button
+        label={`Top Up ${formatNaira(shortfall)}`}
+        onPress={() => void pay(shortfall, 'booking_shortfall')}
+        loading={loading}
         disabled={loading}
-        className="bg-primary py-4 rounded-xl items-center mb-3"
-      >
-        {loading ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text className="text-white font-semibold text-base">
-            Top Up {formatNaira(shortfall)}
-          </Text>
-        )}
-      </Pressable>
+        variant="primary"
+        style={styles.primaryButton}
+      />
 
-      <Pressable
-        onPress={() => pay(totalAmount, 'booking_shortfall')}
+      <View style={styles.cardButtonWrap}>
+        <Button
+          label={`Pay ${formatNaira(totalAmount)} now (card only)`}
+          onPress={() => void pay(totalAmount, 'booking_shortfall')}
+          loading={loading}
+          disabled={loading}
+          variant="secondary"
+        />
+        <Text style={styles.cardHint}>Funds wallet then immediately deducts</Text>
+      </View>
+
+      <Button
+        label="Cancel"
+        onPress={handleDismiss}
         disabled={loading}
-        className="border border-primary py-4 rounded-xl items-center mb-3"
-      >
-        {loading ? (
-          <ActivityIndicator color="#16a34a" />
-        ) : (
-          <>
-            <Text className="text-primary font-semibold text-base">
-              Pay {formatNaira(totalAmount)} now (card only)
-            </Text>
-            <Text className="text-xs text-gray-400 mt-1">Funds wallet then immediately deducts</Text>
-          </>
-        )}
-      </Pressable>
-
-      <Pressable onPress={onDismiss} disabled={loading} className="items-center py-2">
-        <Text className="text-sm text-gray-400">Cancel</Text>
-      </Pressable>
-    </View>
+        variant="secondary"
+        style={styles.cancelButton}
+      />
+    </BottomSheet>
   );
 }
+
+const styles = StyleSheet.create({
+  body: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  bodyStrong: {
+    fontWeight: '600',
+    color: '#111827',
+  },
+  primaryButton: {
+    marginBottom: 12,
+  },
+  cardButtonWrap: {
+    marginBottom: 12,
+  },
+  cardHint: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginTop: 6,
+  },
+  cancelButton: {
+    borderColor: 'transparent',
+  },
+});

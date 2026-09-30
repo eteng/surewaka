@@ -26,6 +26,7 @@ import {
   reverseGeocode,
   createAddressesClient,
   useSavedAddresses,
+  useBottomActionInset,
 } from '@surewaka/mobile-shared';
 import type { LocationSuggestion } from '@surewaka/mobile-shared';
 import type { SavedAddress, RecentLocation } from '@surewaka/shared';
@@ -72,6 +73,7 @@ export default function PickupScreen() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const insets = useSafeAreaInsets();
+  const bottomActionInset = useBottomActionInset(8);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const panelBottom = useRef(new Animated.Value(0)).current;
 
@@ -92,7 +94,10 @@ export default function PickupScreen() {
         useNativeDriver: false,
       }).start();
     });
-    return () => { show.remove(); hide.remove(); };
+    return () => {
+      show.remove();
+      hide.remove();
+    };
   }, [panelBottom]);
 
   useEffect(() => {
@@ -107,7 +112,13 @@ export default function PickupScreen() {
           const address = await reverseGeocode(loc.coords.latitude, loc.coords.longitude);
           if (address) {
             setSelectedAddress(address.display_name);
-            setSelectedCity(address.address?.city ?? address.address?.town ?? address.address?.suburb ?? address.address?.county ?? '');
+            setSelectedCity(
+              address.address?.city ??
+                address.address?.town ??
+                address.address?.suburb ??
+                address.address?.county ??
+                '',
+            );
             setSelectedState(address.address?.state ?? '');
           }
         }
@@ -117,43 +128,48 @@ export default function PickupScreen() {
   }, []);
 
   useEffect(() => {
-    getTokenRef.current().then((t) => { if (t) setToken(t); });
+    getTokenRef.current().then((t) => {
+      if (t) setToken(t);
+    });
   }, []);
 
-  const handleSearch = useCallback(
-    (text: string) => {
-      setQuery(text);
-      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+  const handleSearch = useCallback((text: string) => {
+    setQuery(text);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
 
-      if (text.length < 3) {
-        setSuggestions([]);
-        setShowSuggestions(true);
-        return;
-      }
-
+    if (text.length < 3) {
+      setSuggestions([]);
       setShowSuggestions(true);
-      setSearching(true);
+      return;
+    }
 
-      searchTimeout.current = setTimeout(async () => {
-        try {
-          const results = await searchAddress(text);
-          setSuggestions(results);
-        } catch {
-          setSuggestions([]);
-        } finally {
-          setSearching(false);
-        }
-      }, 400);
-    },
-    [],
-  );
+    setShowSuggestions(true);
+    setSearching(true);
+
+    searchTimeout.current = setTimeout(async () => {
+      try {
+        const results = await searchAddress(text);
+        setSuggestions(results);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+  }, []);
 
   const selectSuggestion = useCallback((suggestion: LocationSuggestion) => {
     const lat = parseFloat(suggestion.lat);
     const lon = parseFloat(suggestion.lon);
     setSelectedCoords([lon, lat]);
     setSelectedAddress(suggestion.display_name);
-    setSelectedCity(suggestion.address?.city ?? suggestion.address?.town ?? suggestion.address?.suburb ?? suggestion.address?.county ?? '');
+    setSelectedCity(
+      suggestion.address?.city ??
+        suggestion.address?.town ??
+        suggestion.address?.suburb ??
+        suggestion.address?.county ??
+        '',
+    );
     setSelectedState(suggestion.address?.state ?? '');
     setSavedLabel(null);
     setSaveError(null);
@@ -183,7 +199,9 @@ export default function PickupScreen() {
   }, []);
 
   const handleMapPress = useCallback(
-    async (feature: Parameters<NonNullable<React.ComponentProps<typeof Mapbox.MapView>['onPress']>>[0]) => {
+    async (
+      feature: Parameters<NonNullable<React.ComponentProps<typeof Mapbox.MapView>['onPress']>>[0],
+    ) => {
       const coords = feature.geometry.coordinates as [number, number];
       setSelectedCoords(coords);
       setSavedLabel(null);
@@ -192,7 +210,13 @@ export default function PickupScreen() {
       const address = await reverseGeocode(coords[1], coords[0]);
       if (address) {
         setSelectedAddress(address.display_name);
-        setSelectedCity(address.address?.city ?? address.address?.town ?? address.address?.suburb ?? address.address?.county ?? '');
+        setSelectedCity(
+          address.address?.city ??
+            address.address?.town ??
+            address.address?.suburb ??
+            address.address?.county ??
+            '',
+        );
         setSelectedState(address.address?.state ?? '');
       }
     },
@@ -211,12 +235,12 @@ export default function PickupScreen() {
           return;
         }
         const result = await createAddressesClient(freshToken).create({
-          label:        nudgeLabel,
+          label: nudgeLabel,
           address_text: selectedAddress,
-          city:         selectedCity,
-          state:        selectedState,
-          lat:          selectedCoords[1],
-          lng:          selectedCoords[0],
+          city: selectedCity,
+          state: selectedState,
+          lat: selectedCoords[1],
+          lng: selectedCoords[0],
         });
         if (!result.error) {
           setSavedLabel(nudgeLabel);
@@ -225,11 +249,9 @@ export default function PickupScreen() {
         } else {
           setSaveError("Couldn't save — try again");
           Sentry.captureException(
-            result.error instanceof Error
-              ? result.error
-              : new Error(JSON.stringify(result.error)),
+            result.error instanceof Error ? result.error : new Error(JSON.stringify(result.error)),
             {
-              tags:  { app: 'mobile-customer', screen: 'booking/pickup' },
+              tags: { app: 'mobile-customer', screen: 'booking/pickup' },
               extra: { op: 'create' },
             },
           );
@@ -237,7 +259,7 @@ export default function PickupScreen() {
       } catch (e) {
         setSaveError("Couldn't save — try again");
         Sentry.captureException(e, {
-          tags:  { app: 'mobile-customer', screen: 'booking/pickup' },
+          tags: { app: 'mobile-customer', screen: 'booking/pickup' },
           extra: { op: 'create' },
         });
       }
@@ -253,10 +275,10 @@ export default function PickupScreen() {
 
     setPickup({
       address: selectedAddress,
-      city:    selectedCity,
-      state:   selectedState,
-      lat:     selectedCoords[1],
-      lng:     selectedCoords[0],
+      city: selectedCity,
+      state: selectedState,
+      lat: selectedCoords[1],
+      lng: selectedCoords[0],
     });
     setStep(1);
 
@@ -268,14 +290,14 @@ export default function PickupScreen() {
     createAddressesClient(token)
       .upsertRecent({
         address_text: selectedAddress,
-        city:         selectedCity,
-        state:        selectedState,
-        lat:          selectedCoords[1],
-        lng:          selectedCoords[0],
+        city: selectedCity,
+        state: selectedState,
+        lat: selectedCoords[1],
+        lng: selectedCoords[0],
       })
       .catch((e) =>
         Sentry.captureException(e, {
-          tags:  { app: 'mobile-customer', screen: 'booking/pickup' },
+          tags: { app: 'mobile-customer', screen: 'booking/pickup' },
           extra: { op: 'upsertRecent' },
         }),
       );
@@ -302,20 +324,20 @@ export default function PickupScreen() {
         style={StyleSheet.absoluteFill}
         onPress={handleMapPress}
       >
-          <Mapbox.Camera
-            zoomLevel={14}
-            centerCoordinate={selectedCoords ?? location}
-            animationMode="flyTo"
-            animationDuration={1000}
-          />
-          {selectedCoords && (
-            <Mapbox.PointAnnotation id="pickup" coordinate={selectedCoords}>
-              <View className="w-10 h-10 bg-primary/20 rounded-full items-center justify-center">
-                <View className="w-4 h-4 bg-primary rounded-full border-2 border-white" />
-              </View>
-            </Mapbox.PointAnnotation>
-          )}
-        </Mapbox.MapView>
+        <Mapbox.Camera
+          zoomLevel={14}
+          centerCoordinate={selectedCoords ?? location}
+          animationMode="flyTo"
+          animationDuration={1000}
+        />
+        {selectedCoords && (
+          <Mapbox.PointAnnotation id="pickup" coordinate={selectedCoords}>
+            <View className="w-10 h-10 bg-primary/20 rounded-full items-center justify-center">
+              <View className="w-4 h-4 bg-primary rounded-full border-2 border-white" />
+            </View>
+          </Mapbox.PointAnnotation>
+        )}
+      </Mapbox.MapView>
 
       <View className="absolute top-12 left-4 right-4 z-10">
         {addrLoadState === 'loading' && !showSuggestions && (
@@ -325,10 +347,7 @@ export default function PickupScreen() {
             style={{ paddingHorizontal: 4, gap: 8 }}
           >
             {[0, 1, 2].map((i) => (
-              <View
-                key={i}
-                className="bg-gray-200 rounded-full h-8 w-20 animate-pulse"
-              />
+              <View key={i} className="bg-gray-200 rounded-full h-8 w-20 animate-pulse" />
             ))}
           </View>
         )}
@@ -402,47 +421,49 @@ export default function PickupScreen() {
             </View>
           )}
 
-          {showEmptySearch && addrLoadState === 'ready' && (recentLocations.length > 0 || savedAddresses.length > 0) && (
-            <ScrollView style={{ maxHeight: 260 }} keyboardShouldPersistTaps="always">
-              {recentLocations.length > 0 && (
-                <>
-                  <Text className="px-4 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase">
-                    Recent
-                  </Text>
-                  {recentLocations.map((r) => (
-                    <Pressable
-                      key={r.id}
-                      onPress={() => selectRecentLocation(r)}
-                      className="px-4 py-3 border-b border-gray-50"
-                    >
-                      <Text className="text-sm text-gray-900" numberOfLines={1}>
-                        {r.address_text}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </>
-              )}
-              {savedAddresses.length > 0 && (
-                <>
-                  <Text className="px-4 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase">
-                    Saved
-                  </Text>
-                  {savedAddresses.map((a) => (
-                    <Pressable
-                      key={a.id}
-                      onPress={() => selectSavedAddress(a)}
-                      className="px-4 py-3 border-b border-gray-50"
-                    >
-                      <Text className="text-sm font-medium text-gray-900">{a.label}</Text>
-                      <Text className="text-xs text-gray-500" numberOfLines={1}>
-                        {a.address_text}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </>
-              )}
-            </ScrollView>
-          )}
+          {showEmptySearch &&
+            addrLoadState === 'ready' &&
+            (recentLocations.length > 0 || savedAddresses.length > 0) && (
+              <ScrollView style={{ maxHeight: 260 }} keyboardShouldPersistTaps="always">
+                {recentLocations.length > 0 && (
+                  <>
+                    <Text className="px-4 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase">
+                      Recent
+                    </Text>
+                    {recentLocations.map((r) => (
+                      <Pressable
+                        key={r.id}
+                        onPress={() => selectRecentLocation(r)}
+                        className="px-4 py-3 border-b border-gray-50"
+                      >
+                        <Text className="text-sm text-gray-900" numberOfLines={1}>
+                          {r.address_text}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </>
+                )}
+                {savedAddresses.length > 0 && (
+                  <>
+                    <Text className="px-4 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase">
+                      Saved
+                    </Text>
+                    {savedAddresses.map((a) => (
+                      <Pressable
+                        key={a.id}
+                        onPress={() => selectSavedAddress(a)}
+                        className="px-4 py-3 border-b border-gray-50"
+                      >
+                        <Text className="text-sm font-medium text-gray-900">{a.label}</Text>
+                        <Text className="text-xs text-gray-500" numberOfLines={1}>
+                          {a.address_text}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </>
+                )}
+              </ScrollView>
+            )}
 
           {showAutoComplete && (
             <FlatList
@@ -511,11 +532,8 @@ export default function PickupScreen() {
             </View>
           </View>
         )}
-        <View className="px-4 pt-2 bg-white" style={{ paddingBottom: insets.bottom + 8 }}>
-          <Pressable
-            onPress={handleConfirm}
-            className="bg-primary py-4 rounded-xl items-center"
-          >
+        <View className="px-4 pt-2 bg-white" style={{ paddingBottom: bottomActionInset }}>
+          <Pressable onPress={handleConfirm} className="bg-primary py-4 rounded-xl items-center">
             <Text className="text-white text-lg font-semibold">Confirm Pickup</Text>
           </Pressable>
         </View>

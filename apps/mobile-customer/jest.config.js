@@ -58,6 +58,13 @@ module.exports = {
     // resolution onto a single instance so the mock applies uniformly and the
     // hook's Sentry reporting is observable in the booking-address tests.
     '^@sentry/react-native$': require.resolve('@sentry/react-native'),
+    // react-native-safe-area-context: same pnpm dual-resolution issue as Sentry.
+    // useBottomActionInset lives in packages/mobile-shared and would otherwise
+    // import a DIFFERENT physical copy than the app, bypassing the
+    // jest.mock('react-native-safe-area-context', ...) in jest.setup.js and
+    // throwing "No safe area value available". Collapse onto one instance so the
+    // mock applies uniformly.
+    '^react-native-safe-area-context$': require.resolve('react-native-safe-area-context'),
     // @surewaka/shared is pure TS (zod validators/types) — resolve to source.
     '^@surewaka/shared$': '<rootDir>/../../packages/shared/src/index.ts',
     // @surewaka/mobile-shared's barrel index pulls in heavy transitive modules

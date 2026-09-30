@@ -1,19 +1,27 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
 import * as Sentry from '@sentry/react-native';
-import { recipientDetailsSchema, type RecipientDetails, type SavedRecipient } from '@surewaka/shared';
-import { useBookingStore, useRecipientStore, createRecipientsClient } from '@surewaka/mobile-shared';
+import {
+  recipientDetailsSchema,
+  type RecipientDetails,
+  type SavedRecipient,
+} from '@surewaka/shared';
+import {
+  useBookingStore,
+  useRecipientStore,
+  createRecipientsClient,
+  useBottomActionInset,
+} from '@surewaka/mobile-shared';
 
 const RECIPIENT_CAP = 25;
 
 export default function RecipientScreen() {
-  const { bottom } = useSafeAreaInsets();
+  const bottomActionInset = useBottomActionInset();
   const router = useRouter();
   const { getToken } = useAuth();
   const recipientDetails = useBookingStore((s) => s.recipientDetails);
@@ -140,12 +148,13 @@ export default function RecipientScreen() {
 
   // Save-nudge visibility: valid form values AND under the cap.
   const values = watch();
-  const canSave = recipientDetailsSchema.safeParse(values).success && recipients.length < RECIPIENT_CAP;
+  const canSave =
+    recipientDetailsSchema.safeParse(values).success && recipients.length < RECIPIENT_CAP;
 
   return (
     <ScrollView
       className="flex-1 bg-white px-6 pt-6"
-      contentContainerStyle={{ paddingBottom: bottom + 24 }}
+      contentContainerStyle={{ paddingBottom: bottomActionInset }}
     >
       <Text className="text-2xl font-bold text-gray-900 mb-2">Recipient Details</Text>
       <Text className="text-base text-gray-500 mb-6">

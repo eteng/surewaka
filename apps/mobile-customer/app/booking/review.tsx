@@ -1,9 +1,13 @@
 import { useAuth } from '@clerk/expo';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, Modal } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
-import { useBookingStore, useQuoteExpiry, createAuthClient } from '@surewaka/mobile-shared';
+import {
+  useBookingStore,
+  useQuoteExpiry,
+  createAuthClient,
+  useBottomActionInset,
+} from '@surewaka/mobile-shared';
 import { PaymentShortfallSheet } from '@/components/payment-shortfall-sheet';
 import type { VehicleType } from '@surewaka/shared';
 
@@ -46,7 +50,7 @@ function formatKoboToNaira(kobo: number): string {
 }
 
 export default function ReviewScreen() {
-  const { bottom } = useSafeAreaInsets();
+  const bottomActionInset = useBottomActionInset();
   const router = useRouter();
   const navigation = useNavigation();
   const pickup = useBookingStore((s) => s.pickup);
@@ -94,7 +98,7 @@ export default function ReviewScreen() {
           .catch(() => {});
       });
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Intercept back navigation (gesture, hardware back, header back) so a delivery
@@ -141,7 +145,10 @@ export default function ReviewScreen() {
       }>(`/api/v1/deliveries/${currentDeliveryId}/requote`, {});
 
       if (error || !data) {
-        Alert.alert('Refresh Failed', error?.message ?? 'Could not refresh quote. Please try again.');
+        Alert.alert(
+          'Refresh Failed',
+          error?.message ?? 'Could not refresh quote. Please try again.',
+        );
         return;
       }
 
@@ -182,7 +189,7 @@ export default function ReviewScreen() {
   }
 
   const confirmBooking = async (deliveryId: string) => {
-    if (!await getToken()) return;
+    if (!(await getToken())) return;
     try {
       const res = await fetch(`${API_URL}/api/v1/booking/confirm`, {
         method: 'POST',
@@ -207,7 +214,7 @@ export default function ReviewScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!await getToken()) {
+    if (!(await getToken())) {
       Alert.alert('Error', 'You must be logged in to book a delivery');
       return;
     }
@@ -272,7 +279,10 @@ export default function ReviewScreen() {
       body.legs = legs;
     }
 
-    const { data, error } = await client.post<DeliveryResponse & { deliveryId?: string }>('/api/v1/deliveries', body);
+    const { data, error } = await client.post<DeliveryResponse & { deliveryId?: string }>(
+      '/api/v1/deliveries',
+      body,
+    );
 
     if (error || !data) {
       setSubmitting(false);
@@ -284,7 +294,10 @@ export default function ReviewScreen() {
     if (isSurewakaWay && data.deliveryId) {
       setDeliveryId(data.deliveryId);
       setSubmitting(false);
-      router.push({ pathname: '/booking/routing-pending', params: { deliveryId: data.deliveryId } });
+      router.push({
+        pathname: '/booking/routing-pending',
+        params: { deliveryId: data.deliveryId },
+      });
       return;
     }
 
@@ -350,10 +363,11 @@ export default function ReviewScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-white px-6 pt-6" contentContainerStyle={{ paddingBottom: bottom + 24 }}>
-      <Text className="text-2xl font-bold text-gray-900 mb-6">
-        Review Booking
-      </Text>
+    <ScrollView
+      className="flex-1 bg-white px-6 pt-6"
+      contentContainerStyle={{ paddingBottom: bottomActionInset }}
+    >
+      <Text className="text-2xl font-bold text-gray-900 mb-6">Review Booking</Text>
 
       {/* Quote expiry warning — shows when < 2 minutes remaining */}
       {isExpiringSoon && !isExpired && (
@@ -363,9 +377,7 @@ export default function ReviewScreen() {
           className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex-row items-center justify-between"
         >
           <View className="flex-1">
-            <Text className="text-sm font-semibold text-amber-800">
-              Quote expiring soon
-            </Text>
+            <Text className="text-sm font-semibold text-amber-800">Quote expiring soon</Text>
             <Text className="text-xs text-amber-600 mt-0.5">
               Expires in {countdownDisplay}. Tap to refresh.
             </Text>
@@ -385,9 +397,7 @@ export default function ReviewScreen() {
           className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 flex-row items-center justify-between"
         >
           <View className="flex-1">
-            <Text className="text-sm font-semibold text-red-800">
-              Quote expired
-            </Text>
+            <Text className="text-sm font-semibold text-red-800">Quote expired</Text>
             <Text className="text-xs text-red-600 mt-0.5">
               Tap to get updated pricing before confirming.
             </Text>
@@ -401,32 +411,20 @@ export default function ReviewScreen() {
       )}
 
       <View className="bg-gray-50 rounded-xl p-4 mb-4">
-        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">
-          Pickup
-        </Text>
-        <Text className="text-base text-gray-900">
-          {pickup?.address ?? '—'}
-        </Text>
+        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">Pickup</Text>
+        <Text className="text-base text-gray-900">{pickup?.address ?? '—'}</Text>
         <Text className="text-sm text-gray-500">{pickup?.city ?? '—'}</Text>
       </View>
 
       <View className="bg-gray-50 rounded-xl p-4 mb-4">
-        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">
-          Drop-off
-        </Text>
-        <Text className="text-base text-gray-900">
-          {dropoff?.address ?? '—'}
-        </Text>
+        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">Drop-off</Text>
+        <Text className="text-base text-gray-900">{dropoff?.address ?? '—'}</Text>
         <Text className="text-sm text-gray-500">{dropoff?.city ?? '—'}</Text>
       </View>
 
       <View className="bg-gray-50 rounded-xl p-4 mb-4">
-        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">
-          Package
-        </Text>
-        <Text className="text-base text-gray-900">
-          {packageDetails?.description ?? '—'}
-        </Text>
+        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">Package</Text>
+        <Text className="text-base text-gray-900">{packageDetails?.description ?? '—'}</Text>
         <Text className="text-sm text-gray-500">
           {packageDetails?.weight}kg · {packageDetails?.category}
         </Text>
@@ -437,14 +435,14 @@ export default function ReviewScreen() {
         <Text className="text-base text-gray-900">{recipientDetails?.recipientName ?? '—'}</Text>
         <Text className="text-sm text-gray-500">{recipientDetails?.recipientPhone ?? '—'}</Text>
         {recipientDetails?.deliveryNotes && (
-          <Text className="text-sm text-gray-400 mt-1 italic">"{recipientDetails.deliveryNotes}"</Text>
+          <Text className="text-sm text-gray-400 mt-1 italic">
+            "{recipientDetails.deliveryNotes}"
+          </Text>
         )}
       </View>
 
       <View className="bg-gray-50 rounded-xl p-4 mb-4">
-        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">
-          Service
-        </Text>
+        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">Service</Text>
         <Text className="text-base text-gray-900">
           {selectedCarrier === 'instant' ? 'Instant Match' : 'Carrier Delivery'}
         </Text>
@@ -460,9 +458,7 @@ export default function ReviewScreen() {
           {compositeQuote.legs.map((leg, index) => (
             <View key={`${leg.legType}-${index}`} className={index > 0 ? 'mt-4' : ''}>
               {/* Leg label as section header */}
-              <Text className="text-sm font-semibold text-gray-800 mb-2">
-                {leg.legLabel}
-              </Text>
+              <Text className="text-sm font-semibold text-gray-800 mb-2">{leg.legLabel}</Text>
 
               {/* Line items under each leg */}
               {leg.lineItems.map((item, itemIndex) => (
@@ -470,9 +466,7 @@ export default function ReviewScreen() {
                   key={`${leg.legType}-item-${itemIndex}`}
                   className="flex-row justify-between items-center py-1 px-1"
                 >
-                  <Text className="text-sm text-gray-600 flex-1">
-                    {item.label}
-                  </Text>
+                  <Text className="text-sm text-gray-600 flex-1">{item.label}</Text>
                   <Text className="text-sm text-gray-900 font-medium">
                     {formatKoboToNaira(item.amountKobo)}
                   </Text>
@@ -481,9 +475,7 @@ export default function ReviewScreen() {
 
               {/* Leg subtotal */}
               <View className="flex-row justify-between items-center pt-2 mt-1 border-t border-gray-200 px-1">
-                <Text className="text-sm font-medium text-gray-700">
-                  Subtotal
-                </Text>
+                <Text className="text-sm font-medium text-gray-700">Subtotal</Text>
                 <Text className="text-sm font-semibold text-gray-900">
                   {formatKoboToNaira(leg.totalKobo)}
                 </Text>
@@ -493,9 +485,7 @@ export default function ReviewScreen() {
 
           {/* Composite total */}
           <View className="flex-row justify-between items-center pt-3 mt-4 border-t border-gray-300 px-1">
-            <Text className="text-base font-bold text-gray-900">
-              Total
-            </Text>
+            <Text className="text-base font-bold text-gray-900">Total</Text>
             <Text className="text-base font-bold text-primary">
               {formatKoboToNaira(compositeQuote.compositeTotalKobo)}
             </Text>
@@ -517,22 +507,19 @@ export default function ReviewScreen() {
         )}
       </Pressable>
 
-      <Modal visible={showShortfall} transparent animationType="slide">
-        <View className="flex-1 justify-end bg-black/40">
-          {shortfallData && (
-            <PaymentShortfallSheet
-              shortfall={shortfallData.shortfall}
-              deliveryId={shortfallData.deliveryId}
-              totalAmount={shortfallData.totalAmount}
-              onSuccess={() => {
-                setShowShortfall(false);
-                void confirmBooking(shortfallData.deliveryId);
-              }}
-              onDismiss={() => setShowShortfall(false)}
-            />
-          )}
-        </View>
-      </Modal>
+      {shortfallData && (
+        <PaymentShortfallSheet
+          visible={showShortfall}
+          shortfall={shortfallData.shortfall}
+          deliveryId={shortfallData.deliveryId}
+          totalAmount={shortfallData.totalAmount}
+          onSuccess={() => {
+            setShowShortfall(false);
+            void confirmBooking(shortfallData.deliveryId);
+          }}
+          onDismiss={() => setShowShortfall(false)}
+        />
+      )}
     </ScrollView>
   );
 }

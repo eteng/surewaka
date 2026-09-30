@@ -14,6 +14,7 @@ export { tokenCache } from './clerk';
 export { useAuth } from './hooks/use-auth';
 export { useLocation } from './hooks/use-location';
 export { useQuoteExpiry } from './hooks/use-quote-expiry';
+export { useBottomActionInset } from './hooks/use-bottom-action-inset';
 export { useSavedAddresses } from './hooks/use-saved-addresses';
 export type { AddrLoadState } from './hooks/use-saved-addresses';
 export { apiClient, createAuthClient } from './api/client';
@@ -32,7 +33,11 @@ export type { WalletTransaction, WalletState } from './store/wallet-store';
 export { NotificationBanner } from './components/notification-banner';
 export { navigateToDeepLink } from './utils/deep-link-router';
 export type { PushNotificationData } from './utils/deep-link-router';
-export { storeDeferredDeepLink, consumeDeferredDeepLink, clearDeferredDeepLink } from './utils/deferred-deep-link';
+export {
+  storeDeferredDeepLink,
+  consumeDeferredDeepLink,
+  clearDeferredDeepLink,
+} from './utils/deferred-deep-link';
 export { usePushNotifications, deactivatePushToken } from './hooks/use-push-notifications';
 export { useNetInfoListener } from './hooks/use-net-info-listener';
 export { useRealtimeChannel } from './hooks/use-realtime-channel';

@@ -1,11 +1,10 @@
 import { View, Text, TextInput, Pressable, ScrollView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useBookingStore } from '@surewaka/mobile-shared';
+import { useBookingStore, useBottomActionInset } from '@surewaka/mobile-shared';
 import { PACKAGE_CATEGORIES, VEHICLE_TYPES } from '@surewaka/shared';
 import type { VehicleType } from '@surewaka/shared';
 
@@ -25,7 +24,7 @@ const packageSchema = z.object({
 type FormData = z.infer<typeof packageSchema>;
 
 export default function PackageScreen() {
-  const { bottom } = useSafeAreaInsets();
+  const bottomActionInset = useBottomActionInset();
   const router = useRouter();
   const packageDetails = useBookingStore((s) => s.packageDetails);
   const setPackageDetails = useBookingStore((s) => s.setPackageDetails);
@@ -33,7 +32,11 @@ export default function PackageScreen() {
   const setVehicleType = useBookingStore((s) => s.setVehicleType);
   const setStep = useBookingStore((s) => s.setStep);
 
-  const { control, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<FormData>({
     resolver: zodResolver(packageSchema),
     defaultValues: {
       description: packageDetails?.description ?? '',
@@ -53,13 +56,12 @@ export default function PackageScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-white px-6 pt-6" contentContainerStyle={{ paddingBottom: bottom + 24 }}>
-      <Text className="text-2xl font-bold text-gray-900 mb-2">
-        Package Details
-      </Text>
-      <Text className="text-base text-gray-500 mb-8">
-        Tell us about your package
-      </Text>
+    <ScrollView
+      className="flex-1 bg-white px-6 pt-6"
+      contentContainerStyle={{ paddingBottom: bottomActionInset }}
+    >
+      <Text className="text-2xl font-bold text-gray-900 mb-2">Package Details</Text>
+      <Text className="text-base text-gray-500 mb-8">Tell us about your package</Text>
 
       <Controller
         control={control}
@@ -92,7 +94,7 @@ export default function PackageScreen() {
               value={value}
               onChangeText={onChange}
               keyboardType="numeric"
-              placeholder="5"
+              placeholder="e.g. 5"
               className="border border-gray-300 rounded-xl px-4 py-3 text-base"
               placeholderClassName="text-gray-400"
             />
@@ -115,16 +117,10 @@ export default function PackageScreen() {
                 <Pressable
                   onPress={() => onChange(cat)}
                   className={`px-4 py-2 rounded-full border ${
-                    value === cat
-                      ? 'bg-primary border-primary'
-                      : 'border-gray-300 bg-white'
+                    value === cat ? 'bg-primary border-primary' : 'border-gray-300 bg-white'
                   }`}
                 >
-                  <Text
-                    className={`text-sm ${
-                      value === cat ? 'text-white' : 'text-gray-700'
-                    }`}
-                  >
+                  <Text className={`text-sm ${value === cat ? 'text-white' : 'text-gray-700'}`}>
                     {cat.charAt(0).toUpperCase() + cat.slice(1)}
                   </Text>
                 </Pressable>
@@ -148,9 +144,7 @@ export default function PackageScreen() {
                 key={vt}
                 onPress={() => setVehicleType(vt)}
                 className={`flex-row items-center justify-between px-4 py-3 rounded-xl border ${
-                  isSelected
-                    ? 'border-primary bg-primary/5'
-                    : 'border-gray-200 bg-white'
+                  isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 bg-white'
                 }`}
               >
                 <View>

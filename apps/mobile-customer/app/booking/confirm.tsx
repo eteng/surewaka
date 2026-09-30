@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { useBookingStore, createAuthClient } from '@surewaka/mobile-shared';
+import { useBookingStore, createAuthClient, useBottomActionInset } from '@surewaka/mobile-shared';
+import { PaymentShortfallSheet } from '@/components/payment-shortfall-sheet';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -31,7 +31,7 @@ const LEG_LABELS: Record<string, string> = {
 };
 
 export default function ConfirmRoutedScreen() {
-  const { bottom } = useSafeAreaInsets();
+  const bottomActionInset = useBottomActionInset();
   const router = useRouter();
   const navigation = useNavigation();
   const { getToken } = useAuth();
@@ -41,16 +41,17 @@ export default function ConfirmRoutedScreen() {
   const packageDetails = useBookingStore((s) => s.packageDetails);
   const recipientDetails = useBookingStore((s) => s.recipientDetails);
 
-  const { deliveryId, compositeTotalKobo, expiresAt, estimatedDeliveryAt } =
-    useLocalSearchParams<{
-      deliveryId: string;
-      compositeTotalKobo: string;
-      expiresAt: string;
-      estimatedDeliveryAt: string;
-    }>();
+  const { deliveryId, compositeTotalKobo, expiresAt, estimatedDeliveryAt } = useLocalSearchParams<{
+    deliveryId: string;
+    compositeTotalKobo: string;
+    expiresAt: string;
+    estimatedDeliveryAt: string;
+  }>();
 
   const totalKobo = parseInt(compositeTotalKobo ?? '0', 10);
   const [confirming, setConfirming] = useState(false);
+  const [showShortfall, setShowShortfall] = useState(false);
+  const [shortfall, setShortfall] = useState(0);
 
   // Tracks whether the booking completed successfully so back-navigation guard below
   // doesn't prompt to discard a delivery that's already been confirmed.
@@ -113,16 +114,27 @@ export default function ConfirmRoutedScreen() {
       }
 
       if (!checkJson.data.sufficient) {
-        Alert.alert(
-          'Insufficient Balance',
-          `You need ₦${((checkJson.data.shortfall ?? totalKobo) / 100).toFixed(2)} more. Please top up your wallet.`,
-          [{ text: 'OK' }],
-        );
+        // Show the inline Top Up sheet (same path as the on-demand flow) instead of a
+        // dead-end "OK" alert that leaves the user to find the wallet themselves.
+        setShortfall(checkJson.data.shortfall ?? totalKobo);
+        setShowShortfall(true);
         setConfirming(false);
         return;
       }
 
-      // Confirm booking
+      await runConfirmBooking(token);
+    } catch {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+      setConfirming(false);
+    }
+  };
+
+  /**
+   * Confirms the (already-funded) booking with the server and routes onward.
+   * Extracted so the insufficient-balance sheet can call it after a successful top-up.
+   */
+  const runConfirmBooking = async (token: string) => {
+    try {
       const confirmRes = await fetch(`${API_URL}/api/v1/booking/confirm`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -158,105 +170,109 @@ export default function ConfirmRoutedScreen() {
   };
 
   return (
-    <ScrollView
-      className="flex-1 bg-white px-6 pt-6"
-      contentContainerStyle={{ paddingBottom: bottom + 24 }}
-    >
-      <Text className="text-2xl font-bold text-gray-900 mb-2">Your route is ready</Text>
-      <Text className="text-base text-gray-500 mb-6">
-        SureWaka found the best intercity path for your delivery.
-      </Text>
+    <>
+      <ScrollView
+        className="flex-1 bg-white px-6 pt-6"
+        contentContainerStyle={{ paddingBottom: bottomActionInset }}
+      >
+        <Text className="text-2xl font-bold text-gray-900 mb-2">Your route is ready</Text>
+        <Text className="text-base text-gray-500 mb-6">
+          SureWaka found the best intercity path for your delivery.
+        </Text>
 
-      <View className="bg-gray-50 rounded-xl p-4 mb-4">
-        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">
-          Pickup
-        </Text>
-        <Text className="text-base text-gray-900">
-          {pickup?.address ?? '—'}
-        </Text>
-        <Text className="text-sm text-gray-500">{pickup?.city ?? '—'}</Text>
-      </View>
+        <View className="bg-gray-50 rounded-xl p-4 mb-4">
+          <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">Pickup</Text>
+          <Text className="text-base text-gray-900">{pickup?.address ?? '—'}</Text>
+          <Text className="text-sm text-gray-500">{pickup?.city ?? '—'}</Text>
+        </View>
 
-      <View className="bg-gray-50 rounded-xl p-4 mb-4">
-        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">
-          Drop-off
-        </Text>
-        <Text className="text-base text-gray-900">
-          {dropoff?.address ?? '—'}
-        </Text>
-        <Text className="text-sm text-gray-500">{dropoff?.city ?? '—'}</Text>
-      </View>
+        <View className="bg-gray-50 rounded-xl p-4 mb-4">
+          <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">Drop-off</Text>
+          <Text className="text-base text-gray-900">{dropoff?.address ?? '—'}</Text>
+          <Text className="text-sm text-gray-500">{dropoff?.city ?? '—'}</Text>
+        </View>
 
-      <View className="bg-gray-50 rounded-xl p-4 mb-4">
-        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">
-          Package
-        </Text>
-        <Text className="text-base text-gray-900">
-          {packageDetails?.description ?? '—'}
-        </Text>
-        <Text className="text-sm text-gray-500">
-          {packageDetails?.weight}kg · {packageDetails?.category}
-        </Text>
-      </View>
-
-      <View className="bg-gray-50 rounded-xl p-4 mb-4">
-        <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">Recipient</Text>
-        <Text className="text-base text-gray-900">{recipientDetails?.recipientName ?? '—'}</Text>
-        <Text className="text-sm text-gray-500">{recipientDetails?.recipientPhone ?? '—'}</Text>
-        {recipientDetails?.deliveryNotes && (
-          <Text className="text-sm text-gray-400 mt-1 italic">"{recipientDetails.deliveryNotes}"</Text>
-        )}
-      </View>
-
-      {estimatedDeliveryAt ? (
-        <View className="bg-emerald-50 rounded-xl p-4 mb-4 border border-emerald-200">
-          <Text className="text-sm font-semibold text-emerald-700 uppercase mb-1">
-            Estimated delivery
-          </Text>
-          <Text className="text-base font-bold text-emerald-900">
-            {formatEta(estimatedDeliveryAt)}
+        <View className="bg-gray-50 rounded-xl p-4 mb-4">
+          <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">Package</Text>
+          <Text className="text-base text-gray-900">{packageDetails?.description ?? '—'}</Text>
+          <Text className="text-sm text-gray-500">
+            {packageDetails?.weight}kg · {packageDetails?.category}
           </Text>
         </View>
-      ) : null}
 
-      {expiresAt ? (
-        <View className="bg-amber-50 rounded-xl p-4 mb-4 border border-amber-200">
-          <Text className="text-sm font-semibold text-amber-700 uppercase mb-1">
-            Free cancellation until
-          </Text>
-          <Text className="text-base font-bold text-amber-900">
-            {formatEta(expiresAt)}
-          </Text>
-          <Text className="text-xs text-amber-600 mt-1">
-            Cancel for free before this time. After this, a cancellation fee applies.
-          </Text>
+        <View className="bg-gray-50 rounded-xl p-4 mb-4">
+          <Text className="text-sm font-semibold text-gray-500 uppercase mb-2">Recipient</Text>
+          <Text className="text-base text-gray-900">{recipientDetails?.recipientName ?? '—'}</Text>
+          <Text className="text-sm text-gray-500">{recipientDetails?.recipientPhone ?? '—'}</Text>
+          {recipientDetails?.deliveryNotes && (
+            <Text className="text-sm text-gray-400 mt-1 italic">
+              "{recipientDetails.deliveryNotes}"
+            </Text>
+          )}
         </View>
-      ) : null}
 
-      <View className="bg-gray-50 rounded-xl p-4 mb-6">
-        <Text className="text-sm font-semibold text-gray-500 uppercase mb-3">Total</Text>
-        <Text className="text-3xl font-bold text-gray-900">{formatKobo(totalKobo)}</Text>
-      </View>
+        {estimatedDeliveryAt ? (
+          <View className="bg-emerald-50 rounded-xl p-4 mb-4 border border-emerald-200">
+            <Text className="text-sm font-semibold text-emerald-700 uppercase mb-1">
+              Estimated delivery
+            </Text>
+            <Text className="text-base font-bold text-emerald-900">
+              {formatEta(estimatedDeliveryAt)}
+            </Text>
+          </View>
+        ) : null}
 
-      <Pressable
-        onPress={handleConfirm}
-        disabled={confirming}
-        className={`py-4 rounded-xl items-center ${confirming ? 'bg-primary/50' : 'bg-primary'}`}
-      >
-        {confirming ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text className="text-white text-lg font-semibold">Confirm & Pay</Text>
-        )}
-      </Pressable>
+        {expiresAt ? (
+          <View className="bg-amber-50 rounded-xl p-4 mb-4 border border-amber-200">
+            <Text className="text-sm font-semibold text-amber-700 uppercase mb-1">
+              Free cancellation until
+            </Text>
+            <Text className="text-base font-bold text-amber-900">{formatEta(expiresAt)}</Text>
+            <Text className="text-xs text-amber-600 mt-1">
+              Cancel for free before this time. After this, a cancellation fee applies.
+            </Text>
+          </View>
+        ) : null}
 
-      <Pressable
-        onPress={() => router.back()}
-        disabled={confirming}
-        className="py-3 items-center mt-2"
-      >
-        <Text className="text-gray-500 text-base">Cancel</Text>
-      </Pressable>
-    </ScrollView>
+        <View className="bg-gray-50 rounded-xl p-4 mb-6">
+          <Text className="text-sm font-semibold text-gray-500 uppercase mb-3">Total</Text>
+          <Text className="text-3xl font-bold text-gray-900">{formatKobo(totalKobo)}</Text>
+        </View>
+
+        <Pressable
+          onPress={handleConfirm}
+          disabled={confirming}
+          className={`py-4 rounded-xl items-center ${confirming ? 'bg-primary/50' : 'bg-primary'}`}
+        >
+          {confirming ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text className="text-white text-lg font-semibold">Confirm & Pay</Text>
+          )}
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.back()}
+          disabled={confirming}
+          className="py-3 items-center mt-2"
+        >
+          <Text className="text-gray-500 text-base">Cancel</Text>
+        </Pressable>
+      </ScrollView>
+
+      <PaymentShortfallSheet
+        visible={showShortfall}
+        shortfall={shortfall}
+        deliveryId={deliveryId ?? ''}
+        totalAmount={totalKobo}
+        onSuccess={async () => {
+          setShowShortfall(false);
+          setConfirming(true);
+          const token = await getToken();
+          if (token) await runConfirmBooking(token);
+        }}
+        onDismiss={() => setShowShortfall(false)}
+      />
+    </>
   );
 }
